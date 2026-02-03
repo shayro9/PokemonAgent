@@ -2,17 +2,17 @@ import asyncio
 
 from poke_env import AccountConfiguration, LocalhostServerConfiguration
 from poke_env.player import RandomPlayer
-from ObservingAgent import ObservingAgent
+from BasicAgents import DebugRLPlayer
 
 
 async def main():
-    player1 = ObservingAgent(
-        account_configuration=AccountConfiguration("bot_username", None),
+    player1 = DebugRLPlayer(
+        account_configuration=AccountConfiguration("bot_1", None),
         server_configuration=LocalhostServerConfiguration,
     )
 
     player2 = RandomPlayer(
-        account_configuration=AccountConfiguration("bot2_username", None),
+        account_configuration=AccountConfiguration("bot_2", None),
         server_configuration=LocalhostServerConfiguration,
     )
 
