@@ -4,13 +4,13 @@ import gymnasium as gym
 
 
 class PokemonRLWrapper(SinglesEnv):
-    def __init__(self, *, team, opponent_team, **kwargs):
+    def __init__(self, *, team, opponent_teams: list[str] | None, rounds_per_opponents: int = 2_000, **kwargs):
         super().__init__(
             team=team,
             **kwargs
         )
-
-        self.agent2.update_team(opponent_team)
+        self.opponent_teams = opponent_teams
+        self.agent2.update_team(opponent_teams[0])
 
         self._action_space = gym.spaces.Discrete(4)
         self.action_spaces = {
@@ -25,6 +25,8 @@ class PokemonRLWrapper(SinglesEnv):
 
         self.last_hp = {}
         self.last_fainted = {}
+        self.rounds_played = 0
+        self.rounds_per_opponents = rounds_per_opponents
 
     def action_to_order(self, action, battle, fake=False, strict=True):
         real_action = action + 6 if action < 4 else action
@@ -33,6 +35,9 @@ class PokemonRLWrapper(SinglesEnv):
     def reset(self, *args, **kwargs):
         self.last_hp = {}
         self.last_fainted = {}
+        if self.rounds_played % self.rounds_per_opponents == 0:
+            i = (self.rounds_played // self.rounds_per_opponents) % len(self.opponent_teams)
+            self.agent2.update_team(self.opponent_teams[i])
         return super().reset(*args, **kwargs)
 
     def embed_battle(self, battle):
@@ -50,6 +55,7 @@ class PokemonRLWrapper(SinglesEnv):
         opp_boosts = np.array(list(opp.boosts.values())) / 6.0
 
         bucket = my.weight // opp.weight
+        bucket = max(0, min(bucket, 5))
         weight_one_hot = np.zeros(6, dtype=np.float32)
         weight_one_hot[bucket] = 1.0
 
@@ -78,6 +84,7 @@ class PokemonRLWrapper(SinglesEnv):
         self.last_hp[battle] = (my_hp, opp_hp)
 
         if battle.finished:
+            self.rounds_played += 1
             if battle.won:
                 reward += 5.0
             elif battle.lost:

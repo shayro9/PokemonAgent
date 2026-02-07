@@ -1,25 +1,23 @@
-import asyncio
 from stable_baselines3 import DQN
 from env_wrapper import PokemonRLWrapper
-from poke_env import RandomPlayer, AccountConfiguration, LocalhostServerConfiguration
+from poke_env import RandomPlayer, LocalhostServerConfiguration
 from poke_env.environment import SingleAgentWrapper
 from teams.single_teams import *
 
 
 def main():
     team1 = STEELIX_TEAM
-    team2 = CONKELDURR_TEAM
+    team_pool = [team for _, team in ALL_SOLO_TEAMS]
 
     opponent = RandomPlayer(
         battle_format="gen9nationaldex",
-        team=team2,
         server_configuration=LocalhostServerConfiguration,
     )
 
     agent = PokemonRLWrapper(
         battle_format="gen9nationaldex",
         team=team1,
-        opponent_team=team2,
+        opponent_teams=team_pool,
         server_configuration=LocalhostServerConfiguration,
         strict=False,
     )
