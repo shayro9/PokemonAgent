@@ -1,3 +1,7 @@
+import random
+from collections.abc import Iterator, Sequence
+
+
 STEELIX_TEAM = """
 Steelix @ Leftovers  
 Ability: Sturdy  
@@ -120,3 +124,14 @@ ALL_SOLO_TEAMS = [
     ("breloom", BRELOOM_TEAM),
     ("volcarona", VOLCARONA_TEAM),
 ]
+
+
+def shuffled_team_generator(teams: Sequence[str]) -> Iterator[str]:
+    if not teams:
+        raise ValueError("teams must contain at least one team")
+
+    pool = list(teams)
+    while True:
+        random.shuffle(pool)
+        for team in pool:
+            yield team
