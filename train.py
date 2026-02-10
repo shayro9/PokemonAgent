@@ -6,7 +6,7 @@ from poke_env import LocalhostServerConfiguration, RandomPlayer
 from poke_env.environment import SingleAgentWrapper
 
 from env_wrapper import PokemonRLWrapper
-from teams.single_teams import ALL_SOLO_TEAMS, STEELIX_TEAM, shuffled_team_generator
+from teams.single_teams import ALL_SOLO_TEAMS, STEELIX_TEAM
 
 
 TEAM_BY_NAME = {name: team for name, team in ALL_SOLO_TEAMS}
@@ -46,7 +46,6 @@ def _parse_pool(raw_pool: str | None) -> list[str]:
 
 def _build_train_env(agent_team: str, opponent_names: list[str], rounds_per_opponent: int) -> SingleAgentWrapper:
     opponent_pool = [TEAM_BY_NAME[name] for name in opponent_names]
-    opponent_team_gen = shuffled_team_generator(opponent_pool)
 
     opponent_policy = RandomPlayer(
         battle_format="gen9nationaldex",
@@ -57,7 +56,6 @@ def _build_train_env(agent_team: str, opponent_names: list[str], rounds_per_oppo
         battle_format="gen9nationaldex",
         team=agent_team,
         opponent_teams=opponent_pool,
-        opponent_team_generator=opponent_team_gen,
         rounds_per_opponents=rounds_per_opponent,
         server_configuration=LocalhostServerConfiguration,
         strict=False,
