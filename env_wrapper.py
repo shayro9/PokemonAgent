@@ -4,13 +4,26 @@ import gymnasium as gym
 
 
 class PokemonRLWrapper(SinglesEnv):
-    def __init__(self, *, team, opponent_teams: list[str] | None, rounds_per_opponents: int = 2_000, **kwargs):
+    def __init__(
+        self,
+        *,
+        team,
+        opponent_teams: list[str] | None,
+        rounds_per_opponents: int = 2_000,
+        opponent_team_generator=None,
+        **kwargs,
+    ):
         super().__init__(
             team=team,
             **kwargs
         )
-        self.opponent_teams = opponent_teams
-        self.agent2.update_team(opponent_teams[0])
+        self.opponent_teams = opponent_teams or []
+        self.opponent_team_generator = opponent_team_generator
+
+        if self.opponent_team_generator is not None:
+            self.agent2.update_team(next(self.opponent_team_generator))
+        elif self.opponent_teams:
+            self.agent2.update_team(self.opponent_teams[0])
 
         self._action_space = gym.spaces.Discrete(4)
         self.action_spaces = {
@@ -36,8 +49,11 @@ class PokemonRLWrapper(SinglesEnv):
         self.last_hp = {}
         self.last_fainted = {}
         if self.rounds_played % self.rounds_per_opponents == 0:
-            i = (self.rounds_played // self.rounds_per_opponents) % len(self.opponent_teams)
-            self.agent2.update_team(self.opponent_teams[i])
+            if self.opponent_team_generator is not None:
+                self.agent2.update_team(next(self.opponent_team_generator))
+            elif self.opponent_teams:
+                i = (self.rounds_played // self.rounds_per_opponents) % len(self.opponent_teams)
+                self.agent2.update_team(self.opponent_teams[i])
         return super().reset(*args, **kwargs)
 
     def embed_battle(self, battle):
