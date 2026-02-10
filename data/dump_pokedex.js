@@ -16,6 +16,7 @@ for (const key in pokedex) {
     if (learnsets[key] && learnsets[key].learnset) {
       moves = Object.keys(learnsets[key].learnset);
     }
+    if (moves.length < 4) continue;
 
     result[key] = {
       abilities: abilities,

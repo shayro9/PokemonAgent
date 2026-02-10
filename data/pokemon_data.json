@@ -288,19 +288,6 @@
       "worryseed"
     ]
   },
-  "venusaurmega": {
-    "abilities": {
-      "0": "Thick Fat"
-    },
-    "moves": []
-  },
-  "venusaurgmax": {
-    "abilities": {
-      "0": "Overgrow",
-      "H": "Chlorophyll"
-    },
-    "moves": []
-  },
   "charmander": {
     "abilities": {
       "0": "Blaze",
@@ -663,25 +650,6 @@
       "workup"
     ]
   },
-  "charizardmegax": {
-    "abilities": {
-      "0": "Tough Claws"
-    },
-    "moves": []
-  },
-  "charizardmegay": {
-    "abilities": {
-      "0": "Drought"
-    },
-    "moves": []
-  },
-  "charizardgmax": {
-    "abilities": {
-      "0": "Blaze",
-      "H": "Solar Power"
-    },
-    "moves": []
-  },
   "squirtle": {
     "abilities": {
       "0": "Torrent",
@@ -1020,19 +988,6 @@
       "zenheadbutt"
     ]
   },
-  "blastoisemega": {
-    "abilities": {
-      "0": "Mega Launcher"
-    },
-    "moves": []
-  },
-  "blastoisegmax": {
-    "abilities": {
-      "0": "Torrent",
-      "H": "Rain Dish"
-    },
-    "moves": []
-  },
   "caterpie": {
     "abilities": {
       "0": "Shield Dust",
@@ -1153,13 +1108,6 @@
       "whirlwind"
     ]
   },
-  "butterfreegmax": {
-    "abilities": {
-      "0": "Compound Eyes",
-      "H": "Tinted Lens"
-    },
-    "moves": []
-  },
   "weedle": {
     "abilities": {
       "0": "Shield Dust",
@@ -1272,12 +1220,6 @@
       "venoshock",
       "xscissor"
     ]
-  },
-  "beedrillmega": {
-    "abilities": {
-      "0": "Adaptability"
-    },
-    "moves": []
   },
   "pidgey": {
     "abilities": {
@@ -1493,12 +1435,6 @@
       "wingattack",
       "workup"
     ]
-  },
-  "pidgeotmega": {
-    "abilities": {
-      "0": "No Guard"
-    },
-    "moves": []
   },
   "rattata": {
     "abilities": {
@@ -2455,46 +2391,6 @@
       "wildcharge"
     ]
   },
-  "pikachurockstar": {
-    "abilities": {
-      "0": "Lightning Rod"
-    },
-    "moves": [
-      "meteormash"
-    ]
-  },
-  "pikachubelle": {
-    "abilities": {
-      "0": "Lightning Rod"
-    },
-    "moves": [
-      "iciclecrash"
-    ]
-  },
-  "pikachupopstar": {
-    "abilities": {
-      "0": "Lightning Rod"
-    },
-    "moves": [
-      "drainingkiss"
-    ]
-  },
-  "pikachuphd": {
-    "abilities": {
-      "0": "Lightning Rod"
-    },
-    "moves": [
-      "electricterrain"
-    ]
-  },
-  "pikachulibre": {
-    "abilities": {
-      "0": "Lightning Rod"
-    },
-    "moves": [
-      "flyingpress"
-    ]
-  },
   "pikachuoriginal": {
     "abilities": {
       "0": "Static",
@@ -3223,13 +3119,6 @@
       "zippyzap"
     ]
   },
-  "pikachugmax": {
-    "abilities": {
-      "0": "Static",
-      "H": "Lightning Rod"
-    },
-    "moves": []
-  },
   "pikachuworld": {
     "abilities": {
       "0": "Static",
@@ -3533,18 +3422,6 @@
       "voltswitch",
       "wildcharge"
     ]
-  },
-  "raichumegax": {
-    "abilities": {
-      "0": "Surge Surfer"
-    },
-    "moves": []
-  },
-  "raichumegay": {
-    "abilities": {
-      "0": "Surge Surfer"
-    },
-    "moves": []
   },
   "sandshrew": {
     "abilities": {
@@ -4923,14 +4800,6 @@
       "zapcannon",
       "zenheadbutt"
     ]
-  },
-  "clefablemega": {
-    "abilities": {
-      "0": "Cute Charm",
-      "1": "Magic Guard",
-      "H": "Unaware"
-    },
-    "moves": []
   },
   "vulpix": {
     "abilities": {
@@ -7108,14 +6977,6 @@
       "xscissor"
     ]
   },
-  "meowthgmax": {
-    "abilities": {
-      "0": "Pickup",
-      "1": "Technician",
-      "H": "Unnerve"
-    },
-    "moves": []
-  },
   "persian": {
     "abilities": {
       "0": "Limber",
@@ -8820,12 +8681,6 @@
       "zenheadbutt"
     ]
   },
-  "alakazammega": {
-    "abilities": {
-      "0": "Trace"
-    },
-    "moves": []
-  },
   "machop": {
     "abilities": {
       "0": "Guts",
@@ -9140,14 +8995,6 @@
       "workup"
     ]
   },
-  "machampgmax": {
-    "abilities": {
-      "0": "Guts",
-      "1": "No Guard",
-      "H": "Steadfast"
-    },
-    "moves": []
-  },
   "bellsprout": {
     "abilities": {
       "0": "Chlorophyll",
@@ -9416,13 +9263,6 @@
       "worryseed",
       "wrap"
     ]
-  },
-  "victreebelmega": {
-    "abilities": {
-      "0": "Chlorophyll",
-      "H": "Gluttony"
-    },
-    "moves": []
   },
   "tentacool": {
     "abilities": {
@@ -10828,12 +10668,6 @@
       "zapcannon",
       "zenheadbutt"
     ]
-  },
-  "slowbromega": {
-    "abilities": {
-      "0": "Shell Armor"
-    },
-    "moves": []
   },
   "slowbrogalar": {
     "abilities": {
@@ -12599,18 +12433,6 @@
       "zapcannon"
     ]
   },
-  "gengarmega": {
-    "abilities": {
-      "0": "Shadow Tag"
-    },
-    "moves": []
-  },
-  "gengargmax": {
-    "abilities": {
-      "0": "Cursed Body"
-    },
-    "moves": []
-  },
   "onix": {
     "abilities": {
       "0": "Rock Head",
@@ -13144,14 +12966,6 @@
       "wideguard",
       "xscissor"
     ]
-  },
-  "kinglergmax": {
-    "abilities": {
-      "0": "Hyper Cutter",
-      "1": "Shell Armor",
-      "H": "Sheer Force"
-    },
-    "moves": []
   },
   "voltorb": {
     "abilities": {
@@ -15382,12 +15196,6 @@
       "zapcannon"
     ]
   },
-  "kangaskhanmega": {
-    "abilities": {
-      "0": "Parental Bond"
-    },
-    "moves": []
-  },
   "horsea": {
     "abilities": {
       "0": "Swift Swim",
@@ -15901,14 +15709,6 @@
       "wonderroom",
       "zapcannon"
     ]
-  },
-  "starmiemega": {
-    "abilities": {
-      "0": "Illuminate",
-      "1": "Natural Cure",
-      "H": "Analytic"
-    },
-    "moves": []
   },
   "mrmime": {
     "abilities": {
@@ -16675,12 +16475,6 @@
       "xscissor"
     ]
   },
-  "pinsirmega": {
-    "abilities": {
-      "0": "Aerilate"
-    },
-    "moves": []
-  },
   "tauros": {
     "abilities": {
       "0": "Intimidate",
@@ -17096,12 +16890,6 @@
       "zapcannon"
     ]
   },
-  "gyaradosmega": {
-    "abilities": {
-      "0": "Mold Breaker"
-    },
-    "moves": []
-  },
   "lapras": {
     "abilities": {
       "0": "Water Absorb",
@@ -17221,23 +17009,6 @@
       "whirlpool",
       "zapcannon",
       "zenheadbutt"
-    ]
-  },
-  "laprasgmax": {
-    "abilities": {
-      "0": "Water Absorb",
-      "1": "Shell Armor",
-      "H": "Hydration"
-    },
-    "moves": []
-  },
-  "ditto": {
-    "abilities": {
-      "0": "Limber",
-      "H": "Imposter"
-    },
-    "moves": [
-      "transform"
     ]
   },
   "eevee": {
@@ -17388,14 +17159,6 @@
       "wish",
       "yawn"
     ]
-  },
-  "eeveegmax": {
-    "abilities": {
-      "0": "Run Away",
-      "1": "Adaptability",
-      "H": "Anticipation"
-    },
-    "moves": []
   },
   "vaporeon": {
     "abilities": {
@@ -18304,12 +18067,6 @@
       "wingattack"
     ]
   },
-  "aerodactylmega": {
-    "abilities": {
-      "0": "Tough Claws"
-    },
-    "moves": []
-  },
   "snorlax": {
     "abilities": {
       "0": "Immunity",
@@ -18456,14 +18213,6 @@
       "zapcannon",
       "zenheadbutt"
     ]
-  },
-  "snorlaxgmax": {
-    "abilities": {
-      "0": "Immunity",
-      "1": "Thick Fat",
-      "H": "Gluttony"
-    },
-    "moves": []
   },
   "articuno": {
     "abilities": {
@@ -19279,13 +19028,6 @@
       "zapcannon"
     ]
   },
-  "dragonitemega": {
-    "abilities": {
-      "0": "Inner Focus",
-      "H": "Multiscale"
-    },
-    "moves": []
-  },
   "mewtwo": {
     "abilities": {
       "0": "Pressure",
@@ -19461,18 +19203,6 @@
       "zapcannon",
       "zenheadbutt"
     ]
-  },
-  "mewtwomegax": {
-    "abilities": {
-      "0": "Steadfast"
-    },
-    "moves": []
-  },
-  "mewtwomegay": {
-    "abilities": {
-      "0": "Insomnia"
-    },
-    "moves": []
   },
   "mew": {
     "abilities": {
@@ -19856,15 +19586,6 @@
       "zenheadbutt"
     ]
   },
-  "burmysandy": {
-    "moves": []
-  },
-  "burmytrash": {
-    "moves": []
-  },
-  "shelloseast": {
-    "moves": []
-  },
   "gastrodoneast": {
     "moves": [
       "earthpower",
@@ -19874,104 +19595,5 @@
       "surf",
       "yawn"
     ]
-  },
-  "deerlingsummer": {
-    "moves": []
-  },
-  "deerlingautumn": {
-    "moves": []
-  },
-  "deerlingwinter": {
-    "moves": []
-  },
-  "vivillonicysnow": {
-    "moves": []
-  },
-  "vivillonpolar": {
-    "moves": []
-  },
-  "vivillontundra": {
-    "moves": []
-  },
-  "vivilloncontinental": {
-    "moves": []
-  },
-  "vivillongarden": {
-    "moves": []
-  },
-  "vivillonelegant": {
-    "moves": []
-  },
-  "vivillonmodern": {
-    "moves": []
-  },
-  "vivillonmarine": {
-    "moves": []
-  },
-  "vivillonarchipelago": {
-    "moves": []
-  },
-  "vivillonhighplains": {
-    "moves": []
-  },
-  "vivillonsandstorm": {
-    "moves": []
-  },
-  "vivillonriver": {
-    "moves": []
-  },
-  "vivillonmonsoon": {
-    "moves": []
-  },
-  "vivillonsavanna": {
-    "moves": []
-  },
-  "vivillonsun": {
-    "moves": []
-  },
-  "vivillonocean": {
-    "moves": []
-  },
-  "vivillonjungle": {
-    "moves": []
-  },
-  "miniororange": {
-    "moves": []
-  },
-  "minioryellow": {
-    "moves": []
-  },
-  "miniorgreen": {
-    "moves": []
-  },
-  "miniorblue": {
-    "moves": []
-  },
-  "miniorindigo": {
-    "moves": []
-  },
-  "miniorviolet": {
-    "moves": []
-  },
-  "alcremierubycream": {
-    "moves": []
-  },
-  "alcremiematchacream": {
-    "moves": []
-  },
-  "alcremiemintcream": {
-    "moves": []
-  },
-  "alcremielemoncream": {
-    "moves": []
-  },
-  "alcremierubyswirl": {
-    "moves": []
-  },
-  "alcremiecaramelswirl": {
-    "moves": []
-  },
-  "alcremierainbowswirl": {
-    "moves": []
   }
 }
