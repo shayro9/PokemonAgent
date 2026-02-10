@@ -31,7 +31,7 @@ class PokemonRLWrapper(SinglesEnv):
         }
         self.observation_spaces = {
             agent: gym.spaces.Box(
-                low=-1.0, high=1.0, shape=(25,), dtype=np.float32
+                low=-1.0, high=1.0, shape=(51,), dtype=np.float32
             )
             for agent in self.possible_agents
         }
@@ -69,19 +69,66 @@ class PokemonRLWrapper(SinglesEnv):
 
         my_boosts = np.array(list(my.boosts.values())) / 6.0
         opp_boosts = np.array(list(opp.boosts.values())) / 6.0
+        opp_base_stats = np.array(list(opp.base_stats.values())) / 255.0
 
-        bucket = my.weight // opp.weight
+        opp_type = np.zeros(20, dtype=np.float32)
+        for t in opp.types:
+            if t is not None:
+                opp_type[t.value - 1] = 1.0
+
+        bucket = int(my.weight // opp.weight)
         bucket = max(0, min(bucket, 5))
         weight_one_hot = np.zeros(6, dtype=np.float32)
         weight_one_hot[bucket] = 1.0
 
         state = np.concatenate([
             [my_hp, my_status], my_boosts,
-            [opp_hp, opp_status, opp_preparing], opp_boosts,
+            [opp_hp, opp_status, opp_preparing], opp_boosts, opp_type, opp_base_stats,
             weight_one_hot
         ]).astype(np.float32)
 
         return state
+
+    def print_state(self, battle, *, prefix="[PokemonRLWrapper]"):
+        state = self.embed_battle(battle)
+
+        my = battle.active_pokemon
+        opp = battle.opponent_active_pokemon
+
+        layout = [
+            ("my_hp", 1),
+            ("my_status", 1),
+            ("my_boosts", len(my.boosts)),
+
+            ("opp_hp", 1),
+            ("opp_status", 1),
+            ("opp_preparing", 1),
+            ("opp_boosts", len(opp.boosts)),
+
+            ("opp_type(one-hot)", 20),
+            ("opp_base_stats", len(opp.base_stats)),
+
+            ("weight_bucket(one-hot)", 6),
+        ]
+
+        idx = 0
+        lines = [f"{prefix} STATE BREAKDOWN"]
+
+        for name, size in layout:
+            chunk = state[idx: idx + size]
+
+            if size == 1:
+                lines.append(f"  {name:24}: {chunk[0]: .3f}")
+            else:
+                formatted = ", ".join(f"{x: .3f}" for x in chunk)
+                lines.append(f"  {name:24}: [{formatted}]")
+
+            idx += size
+
+        message = "\n".join(lines)
+
+        print(message)
+        return message
 
     def calc_reward(self, battle) -> float:
         if battle.player_username != self.agent1.username:

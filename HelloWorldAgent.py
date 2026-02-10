@@ -5,20 +5,24 @@ from poke_env.player import RandomPlayer
 from BasicAgents import DebugRLPlayer
 from env_wrapper import PokemonRLWrapper
 from teams.single_teams import *
+from team_generators import single_simple_team_generator
 
 
 async def main():
+    team = next(single_simple_team_generator(data_path='data/pokemon_data.json'))
+    print(team)
+
     env = PokemonRLWrapper(
         battle_format="gen9nationaldex",
         team=STEELIX_TEAM,
-        opponent_team=CONKELDURR_TEAM,
+        opponent_teams=[team],
         strict=False,
     )
 
     debug_player = DebugRLPlayer(
         env,
         battle_format="gen9nationaldex",
-        team=CONKELDURR_TEAM,
+        team=team,
     )
 
     print("Sending challenge...")

@@ -77,19 +77,19 @@ def train_model(
         "MlpPolicy",
         train_env,
         learning_rate=3e-4,
-        buffer_size=20_000,
+        buffer_size=100_000,
         learning_starts=2_000,
         batch_size=64,
         tau=1.0,
         gamma=0.999,
         train_freq=1,
         gradient_steps=1,
-        target_update_interval=500,
-        exploration_fraction=0.5,
+        target_update_interval=1000,
+        exploration_fraction=0.7,
         exploration_initial_eps=1.0,
         exploration_final_eps=0.05,
         max_grad_norm=10.0,
-        verbose=1,
+        verbose=0,
     )
 
     print(
@@ -182,7 +182,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--timesteps", type=int, default=20_000)
     parser.add_argument("--rounds-per-opponent", type=int, default=2_000)
-    parser.add_argument("--model-path", default="steelix")
+    parser.add_argument("--model-path", default="data/steelix")
     parser.add_argument("--eval-episodes", type=int, default=10)
     parser.add_argument("--eval-max-steps", type=int, default=500)
     parser.add_argument(

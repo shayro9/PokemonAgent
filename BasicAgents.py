@@ -9,12 +9,8 @@ class DebugRLPlayer(RandomPlayer):
         self.env = env
 
     def choose_move(self, battle):
-        state = self.env.embed_battle(battle)
-        reward = self.env.calc_reward(battle)
-
-        print("STATE:", np.round(state, 3))
-        print("REWARD:", reward)
-        print("-" * 50)
+        self.env.print_state(battle)
+        print("=" * 50)
 
         return self.choose_random_move(battle)
 
