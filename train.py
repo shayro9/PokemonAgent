@@ -131,6 +131,9 @@ def _play_episode(eval_env: SingleAgentWrapper, model: DQN, max_steps: int) -> t
     return total_reward, truncated
 
 def _generate_eval_pool(pool_size: int, opponent_generator) -> list[str]:
+    if opponent_generator is None:
+        raise ValueError("Cannot generate eval pool without an opponent team generator.")
+
     pool = []
     for _ in range(pool_size):
         pool.append(next(opponent_generator))
@@ -149,18 +152,28 @@ def evaluate_model(
     eval_pool: int,
 ) -> list[EvalResult]:
     results: list[EvalResult] = []
+    eval_opponents: list[tuple[str, str]] = []
+
     if not opponent_names:
         opponent_pool = _generate_eval_pool(eval_pool, opponent_generator)
-        opponent_names = [name.split("|")[0] for name in opponent_pool]
-        print("opponent_names: " + str(opponent_names))
+        eval_opponents = [
+            (f"generated_{i + 1}", opponent_team)
+            for i, opponent_team in enumerate(opponent_pool)
+        ]
+    else:
+        eval_opponents = [
+            (opponent_name, TEAM_BY_NAME[opponent_name])
+            for opponent_name in opponent_names
+        ]
 
-    for opponent_name in opponent_names:
+    for opponent_name, opponent_team in eval_opponents:
         eval_env = _build_train_env(
             agent_team=train_team,
             battle_format=battle_format,
             opponent_names=[],
-            opponent_generator=opponent_generator,
+            opponent_generator=None,
             rounds_per_opponent=episodes_per_opponent,
+            opponent_pool=[opponent_team],
         )
 
         wins = 0
