@@ -6,11 +6,10 @@ from typing import List, Optional, Dict
 def single_simple_team_generator(data_path):
     with open(data_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
-        valid_pokemon = []
-        for s, d in data.items():
-            legal_moves = [m for m in d.get('moves', []) if m.lower() not in BANNED_MOVES]
-            if len(legal_moves) >= 4:
-                valid_pokemon.append(s)
+        valid_pokemon = [
+            name for name, details in data.items()
+            if len(details.get('moves', [])) >= 4 and details.get('abilities')
+        ]
 
         if not valid_pokemon:
             raise ValueError("No Pokémon in the dataset have 4 or more moves.")
@@ -21,12 +20,6 @@ def single_simple_team_generator(data_path):
 
         yield generate_team(species=pokemon_name, moves=moves)
 
-
-BANNED_MOVES = {
-    "doubleteam", "minimize",
-    "fissure", "guillotine",
-    "horndrill", "sheercold"
-}
 
 def generate_team(
         *,

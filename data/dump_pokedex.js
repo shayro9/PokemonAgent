@@ -1,11 +1,17 @@
 const { Dex } = require('../pokemon-showdown/dist/sim/dex');
+const { TeamValidator } = require('../pokemon-showdown/dist/sim/team-validator');
 const fs = require('fs');
 
 const formatId = 'gen9nationaldex';
 const dex = Dex.forFormat(formatId);
+const validator = new TeamValidator(formatId);
 const output = {};
 
 console.log(`Targeting Format: ${formatId}`);
+
+// Get the banlist from the format object
+const banlist = validator.format.banlist || [];
+const restricted = validator.format.restricted || [];
 
 const allSpecies = dex.species.all();
 
@@ -25,19 +31,29 @@ for (const species of allSpecies) {
             const learnset = dex.data.Learnsets[currentSpecies.id]?.learnset;
             if (learnset) {
                 for (const moveId in learnset) {
-                    moves.add(dex.moves.get(moveId).name);
+                    const move = dex.moves.get(moveId);
+
+                    // FILTER LOGIC:
+                    // 1. Is the move in the format's banlist?
+                    // 2. Is the move "Nonstandard" (like Z-moves or Max moves in Gen 9)?
+                    const isBanned = banlist.includes(move.name) || restricted.includes(move.name);
+                    const isIllegal = move.isNonstandard && move.isNonstandard !== 'Past';
+
+                    if (!isBanned && !isIllegal && move.exists) {
+                        moves.add(move.name);
+                    }
                 }
             }
             currentSpecies = dex.species.get(currentSpecies.prevo);
         }
 
         output[species.name] = {
-            // This now preserves the {"0": "...", "H": "..."} structure
             abilities: species.abilities,
             moves: Array.from(moves).sort()
         };
     }
 }
 
-fs.writeFileSync(`${formatId}.json`, JSON.stringify(output, null, 4));
-console.log(`✅ Success! Generated ${formatId}.json with ${Object.keys(output).length} Pokémon.`);
+// Write with UTF-8 encoding explicitly (though Node does this by default)
+fs.writeFileSync(`${formatId}.json`, JSON.stringify(output, null, 4), 'utf8');
+console.log(`✅ Success! Generated ${formatId}.json without banned moves.`);
