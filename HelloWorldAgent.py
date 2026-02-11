@@ -5,12 +5,11 @@ from poke_env.player import RandomPlayer
 from BasicAgents import DebugRLPlayer
 from env_wrapper import PokemonRLWrapper
 from teams.single_teams import *
-from team_generators import single_simple_team_generator
+from teams.team_generators import single_simple_team_generator
 
 
 async def main():
-    team = next(single_simple_team_generator(data_path='data/pokemon_data.json'))
-    print(team)
+    team = next(single_simple_team_generator(data_path='data/gen9nationaldex.json'))
 
     env = PokemonRLWrapper(
         battle_format="gen9nationaldex",

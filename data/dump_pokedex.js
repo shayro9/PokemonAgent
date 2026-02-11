@@ -1,30 +1,43 @@
+const { Dex } = require('../pokemon-showdown/dist/sim/dex');
 const fs = require('fs');
 
-const pokedex = require('../pokemon-showdown/data/pokedex.ts').Pokedex;
-const learnsets = require('../pokemon-showdown/data/learnsets.ts').Learnsets;
+const formatId = 'gen9nationaldex';
+const dex = Dex.forFormat(formatId);
+const output = {};
 
-const result = {};
+console.log(`Targeting Format: ${formatId}`);
 
-for (const key in pokedex) {
-  if (pokedex.hasOwnProperty(key)) {
-    const pokemon = pokedex[key];
-    if (pokemon.num <= 0 || pokemon.num > 151) continue;
+const allSpecies = dex.species.all();
 
-    const abilities = pokemon.abilities;
-
-    let moves = [];
-    if (learnsets[key] && learnsets[key].learnset) {
-      moves = Object.keys(learnsets[key].learnset);
+for (const species of allSpecies) {
+    if (!species.exists || (species.isNonstandard && !['Past', 'Future'].includes(species.isNonstandard))) {
+        continue;
     }
-    if (moves.length < 4) continue;
 
-    result[key] = {
-      abilities: abilities,
-      moves: moves
-    };
-  }
+    const speciesData = dex.species.get(species.id);
+    const tier = speciesData.tier;
+
+    if (tier !== 'Illegal' && tier !== 'Unreleased' && tier !== 'CAP') {
+        const moves = new Set();
+        let currentSpecies = species;
+
+        while (currentSpecies && currentSpecies.exists) {
+            const learnset = dex.data.Learnsets[currentSpecies.id]?.learnset;
+            if (learnset) {
+                for (const moveId in learnset) {
+                    moves.add(dex.moves.get(moveId).name);
+                }
+            }
+            currentSpecies = dex.species.get(currentSpecies.prevo);
+        }
+
+        output[species.name] = {
+            // This now preserves the {"0": "...", "H": "..."} structure
+            abilities: species.abilities,
+            moves: Array.from(moves).sort()
+        };
+    }
 }
 
-fs.writeFileSync('pokemon_data.json', JSON.stringify(result, null, 2));
-
-console.log("Extraction complete! Check pokemon_data.json");
+fs.writeFileSync(`${formatId}.json`, JSON.stringify(output, null, 4));
+console.log(`✅ Success! Generated ${formatId}.json with ${Object.keys(output).length} Pokémon.`);

@@ -4,7 +4,7 @@ from typing import List, Optional, Dict
 
 
 def single_simple_team_generator(data_path):
-    with open(data_path, 'r') as f:
+    with open(data_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
         valid_pokemon = []
         for s, d in data.items():
