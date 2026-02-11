@@ -2,13 +2,12 @@ import argparse
 from dataclasses import dataclass
 
 from stable_baselines3 import DQN
-from poke_env import LocalhostServerConfiguration, RandomPlayer
+from poke_env import LocalhostServerConfiguration, RandomPlayer, MaxBasePowerPlayer
 from poke_env.environment import SingleAgentWrapper
 
 from env_wrapper import PokemonRLWrapper
 from teams.single_teams import ALL_SOLO_TEAMS, STEELIX_TEAM
 from teams.team_generators import single_simple_team_generator
-
 
 TEAM_BY_NAME = {name: team for name, team in ALL_SOLO_TEAMS}
 
@@ -48,11 +47,12 @@ def _parse_pool(raw_pool: str | None, pool_all: bool) -> list[str]:
     return names
 
 
-def _build_train_env(agent_team: str, battle_format: str, opponent_names: list[str], opponent_generator, rounds_per_opponent: int, opponent_pool: list[str] = None) -> SingleAgentWrapper:
+def _build_train_env(agent_team: str, battle_format: str, opponent_names: list[str], opponent_generator,
+                     rounds_per_opponent: int, opponent_pool: list[str] = None) -> SingleAgentWrapper:
     if not opponent_pool:
         opponent_pool = [TEAM_BY_NAME[name] for name in opponent_names]
 
-    opponent_policy = RandomPlayer(
+    opponent_policy = MaxBasePowerPlayer(
         battle_format=battle_format,
         server_configuration=LocalhostServerConfiguration,
     )
@@ -71,13 +71,13 @@ def _build_train_env(agent_team: str, battle_format: str, opponent_names: list[s
 
 
 def train_model(
-    model_path: str,
-    battle_format: str,
-    train_team: str,
-    opponent_names: list[str],
-    opponent_generator,
-    timesteps: int,
-    rounds_per_opponent: int,
+        model_path: str,
+        battle_format: str,
+        train_team: str,
+        opponent_names: list[str],
+        opponent_generator,
+        timesteps: int,
+        rounds_per_opponent: int,
 ) -> DQN:
     train_env = _build_train_env(train_team, battle_format, opponent_names, opponent_generator, rounds_per_opponent)
 
@@ -130,6 +130,7 @@ def _play_episode(eval_env: SingleAgentWrapper, model: DQN, max_steps: int) -> t
 
     return total_reward, truncated
 
+
 def _generate_eval_pool(pool_size: int, opponent_generator) -> list[str]:
     if opponent_generator is None:
         raise ValueError("Cannot generate eval pool without an opponent team generator.")
@@ -142,23 +143,24 @@ def _generate_eval_pool(pool_size: int, opponent_generator) -> list[str]:
 
 
 def evaluate_model(
-    model: DQN,
-    train_team: str,
-    battle_format: str,
-    opponent_names: list[str],
-    opponent_generator,
-    episodes_per_opponent: int,
-    max_steps: int,
-    eval_pool: int,
+        model: DQN,
+        train_team: str,
+        battle_format: str,
+        opponent_names: list[str],
+        opponent_generator,
+        episodes_per_opponent: int,
+        max_steps: int,
+        eval_pool: int,
 ) -> list[EvalResult]:
     results: list[EvalResult] = []
     eval_opponents: list[tuple[str, str]] = []
 
     if not opponent_names:
         opponent_pool = _generate_eval_pool(eval_pool, opponent_generator)
+        opponent_names = [name.split("|")[0] for name in opponent_pool]
         eval_opponents = [
-            (f"generated_{i + 1}", opponent_team)
-            for i, opponent_team in enumerate(opponent_pool)
+            (f"{name}", opponent_team)
+            for (i, opponent_team), name in zip(enumerate(opponent_pool), opponent_names)
         ]
     else:
         eval_opponents = [
@@ -213,13 +215,16 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--train-team", default="steelix", choices=sorted(TEAM_BY_NAME))
     parser.add_argument("--pool", default=None, help="Comma-separated opponent pool (default: empty).")
-    parser.add_argument("--pool-all", action="store_true", help="Insert all pre built solo teams to the pool", default=False)
+    parser.add_argument("--pool-all", action="store_true", help="Insert all pre built solo teams to the pool",
+                        default=False)
     parser.add_argument("--timesteps", type=int, default=20_000)
     parser.add_argument("--rounds-per-opponent", type=int, default=2_000)
     parser.add_argument("--model-path", default="data/steelix")
     parser.add_argument("--eval-episodes", type=int, default=10)
     parser.add_argument("--eval-pool", type=int, default=10)
     parser.add_argument("--eval-max-steps", type=int, default=500)
+    parser.add_argument("--eval-pool-all", action="store_true", help="Insert all pre built solo teams to the eval pool",
+                        default=False)
     parser.add_argument(
         "--skip-eval",
         action="store_true",
@@ -236,7 +241,8 @@ def main():
 
     battle_format = args.format
     opponent_names = _parse_pool(args.pool, args.pool_all)
-    opponent_generator = single_simple_team_generator(data_path=f'data/gen9randombattle_db.json') if args.random_generated else None
+    opponent_generator = single_simple_team_generator(
+        data_path=f'data/gen9randombattle_db.json') if args.random_generated else None
     train_team = TEAM_BY_NAME.get(args.train_team, STEELIX_TEAM)
 
     model = train_model(
@@ -252,11 +258,12 @@ def main():
     if args.skip_eval:
         return
 
+    eval_opponent_names = _parse_pool(args.pool, args.eval_pool_all) if not opponent_names else opponent_names
     eval_results = evaluate_model(
         model=model,
         battle_format=battle_format,
         train_team=train_team,
-        opponent_names=opponent_names,
+        opponent_names=eval_opponent_names,
         opponent_generator=opponent_generator,
         episodes_per_opponent=args.eval_episodes,
         max_steps=args.eval_max_steps,

@@ -1,16 +1,16 @@
 STEELIX_TEAM = """
-Steelix  
+Steelix @ 
 Ability: Sturdy  
-EVs: 1 HP  
+EVs: 252 HP / 252 Def / 4 Atk  
 Impish Nature  
 - Earthquake  
+- Heavy Slam  
 - Curse  
-- Toxic  
-- Heavy Slam
+- Toxic
 """
 
 GARCHOMP_TEAM = """
-Garchomp @ Rocky Helmet  
+Garchomp   
 Ability: Rough Skin  
 EVs: 252 HP / 252 Def / 4 Atk  
 Impish Nature  
@@ -21,7 +21,7 @@ Impish Nature
 """
 
 CONKELDURR_TEAM = """
-Conkeldurr @ Leftovers  
+Conkeldurr  
 Ability: Guts  
 EVs: 252 HP / 252 Atk / 4 Def  
 Adamant Nature  
@@ -32,7 +32,7 @@ Adamant Nature
 """
 
 ROTOM_WASH_TEAM = """
-Rotom-Wash @ Leftovers  
+Rotom-Wash  
 Ability: Levitate  
 EVs: 252 HP / 200 Def / 56 SpA  
 Bold Nature  
@@ -43,7 +43,7 @@ Bold Nature
 """
 
 CORVIKNIGHT_TEAM = """
-Corviknight @ Leftovers  
+Corviknight   
 Ability: Pressure  
 EVs: 252 HP / 168 Def / 88 SpD  
 Impish Nature  
@@ -54,7 +54,7 @@ Impish Nature
 """
 
 TOXAPEX_TEAM = """
-Toxapex @ Black Sludge  
+Toxapex  
 Ability: Regenerator  
 EVs: 252 HP / 252 Def / 4 SpD  
 Bold Nature  
@@ -65,7 +65,7 @@ Bold Nature
 """
 
 EXADRILL_TEAM = """
-Excadrill @ Leftovers  
+Excadrill  
 Ability: Mold Breaker  
 EVs: 252 Atk / 4 Def / 252 Spe  
 Jolly Nature  
@@ -76,7 +76,7 @@ Jolly Nature
 """
 
 HIPPOWDON_TEAM = """
-Hippowdon @ Leftovers  
+Hippowdon  
 Ability: Sand Stream  
 EVs: 252 HP / 252 Def / 4 SpD  
 Impish Nature  
@@ -87,7 +87,7 @@ Impish Nature
 """
 
 BRELOOM_TEAM = """
-Breloom @ Life Orb  
+Breloom 
 Ability: Technician  
 EVs: 252 Atk / 4 Def / 252 Spe  
 Jolly Nature  
@@ -98,7 +98,7 @@ Jolly Nature
 """
 
 VOLCARONA_TEAM = """
-Volcarona @ Heavy-Duty Boots  
+Volcarona  
 Ability: Flame Body  
 EVs: 248 HP / 252 SpA / 8 Spe  
 Modest Nature  
