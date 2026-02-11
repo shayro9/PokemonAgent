@@ -7,6 +7,7 @@ from poke_env.environment import SingleAgentWrapper
 
 from env_wrapper import PokemonRLWrapper
 from teams.single_teams import ALL_SOLO_TEAMS, STEELIX_TEAM
+from teams.team_generators import single_simple_team_generator
 
 
 TEAM_BY_NAME = {name: team for name, team in ALL_SOLO_TEAMS}
@@ -30,9 +31,12 @@ class EvalResult:
         return self.wins / self.episodes
 
 
-def _parse_pool(raw_pool: str | None) -> list[str]:
-    if not raw_pool:
+def _parse_pool(raw_pool: str | None, pool_all: bool) -> list[str]:
+    if pool_all:
         return [name for name, _ in ALL_SOLO_TEAMS]
+
+    if not raw_pool:
+        return []
 
     names = [name.strip() for name in raw_pool.split(",") if name.strip()]
     unknown = [name for name in names if name not in TEAM_BY_NAME]
@@ -44,18 +48,20 @@ def _parse_pool(raw_pool: str | None) -> list[str]:
     return names
 
 
-def _build_train_env(agent_team: str, opponent_names: list[str], rounds_per_opponent: int) -> SingleAgentWrapper:
-    opponent_pool = [TEAM_BY_NAME[name] for name in opponent_names]
+def _build_train_env(agent_team: str, battle_format: str, opponent_names: list[str], opponent_generator, rounds_per_opponent: int, opponent_pool: list[str] = None) -> SingleAgentWrapper:
+    if not opponent_pool:
+        opponent_pool = [TEAM_BY_NAME[name] for name in opponent_names]
 
     opponent_policy = RandomPlayer(
-        battle_format="gen9nationaldex",
+        battle_format=battle_format,
         server_configuration=LocalhostServerConfiguration,
     )
 
     agent = PokemonRLWrapper(
-        battle_format="gen9nationaldex",
+        battle_format=battle_format,
         team=agent_team,
         opponent_teams=opponent_pool,
+        opponent_team_generator=opponent_generator,
         rounds_per_opponents=rounds_per_opponent,
         server_configuration=LocalhostServerConfiguration,
         strict=False,
@@ -66,12 +72,14 @@ def _build_train_env(agent_team: str, opponent_names: list[str], rounds_per_oppo
 
 def train_model(
     model_path: str,
+    battle_format: str,
     train_team: str,
     opponent_names: list[str],
+    opponent_generator,
     timesteps: int,
     rounds_per_opponent: int,
 ) -> DQN:
-    train_env = _build_train_env(train_team, opponent_names, rounds_per_opponent)
+    train_env = _build_train_env(train_team, battle_format, opponent_names, opponent_generator, rounds_per_opponent)
 
     model = DQN(
         "MlpPolicy",
@@ -122,20 +130,36 @@ def _play_episode(eval_env: SingleAgentWrapper, model: DQN, max_steps: int) -> t
 
     return total_reward, truncated
 
+def _generate_eval_pool(pool_size: int, opponent_generator) -> list[str]:
+    pool = []
+    for _ in range(pool_size):
+        pool.append(next(opponent_generator))
+
+    return pool
+
 
 def evaluate_model(
     model: DQN,
     train_team: str,
+    battle_format: str,
     opponent_names: list[str],
+    opponent_generator,
     episodes_per_opponent: int,
     max_steps: int,
+    eval_pool: int,
 ) -> list[EvalResult]:
     results: list[EvalResult] = []
+    if not opponent_names:
+        opponent_pool = _generate_eval_pool(eval_pool, opponent_generator)
+        opponent_names = [name.split("|")[0] for name in opponent_pool]
+        print("opponent_names: " + str(opponent_names))
 
     for opponent_name in opponent_names:
         eval_env = _build_train_env(
             agent_team=train_team,
-            opponent_names=[opponent_name],
+            battle_format=battle_format,
+            opponent_names=[],
+            opponent_generator=opponent_generator,
             rounds_per_opponent=episodes_per_opponent,
         )
 
@@ -175,21 +199,21 @@ def build_arg_parser() -> argparse.ArgumentParser:
         description="Train a DQN Pokémon bot against a pool and run per-opponent evaluation."
     )
     parser.add_argument("--train-team", default="steelix", choices=sorted(TEAM_BY_NAME))
-    parser.add_argument(
-        "--pool",
-        default=None,
-        help="Comma-separated opponent pool (default: all solo teams).",
-    )
+    parser.add_argument("--pool", default=None, help="Comma-separated opponent pool (default: empty).")
+    parser.add_argument("--pool-all", action="store_true", help="Insert all pre built solo teams to the pool", default=False)
     parser.add_argument("--timesteps", type=int, default=20_000)
     parser.add_argument("--rounds-per-opponent", type=int, default=2_000)
     parser.add_argument("--model-path", default="data/steelix")
     parser.add_argument("--eval-episodes", type=int, default=10)
+    parser.add_argument("--eval-pool", type=int, default=10)
     parser.add_argument("--eval-max-steps", type=int, default=500)
     parser.add_argument(
         "--skip-eval",
         action="store_true",
         help="Only train and save model, skip evaluation.",
     )
+    parser.add_argument("--random-generated", action="store_true", default=False)
+    parser.add_argument("--format", type=str, default="gen9customgame")
     return parser
 
 
@@ -197,13 +221,17 @@ def main():
     parser = build_arg_parser()
     args = parser.parse_args()
 
-    opponent_names = _parse_pool(args.pool)
+    battle_format = args.format
+    opponent_names = _parse_pool(args.pool, args.pool_all)
+    opponent_generator = single_simple_team_generator(data_path=f'data/gen9randombattle_db.json') if args.random_generated else None
     train_team = TEAM_BY_NAME.get(args.train_team, STEELIX_TEAM)
 
     model = train_model(
         model_path=args.model_path,
+        battle_format=battle_format,
         train_team=train_team,
         opponent_names=opponent_names,
+        opponent_generator=opponent_generator,
         timesteps=args.timesteps,
         rounds_per_opponent=args.rounds_per_opponent,
     )
@@ -213,10 +241,13 @@ def main():
 
     eval_results = evaluate_model(
         model=model,
+        battle_format=battle_format,
         train_team=train_team,
         opponent_names=opponent_names,
+        opponent_generator=opponent_generator,
         episodes_per_opponent=args.eval_episodes,
         max_steps=args.eval_max_steps,
+        eval_pool=args.eval_pool,
     )
     print_eval_summary(eval_results)
 

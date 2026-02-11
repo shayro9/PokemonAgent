@@ -1,12 +1,12 @@
 STEELIX_TEAM = """
-Steelix @ Leftovers  
+Steelix  
 Ability: Sturdy  
-EVs: 252 HP / 252 Def / 4 Atk  
+EVs: 1 HP  
 Impish Nature  
 - Earthquake  
-- Heavy Slam  
 - Curse  
-- Toxic
+- Toxic  
+- Heavy Slam
 """
 
 GARCHOMP_TEAM = """

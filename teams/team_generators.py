@@ -1,30 +1,45 @@
 import json
 import random
-from typing import List, Optional, Dict
+from typing import List, Optional
 
 
 def single_simple_team_generator(data_path):
     with open(data_path, 'r', encoding='utf-8') as f:
-        data = json.load(f)
-        valid_pokemon = [
-            name for name, details in data.items()
-            if len(details.get('moves', [])) >= 4 and details.get('abilities')
-        ]
+        pokemon_pool = json.load(f)
 
-        if not valid_pokemon:
-            raise ValueError("No Pokémon in the dataset have 4 or more moves.")
+    if not pokemon_pool:
+        raise ValueError("The database is empty. Run the Node.js script first!")
 
     while True:
-        pokemon_name = random.choice(valid_pokemon)
-        moves = random.sample(data[pokemon_name]['moves'], k=4)
+        sampled_mon = random.choice(pokemon_pool)
 
-        yield generate_team(species=pokemon_name, moves=moves)
+        yield generate_team(
+            nickname=sampled_mon.get('name'),
+            species=sampled_mon.get('species'),
+            item=sampled_mon.get('item'),
+            ability=sampled_mon.get('ability'),
+            moves=sampled_mon.get('moves'),
+            nature=sampled_mon.get('nature'),
+            evs=format_stats_dict(sampled_mon.get('evs')),
+            ivs=format_stats_dict(sampled_mon.get('ivs')),
+            gender=sampled_mon.get('gender'),
+            level=sampled_mon.get('level'),
+            shiny=sampled_mon.get('shiny'),
+            teratype=sampled_mon.get('teraType')
+        )
+
+
+def format_stats_dict(stats: Optional[dict]) -> str:
+    """Helper to convert {hp: 252, atk: 0...} to '252,0,0,0,0,0'"""
+    if not stats:
+        return ""
+    keys = ['hp', 'atk', 'def', 'spa', 'spd', 'spe']
+    return ",".join(str(stats.get(k, 0)) for k in keys)
 
 
 def generate_team(
-        *,
         nickname: Optional[str] = None,
-        species: str,
+        species: str = "",
         item: Optional[str] = None,
         ability: Optional[str] = None,
         moves: Optional[List[str]] = None,
@@ -42,43 +57,34 @@ def generate_team(
         teratype: Optional[str] = None,
 ) -> str:
     display_nickname = nickname or species
-    display_species = "" if species == display_nickname else species
-
+    display_species = "" if species == display_nickname else (species or "")
     display_item = item or ""
-    display_ability = ability or "0"
-
+    display_ability = ability or ""
     display_moves = ",".join(moves) if moves else ""
-
     display_nature = nature or ""
-
-    if not evs or evs == "0,0,0,0,0,0" or evs == "":
-        display_evs = "1"
+    display_evs = evs or ""
+    if gender in ["N", None, ""]:
+        display_gender = ""
     else:
-        display_evs = evs
-
-    display_gender = gender or ""
-
-    if not ivs or ivs == "31,31,31,31,31,31":
-        display_ivs = ""
-    else:
-        display_ivs = ivs
-
+        display_gender = gender
+    display_ivs = ivs or ""
     display_shiny = "S" if shiny else ""
+    display_level = str(level) if (level and level != 100) else ""
 
-    display_level = "" if level == 100 else (str(level) if level is not None else "")
-    display_happiness = "" if happiness == 255 else (str(happiness) if happiness is not None else "")
+    trailing = [
+        str(happiness) if happiness and happiness != 255 else "",
+        pokeball or "",
+        hiddenpowertype or "",
+        "G" if gigantamax else "",
+        str(dynamaxlevel) if dynamaxlevel and dynamaxlevel != 10 else "",
+        teratype or ""
+    ]
+    while trailing and not trailing[-1]:
+        trailing.pop()
 
-    display_pokeball = "" if pokeball == "Poké Ball" else (pokeball or "")
-    display_hptype = hiddenpowertype or ""
-    display_gmax = "G" if gigantamax else ""
-    display_dmaxlv = "" if dynamaxlevel == 10 else (str(dynamaxlevel) if dynamaxlevel is not None else "")
-    display_tera = teratype or ""
+    trailing_part = ",".join(trailing)
 
-    trailing_fields = [display_pokeball, display_hptype, display_gmax, display_dmaxlv, display_tera]
-
-    if not any(trailing_fields):
-        trailing_part = display_happiness
-    else:
-        trailing_part = f"{display_happiness},{display_pokeball},{display_hptype},{display_gmax},{display_dmaxlv},{display_tera}"
-
-    return f"{display_nickname}|{display_species}|{display_item}|{display_ability}|{display_moves}|{display_nature}|{display_evs}|{display_gender}|{display_ivs}|{display_shiny}|{display_level}|{trailing_part}]"
+    # Showdown Packed Format:
+    # Nickname|Species|Item|Ability|Moves|Nature|EVs|Gender|IVs|Shiny|Level|Happiness,Pokeball,HPType,Gmax,Dmax,Tera
+    team = f"{display_nickname}|{display_species}|{display_item}|{display_ability}|{display_moves}|{display_nature}|{display_evs}|{display_gender}|{display_ivs}|{display_shiny}|{display_level}|{trailing_part}"
+    return team
