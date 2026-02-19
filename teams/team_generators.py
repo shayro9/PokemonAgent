@@ -5,7 +5,7 @@ from typing import List, Optional
 
 def single_simple_team_generator(data_path):
     with open(data_path, 'r', encoding='utf-8') as f:
-        pokemon_pool = json.load(f)
+        pokemon_pool = json.load(f)['pool']
 
     if not pokemon_pool:
         raise ValueError("The database is empty. Run the Node.js script first!")
