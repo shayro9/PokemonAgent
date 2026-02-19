@@ -47,8 +47,16 @@ def _parse_pool(raw_pool: str | None, pool_all: bool) -> list[str]:
     return names
 
 
-def _build_train_env(agent_team: str, battle_format: str, opponent_names: list[str], opponent_generator,
-                     rounds_per_opponent: int, opponent_pool: list[str] = None) -> SingleAgentWrapper:
+def _build_train_env(
+        agent_team: str,
+        battle_format: str,
+        opponent_names: list[str],
+        opponent_generator,
+        rounds_per_opponent: int,
+        opponent_pool: list[str] = None,
+        agent_team_generator=None,
+        battle_team_generator=None,
+) -> SingleAgentWrapper:
     if not opponent_pool:
         opponent_pool = [TEAM_BY_NAME[name] for name in opponent_names]
 
@@ -61,6 +69,8 @@ def _build_train_env(agent_team: str, battle_format: str, opponent_names: list[s
         battle_format=battle_format,
         team=agent_team,
         opponent_teams=opponent_pool,
+        battle_team_generator=battle_team_generator,
+        agent_team_generator=agent_team_generator,
         opponent_team_generator=opponent_generator,
         rounds_per_opponents=rounds_per_opponent,
         server_configuration=LocalhostServerConfiguration,
@@ -78,8 +88,18 @@ def train_model(
         opponent_generator,
         timesteps: int,
         rounds_per_opponent: int,
+        agent_team_generator=None,
+        battle_team_generator=None,
 ) -> DQN:
-    train_env = _build_train_env(train_team, battle_format, opponent_names, opponent_generator, rounds_per_opponent)
+    train_env = _build_train_env(
+        train_team,
+        battle_format,
+        opponent_names,
+        opponent_generator,
+        rounds_per_opponent,
+        agent_team_generator=agent_team_generator,
+        battle_team_generator=battle_team_generator,
+    )
 
     model = DQN(
         "MlpPolicy",
