@@ -3,9 +3,41 @@ import random
 from typing import List, Optional
 
 
-def single_simple_team_generator(data_path):
+def load_pokemon_pool(data_path: str) -> list[dict]:
     with open(data_path, 'r', encoding='utf-8') as f:
         pokemon_pool = json.load(f)['pool']
+
+    if not pokemon_pool:
+        raise ValueError("The database is empty. Run the Node.js script first!")
+
+    return pokemon_pool
+
+
+def split_pokemon_pool(
+        pokemon_pool: list[dict],
+        train_fraction: float,
+        seed: int,
+) -> tuple[list[dict], list[dict]]:
+    if not 0 < train_fraction < 1:
+        raise ValueError("train_fraction must be between 0 and 1.")
+
+    shuffled_pool = list(pokemon_pool)
+    random.Random(seed).shuffle(shuffled_pool)
+    split_index = int(len(shuffled_pool) * train_fraction)
+
+    if split_index <= 0 or split_index >= len(shuffled_pool):
+        raise ValueError(
+            "train_fraction created an empty train or eval split; use a larger pool or adjust the split."
+        )
+
+    return shuffled_pool[:split_index], shuffled_pool[split_index:]
+
+
+def single_simple_team_generator(data_path: str | None = None, pokemon_pool: list[dict] | None = None):
+    if pokemon_pool is None:
+        if data_path is None:
+            raise ValueError("Either data_path or pokemon_pool must be provided.")
+        pokemon_pool = load_pokemon_pool(data_path)
 
     if not pokemon_pool:
         raise ValueError("The database is empty. Run the Node.js script first!")

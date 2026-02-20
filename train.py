@@ -7,7 +7,7 @@ from poke_env.environment import SingleAgentWrapper
 
 from env_wrapper import PokemonRLWrapper
 from teams.single_teams import ALL_SOLO_TEAMS, STEELIX_TEAM
-from teams.team_generators import single_simple_team_generator
+from teams.team_generators import load_pokemon_pool, single_simple_team_generator, split_pokemon_pool
 
 TEAM_BY_NAME = {name: team for name, team in ALL_SOLO_TEAMS}
 
@@ -46,6 +46,26 @@ def _parse_pool(raw_pool: str | None, pool_all: bool) -> list[str]:
         )
     return names
 
+
+
+
+def _resolve_generated_pools(
+        data_path: str,
+        train_split: float,
+        split_seed: int,
+) -> tuple[list[dict], list[dict]]:
+    pokemon_pool = load_pokemon_pool(data_path)
+
+    train_pool, eval_pool = split_pokemon_pool(
+        pokemon_pool=pokemon_pool,
+        train_fraction=train_split,
+        seed=split_seed,
+    )
+
+    print(
+        f"Generated pool split: train={len(train_pool)} samples, eval={len(eval_pool)} samples (seed={split_seed}, train_split={train_split})"
+    )
+    return train_pool, eval_pool
 
 def _build_train_env(
         agent_team: str,
@@ -251,6 +271,24 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Only train and save model, skip evaluation.",
     )
     parser.add_argument("--random-generated", action="store_true", default=False)
+    parser.add_argument(
+        "--split-generated-pool",
+        action="store_true",
+        default=False,
+        help="Split generated dataset into disjoint train/eval pools.",
+    )
+    parser.add_argument(
+        "--train-split",
+        type=float,
+        default=0.8,
+        help="Fraction of generated dataset used for training when split is enabled.",
+    )
+    parser.add_argument(
+        "--split-seed",
+        type=int,
+        default=42,
+        help="Random seed for generated dataset splitting.",
+    )
     parser.add_argument("--format", type=str, default="gen9customgame")
     return parser
 
@@ -261,16 +299,31 @@ def main():
 
     battle_format = args.format
     opponent_names = _parse_pool(args.pool, args.pool_all)
-    opponent_generator = single_simple_team_generator(
-        data_path=f'data/gen9randombattle_db.json') if args.random_generated else None
     train_team = TEAM_BY_NAME.get(args.train_team, STEELIX_TEAM)
+
+    train_opponent_generator = None
+    eval_opponent_generator = None
+    if args.random_generated:
+        data_path = 'data/gen9randombattle_db.json'
+        if args.split_generated_pool:
+            train_pool, eval_pool = _resolve_generated_pools(
+                data_path=data_path,
+                train_split=args.train_split,
+                split_seed=args.split_seed,
+            )
+            train_opponent_generator = single_simple_team_generator(pokemon_pool=train_pool)
+            eval_opponent_generator = single_simple_team_generator(pokemon_pool=eval_pool)
+        else:
+            shared_pool = load_pokemon_pool(data_path)
+            train_opponent_generator = single_simple_team_generator(pokemon_pool=shared_pool)
+            eval_opponent_generator = single_simple_team_generator(pokemon_pool=shared_pool)
 
     model = train_model(
         model_path=args.model_path,
         battle_format=battle_format,
         train_team=train_team,
         opponent_names=opponent_names,
-        opponent_generator=opponent_generator,
+        opponent_generator=train_opponent_generator,
         timesteps=args.timesteps,
         rounds_per_opponent=args.rounds_per_opponent,
     )
@@ -284,7 +337,7 @@ def main():
         battle_format=battle_format,
         train_team=train_team,
         opponent_names=eval_opponent_names,
-        opponent_generator=opponent_generator,
+        opponent_generator=eval_opponent_generator,
         episodes_per_opponent=args.eval_episodes,
         max_steps=args.eval_max_steps,
         eval_pool=args.eval_pool,
