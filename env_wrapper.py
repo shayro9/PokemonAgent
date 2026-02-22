@@ -1,7 +1,9 @@
 import numpy as np
+from poke_env.battle import Move
 from poke_env.environment import SinglesEnv
 from poke_env.battle.pokemon_type import PokemonType
 from poke_env.data import GenData
+from embedding import *
 import gymnasium as gym
 
 
@@ -90,11 +92,16 @@ class PokemonRLWrapper(SinglesEnv):
         weight_one_hot = np.zeros(6, dtype=np.float32)
         weight_one_hot[bucket] = 1.0
 
+        my_moves = []
+        for move in battle.available_moves:
+            my_moves.extend(embed_move(move))
+
         opp_preparing = float(opp.preparing)
 
         state = np.concatenate([
             [my_hp], my_stats,
             [opp_hp], opp_base_stats, opp_boosts, [opp_preparing],
+            my_moves,
             types_multipliers,
             weight_one_hot,
         ]).astype(np.float32)
@@ -115,6 +122,31 @@ class PokemonRLWrapper(SinglesEnv):
             ("opp_base_stats", len(opp.base_stats)),
             ("opp_boosts", len(opp.boosts)),
             ("opp_preparing", 1),
+
+            ("move1", 4),
+            ("category", 3),
+            ("status", 7),
+            ("boosts_target", 7),
+            ("boosts_self", 7),
+            ("multi_hit", 2),
+            ("move2", 4),
+            ("category", 3),
+            ("status", 7),
+            ("boosts_target", 7),
+            ("boosts_self", 7),
+            ("multi_hit", 2),
+            ("move3", 4),
+            ("category", 3),
+            ("status", 7),
+            ("boosts_target", 7),
+            ("boosts_self", 7),
+            ("multi_hit", 2),
+            ("move4", 4),
+            ("category", 3),
+            ("status", 7),
+            ("boosts_target", 7),
+            ("boosts_self", 7),
+            ("multi_hit", 2),
 
             ("type_multipliers (4)", 4),
 
@@ -167,23 +199,3 @@ class PokemonRLWrapper(SinglesEnv):
         reward = np.clip(reward, -1.0, 1.0)
 
         return reward
-
-
-def calc_types_vector(my_types: list[PokemonType], opp_types: list[PokemonType], gen: int):
-    vec = []
-
-    my_types = list(my_types) + [None]
-    opp_types = list(opp_types) + [None]
-
-    my_types = my_types[:2]
-    opp_types = opp_types[:2]
-
-    for my_t in my_types:
-        for opp_t in opp_types:
-            if my_t is None or opp_t is None:
-                vec.append(0.0)  # neutral
-            else:
-                mult = my_t.damage_multiplier(opp_t, type_chart=GenData.from_gen(gen).type_chart)
-                vec.append(-1.0 if mult == 0.0 else float(np.log2(mult)))
-
-    return np.array(vec, dtype=np.float32)
