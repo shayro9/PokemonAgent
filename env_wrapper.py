@@ -1,19 +1,21 @@
 import numpy as np
 from poke_env.environment import SinglesEnv
+from poke_env.battle.pokemon_type import PokemonType
+from poke_env.data import GenData
 import gymnasium as gym
 
 
 class PokemonRLWrapper(SinglesEnv):
     def __init__(
-        self,
-        *,
-        team,
-        opponent_teams: list[str] | None,
-        rounds_per_opponents: int = 2_000,
-        battle_team_generator=None,
-        agent_team_generator=None,
-        opponent_team_generator=None,
-        **kwargs,
+            self,
+            *,
+            team,
+            opponent_teams: list[str] | None,
+            rounds_per_opponents: int = 2_000,
+            battle_team_generator=None,
+            agent_team_generator=None,
+            opponent_team_generator=None,
+            **kwargs,
     ):
         super().__init__(
             team=team,
@@ -49,8 +51,8 @@ class PokemonRLWrapper(SinglesEnv):
         self.last_hp = {}
         self.last_fainted = {}
         if (
-            self.rounds_played % self.rounds_per_opponents == 0
-            and self._last_team_update_round != self.rounds_played
+                self.rounds_played % self.rounds_per_opponents == 0
+                and self._last_team_update_round != self.rounds_played
         ):
             if self.battle_team_generator is not None:
                 agent1_team, agent2_team = next(self.battle_team_generator)
@@ -75,28 +77,26 @@ class PokemonRLWrapper(SinglesEnv):
         my_hp = my.current_hp_fraction
         opp_hp = opp.current_hp_fraction
 
-        my_status = float(my.status is not None)
-        opp_status = float(opp.status is not None)
-        opp_preparing = float(opp.preparing)
-
-        my_boosts = np.array(list(my.boosts.values())) / 6.0
+        my_stats = np.minimum(np.array(list(my.stats.values())) / 255.0, 1.0)
         opp_boosts = np.array(list(opp.boosts.values())) / 6.0
         opp_base_stats = np.array(list(opp.base_stats.values())) / 255.0
 
-        opp_type = np.zeros(20, dtype=np.float32)
-        for t in opp.types:
-            if t is not None:
-                opp_type[t.value - 1] = 1.0
+        my_types = my.types
+        opp_types = opp.types
+        types_multipliers = calc_types_vector(my_types, opp_types, battle.gen)
 
         bucket = int(my.weight // opp.weight)
         bucket = max(0, min(bucket, 5))
         weight_one_hot = np.zeros(6, dtype=np.float32)
         weight_one_hot[bucket] = 1.0
 
+        opp_preparing = float(opp.preparing)
+
         state = np.concatenate([
-            [my_hp, my_status], my_boosts,
-            [opp_hp, opp_status, opp_preparing], opp_boosts, opp_type, opp_base_stats,
-            weight_one_hot
+            [my_hp], my_stats,
+            [opp_hp], opp_base_stats, opp_boosts, [opp_preparing],
+            types_multipliers,
+            weight_one_hot,
         ]).astype(np.float32)
 
         return state
@@ -109,18 +109,16 @@ class PokemonRLWrapper(SinglesEnv):
 
         layout = [
             ("my_hp", 1),
-            ("my_status", 1),
-            ("my_boosts", len(my.boosts)),
+            ("my_stats", len(my.stats)),
 
             ("opp_hp", 1),
-            ("opp_status", 1),
-            ("opp_preparing", 1),
-            ("opp_boosts", len(opp.boosts)),
-
-            ("opp_type(one-hot)", 20),
             ("opp_base_stats", len(opp.base_stats)),
+            ("opp_boosts", len(opp.boosts)),
+            ("opp_preparing", 1),
 
-            ("weight_bucket(one-hot)", 6),
+            ("type_multipliers (4)", 4),
+
+            ("weight_bucket (one-hot)", 6),
         ]
 
         idx = 0
@@ -130,15 +128,16 @@ class PokemonRLWrapper(SinglesEnv):
             chunk = state[idx: idx + size]
 
             if size == 1:
-                lines.append(f"  {name:24}: {chunk[0]: .3f}")
+                lines.append(f"  {name:28}: {chunk[0]: .3f}")
             else:
                 formatted = ", ".join(f"{x: .3f}" for x in chunk)
-                lines.append(f"  {name:24}: [{formatted}]")
+                lines.append(f"  {name:28}: [{formatted}]")
 
             idx += size
 
-        message = "\n".join(lines)
+        lines.append(f"\n  TOTAL DIMENSIONS: {len(state)}")
 
+        message = "\n".join(lines)
         print(message)
         return message
 
@@ -168,3 +167,23 @@ class PokemonRLWrapper(SinglesEnv):
         reward = np.clip(reward, -1.0, 1.0)
 
         return reward
+
+
+def calc_types_vector(my_types: list[PokemonType], opp_types: list[PokemonType], gen: int):
+    vec = []
+
+    my_types = list(my_types) + [None]
+    opp_types = list(opp_types) + [None]
+
+    my_types = my_types[:2]
+    opp_types = opp_types[:2]
+
+    for my_t in my_types:
+        for opp_t in opp_types:
+            if my_t is None or opp_t is None:
+                vec.append(0.0)  # neutral
+            else:
+                mult = my_t.damage_multiplier(opp_t, type_chart=GenData.from_gen(gen).type_chart)
+                vec.append(-1.0 if mult == 0.0 else float(np.log2(mult)))
+
+    return np.array(vec, dtype=np.float32)
