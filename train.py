@@ -1,6 +1,7 @@
 import argparse
 import random
 from dataclasses import dataclass
+from typing import Optional, Tuple, Iterable
 
 import numpy as np
 from stable_baselines3 import DQN
@@ -275,24 +276,41 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Train a DQN Pokémon bot against a pool and run per-opponent evaluation."
     )
-    parser.add_argument("--train-team", default="steelix", choices=sorted(TEAM_BY_NAME))
-    parser.add_argument("--pool", default=None, help="Comma-separated opponent pool (default: empty).")
-    parser.add_argument("--pool-all", action="store_true", help="Insert all pre built solo teams to the pool",
-                        default=False)
+
+    # Core
+    parser.add_argument("--format", type=str, default="gen9customgame")
+    parser.add_argument("--seed", type=int, default=42, help="Global seed for reproducible training/evaluation.")
+    parser.add_argument("--model-path", default="data/1v1")
+
+    # Training
+    parser.add_argument("--train-team", default=None, choices=sorted(TEAM_BY_NAME))
     parser.add_argument("--timesteps", type=int, default=20_000)
     parser.add_argument("--rounds-per-opponent", type=int, default=2_000)
-    parser.add_argument("--model-path", default="data/steelix")
+    parser.add_argument("--eval-every-timesteps", type=int, default=0)
+
+    # Evaluation
+    parser.add_argument("--skip-eval", action="store_true", help="Only train and save model, skip evaluation.")
     parser.add_argument("--eval-episodes", type=int, default=10)
-    parser.add_argument("--eval-pool", type=int, default=10)
     parser.add_argument("--eval-max-steps", type=int, default=500)
-    parser.add_argument("--eval-pool-all", action="store_true", help="Insert all pre built solo teams to the eval pool",
-                        default=False)
     parser.add_argument(
-        "--skip-eval",
-        action="store_true",
-        help="Only train and save model, skip evaluation.",
+        "--eval-pool-size",
+        type=int,
+        default=10,
+        help="How many opponents to sample for evaluation (when using a large pool).",
     )
-    parser.add_argument("--random-generated", action="store_true", default=False)
+
+    # Opponent selection: TRAIN
+    train_src = parser.add_mutually_exclusive_group()
+    train_src.add_argument("--pool", default=None, help="Comma-separated opponent pool for training.")
+    train_src.add_argument("--pool-all", action="store_true", default=False, help="Use all prebuilt solo teams.")
+    train_src.add_argument("--random-generated", action="store_true", default=False, help="Use generated opponents.")
+
+    # Opponent selection: EVAL (optional override)
+    eval_src = parser.add_mutually_exclusive_group()
+    eval_src.add_argument("--eval-pool", default=None, help="Comma-separated opponent pool for evaluation.")
+    eval_src.add_argument("--eval-pool-all", action="store_true", default=False, help="Use all prebuilt solo teams.")
+
+    # Generated dataset split (only meaningful if --random-generated)
     parser.add_argument(
         "--split-generated-pool",
         action="store_true",
@@ -305,108 +323,106 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=0.8,
         help="Fraction of generated dataset used for training when split is enabled.",
     )
-    parser.add_argument(
-        "--split-seed",
-        type=int,
-        default=42,
-        help="Random seed for generated dataset splitting.",
-    )
-    parser.add_argument("--format", type=str, default="gen9customgame")
-    parser.add_argument("--seed", type=int, default=42, help="Global random seed for reproducible training/evaluation.")
-    parser.add_argument(
-        "--train-generator-seed",
-        type=int,
-        default=None,
-        help="Seed used by random-generated training opponent sampler (defaults to --seed).",
-    )
-    parser.add_argument(
-        "--eval-generator-seed",
-        type=int,
-        default=None,
-        help="Seed used by random-generated evaluation opponent sampler (defaults to --seed).",
-    )
-    parser.add_argument(
-        "--eval-every-timesteps",
-        type=int,
-        default=0,
-        help="If > 0, run evaluation every N training timesteps and print progress.",
-    )
+    parser.add_argument("--split-seed", type=int, default=42)
+
+    # Optional: separate generator seeds (defaults to --seed)
+    parser.add_argument("--train-generator-seed", type=int, default=None)
+    parser.add_argument("--eval-generator-seed", type=int, default=None)
+
     return parser
 
 
-def _resolve_generator_seed(explicit_seed: int | None, fallback_seed: int) -> int:
-    if explicit_seed is not None:
-        return explicit_seed
-    return fallback_seed
+def _resolve_seed(explicit: Optional[int], fallback: int) -> int:
+    return fallback if explicit is None else explicit
 
 
-def _build_generated_opponent_generators(
-        split_generated_pool: bool,
-        train_split: float,
-        split_seed: int,
-        train_generator_seed: int,
-        eval_generator_seed: int,
-        data_path: str = 'data/gen9randombattle_db.json',
-):
-    if split_generated_pool:
-        train_pool, eval_pool = _resolve_generated_pools(
-            data_path=data_path,
-            train_split=train_split,
-            split_seed=split_seed,
-        )
+@dataclass(frozen=True)
+class OpponentsResolved:
+    train_names: list[str]
+    eval_names: list[str]
+    train_gen: Optional[Iterable]
+    eval_gen: Optional[Iterable]
+
+
+def _resolve_opponents(args) -> OpponentsResolved:
+    """
+    Single source of truth for:
+      - train opponent names or generator
+      - eval opponent names or generator
+    """
+
+    # ---- TRAIN opponents ----
+    train_names: list[str] = []
+    train_gen = None
+
+    if args.random_generated:
+        # build generators (possibly split)
+        train_seed = _resolve_seed(args.train_generator_seed, args.seed)
+        eval_seed = _resolve_seed(args.eval_generator_seed, args.seed)
+
+        if args.split_generated_pool:
+            train_pool, eval_pool = _resolve_generated_pools(
+                data_path="data/gen9randombattle_db.json",
+                train_split=args.train_split,
+                split_seed=args.split_seed,
+            )
+        else:
+            shared_pool = load_pokemon_pool("data/gen9randombattle_db.json")
+            train_pool = eval_pool = shared_pool
+
+        train_gen = single_simple_team_generator(pokemon_pool=train_pool, seed=train_seed)
+        eval_gen = single_simple_team_generator(pokemon_pool=eval_pool, seed=eval_seed)
     else:
-        shared_pool = load_pokemon_pool(data_path)
-        train_pool, eval_pool = shared_pool, shared_pool
+        # name-based pools
+        train_names = _parse_pool(args.pool, args.pool_all)
+        eval_gen = None
 
-    train_opponent_generator = single_simple_team_generator(
-        pokemon_pool=train_pool,
-        seed=train_generator_seed,
+    # ---- EVAL opponents ----
+    # If user explicitly provided an eval pool override, use it.
+    if args.eval_pool is not None or args.eval_pool_all:
+        eval_names = _parse_pool(args.eval_pool, args.eval_pool_all)
+    else:
+        # Otherwise:
+        # - if training used names => eval uses same names
+        # - if training used generated => eval will use generator (handled above)
+        eval_names = train_names
+
+    # if not generated, eval_gen must be None
+    if not args.random_generated:
+        eval_gen = None
+
+    return OpponentsResolved(
+        train_names=train_names,
+        eval_names=eval_names,
+        train_gen=train_gen,
+        eval_gen=eval_gen,
     )
-    eval_opponent_generator = single_simple_team_generator(
-        pokemon_pool=eval_pool,
-        seed=eval_generator_seed,
-    )
-    return train_opponent_generator, eval_opponent_generator
 
 
 def main():
-    parser = build_arg_parser()
-    args = parser.parse_args()
+    args = build_arg_parser().parse_args()
 
     battle_format = args.format
-    opponent_names = _parse_pool(args.pool, args.pool_all)
-    train_team = TEAM_BY_NAME.get(args.train_team, STEELIX_TEAM)
+    train_team = TEAM_BY_NAME.get(args.train_team) if args.train_team else None
 
-    train_opponent_generator = None
-    eval_opponent_generator = None
-    if args.random_generated:
-        train_generator_seed = _resolve_generator_seed(args.train_generator_seed, args.seed)
-        eval_generator_seed = _resolve_generator_seed(args.eval_generator_seed, args.seed)
-        train_opponent_generator, eval_opponent_generator = _build_generated_opponent_generators(
-            split_generated_pool=args.split_generated_pool,
-            train_split=args.train_split,
-            split_seed=args.split_seed,
-            train_generator_seed=train_generator_seed,
-            eval_generator_seed=eval_generator_seed,
-        )
+    opp = _resolve_opponents(args)
 
-    eval_opponent_names = _parse_pool(args.pool, args.eval_pool_all) if not opponent_names else opponent_names
     eval_kwargs = {
         "battle_format": battle_format,
         "train_team": train_team,
-        "opponent_names": eval_opponent_names,
-        "opponent_generator": eval_opponent_generator,
+        "opponent_names": opp.eval_names,
+        "opponent_generator": opp.eval_gen,
         "episodes_per_opponent": args.eval_episodes,
         "max_steps": args.eval_max_steps,
-        "eval_pool": args.eval_pool,
+        "eval_pool": args.eval_pool_size,
     }
 
     model = train_model(
         model_path=args.model_path,
         battle_format=battle_format,
         train_team=train_team,
-        opponent_names=opponent_names,
-        opponent_generator=train_opponent_generator,
+        opponent_names=opp.train_names,
+        opponent_generator=opp.train_gen,
         timesteps=args.timesteps,
         rounds_per_opponent=args.rounds_per_opponent,
         eval_every_timesteps=args.eval_every_timesteps,
