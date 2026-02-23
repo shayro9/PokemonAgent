@@ -81,7 +81,7 @@ def embed_move(move: Move, opp_types, gen) -> np.ndarray:
     # 8) Recoil / Drain
     # ---------------------------------------------------
     vec.append(0 if not move.recoil else -move.recoil)
-    vec.append(move.drain)
+    vec.append(move.drain or 0.0)
     # ---------------------------------------------------
     # 9) Multihit
     # ---------------------------------------------------
