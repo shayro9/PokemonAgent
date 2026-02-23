@@ -23,7 +23,7 @@ def embed_move(move: Move, opp_types, gen) -> np.ndarray:
     """
     vec: List[float] = []
     # ---------------------------------------------------
-    # 2) Scalars
+    # 1) Scalars
     # ---------------------------------------------------
     vec.append(_scale_01(move.base_power or 0, 200.0))
 

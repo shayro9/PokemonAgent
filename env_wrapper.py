@@ -6,6 +6,9 @@ from poke_env.data import GenData
 from embedding import *
 import gymnasium as gym
 
+MAX_MOVES = 4
+MOVE_EMBED_LEN = 4 + len(MoveCategory) + 1 + len(Status) + 7 + 7 + 2 + 2
+
 
 class PokemonRLWrapper(SinglesEnv):
     def __init__(
@@ -92,9 +95,11 @@ class PokemonRLWrapper(SinglesEnv):
         weight_one_hot = np.zeros(6, dtype=np.float32)
         weight_one_hot[bucket] = 1.0
 
-        my_moves = []
-        for move in battle.available_moves:
-            my_moves.extend(embed_move(move, opp_types, battle.gen))
+        my_moves = np.zeros(MAX_MOVES * MOVE_EMBED_LEN, dtype=np.float32)
+
+        for i, move in enumerate(battle.available_moves[:MAX_MOVES]):
+            emb = embed_move(move, opp_types, battle.gen)
+            my_moves[i * MOVE_EMBED_LEN: (i + 1) * MOVE_EMBED_LEN] = emb
 
         opp_preparing = float(opp.preparing)
 
