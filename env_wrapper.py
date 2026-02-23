@@ -3,24 +3,15 @@ from poke_env.battle import Move
 from poke_env.environment import SinglesEnv
 from poke_env.battle.pokemon_type import PokemonType
 from poke_env.data import GenData
-from embedding import *
 import gymnasium as gym
-
-MAX_MOVES = 4
-MOVE_EMBED_LEN = 4 + len(MoveCategory) + 1 + len(Status) + 7 + 7 + 2 + 2
-
-ACTION_DEFAULT = -2
-ACTION_FORFEIT = -1
-ACTION_SWITCH_RANGE = range(0, 6)
-ACTION_MOVE_RANGE = range(6, 10)
-ACTION_MEGA_RANGE = range(10, 14)
-ACTION_ZMOVE_RANGE = range(14, 18)
-ACTION_DYNAMAX_RANGE = range(18, 22)
-ACTION_TERASTALLIZE_RANGE = range(22, 26)
+from action_masking import *
 
 
-def _slot_is_available(sequence, slot: int) -> bool:
-    return 0 <= slot < len(sequence)
+def _sample_valid_action(mask: np.ndarray, default: int) -> int:
+    valid = np.flatnonzero(mask)
+    if valid.size == 0:
+        return int(default)
+    return int(np.random.choice(valid))
 
 
 class PokemonRLWrapper(SinglesEnv):
@@ -45,7 +36,7 @@ class PokemonRLWrapper(SinglesEnv):
         self.opponent_team_generator = opponent_team_generator
         self._last_team_update_round = None
 
-        self._action_space = gym.spaces.Discrete(4)
+        self._action_space = gym.spaces.Discrete(26)
         self.action_spaces = {
             agent: self._action_space for agent in self.possible_agents
         }
@@ -61,63 +52,29 @@ class PokemonRLWrapper(SinglesEnv):
         self.rounds_played = 0
         self.rounds_per_opponents = rounds_per_opponents
 
-    def get_valid_action_mask(
-            self,
-            battle,
-            *,
-            allow_switches: bool = True,
-            allow_moves: bool = True,
-            allow_mega: bool = True,
-            allow_zmove: bool = True,
-            allow_dynamax: bool = True,
-            allow_terastallize: bool = True,
-    ) -> np.ndarray:
-        """Returns a mask over the canonical action space [0..25]."""
-        mask = np.zeros(26, dtype=bool)
-
-        if allow_switches:
-            available_switches = getattr(battle, "available_switches", [])
-            for slot, action in enumerate(ACTION_SWITCH_RANGE):
-                mask[action] = _slot_is_available(available_switches, slot)
-
-        if allow_moves:
-            available_moves = getattr(battle, "available_moves", [])
-            for slot, action in enumerate(ACTION_MOVE_RANGE):
-                mask[action] = _slot_is_available(available_moves, slot)
-
-            if allow_mega and getattr(battle, "can_mega_evolve", False):
-                for slot, action in enumerate(ACTION_MEGA_RANGE):
-                    mask[action] = _slot_is_available(available_moves, slot)
-
-            if allow_zmove and getattr(battle, "can_z_move", False):
-                available_z_moves = getattr(battle, "available_z_moves", [])
-                for slot, action in enumerate(ACTION_ZMOVE_RANGE):
-                    mask[action] = _slot_is_available(available_z_moves, slot)
-
-            if allow_dynamax and getattr(battle, "can_dynamax", False):
-                for slot, action in enumerate(ACTION_DYNAMAX_RANGE):
-                    mask[action] = _slot_is_available(available_moves, slot)
-
-            if allow_terastallize and getattr(battle, "can_tera", False):
-                for slot, action in enumerate(ACTION_TERASTALLIZE_RANGE):
-                    mask[action] = _slot_is_available(available_moves, slot)
-
-        return mask
-
     def action_to_order(self, action, battle, fake=False, strict=True):
-        # Current training setup is 1v1 move-only: [0..3] maps to canonical move actions [6..9].
-        canonical_action = int(action) + ACTION_MOVE_RANGE.start if int(action) < 4 else int(action)
-        valid_mask = self.get_valid_action_mask(
-            battle,
-            allow_switches=False,
+        canonical_action = action
+
+        mask = get_valid_action_mask(
+            battle=battle,
+            allow_switches=True,
             allow_moves=True,
-            allow_mega=False,
-            allow_zmove=False,
-            allow_dynamax=False,
-            allow_terastallize=False,
+            allow_mega=True,
+            allow_zmove=True,
+            allow_dynamax=True,
+            allow_terastallize=True,
         )
 
-        if not (0 <= canonical_action < len(valid_mask)) or not valid_mask[canonical_action]:
+        if not (0 <= canonical_action < len(mask)):
+            if strict:
+                raise ValueError(f"Action {canonical_action} out of bounds for action space size {len(mask)}.")
+            canonical_action = ACTION_DEFAULT
+
+        # Validity check
+        elif not mask[canonical_action]:
+            if strict:
+                raise ValueError(
+                    f"Invalid action {canonical_action} selected. Valid actions: {np.flatnonzero(mask).tolist()}")
             canonical_action = ACTION_DEFAULT
 
         return super().action_to_order(canonical_action, battle, fake, strict)

@@ -3,6 +3,7 @@ import unittest
 from contextlib import redirect_stdout
 from types import SimpleNamespace
 from unittest.mock import patch
+from action_masking import get_valid_action_mask
 
 import numpy as np
 
@@ -193,9 +194,8 @@ class ActionMaskTests(unittest.TestCase):
 
     def test_get_valid_action_mask_move_only_for_1v1(self):
         battle = self._make_battle()
-        wrapper = object.__new__(PokemonRLWrapper)
 
-        mask = wrapper.get_valid_action_mask(
+        mask = get_valid_action_mask(
             battle,
             allow_switches=False,
             allow_moves=True,
@@ -211,9 +211,8 @@ class ActionMaskTests(unittest.TestCase):
 
     def test_get_valid_action_mask_supports_extended_action_types(self):
         battle = self._make_battle()
-        wrapper = object.__new__(PokemonRLWrapper)
 
-        mask = wrapper.get_valid_action_mask(battle)
+        mask = get_valid_action_mask(battle)
 
         self.assertTrue(mask[0])
         self.assertTrue(mask[6])
@@ -225,6 +224,7 @@ class ActionMaskTests(unittest.TestCase):
         self.assertFalse(mask[ACTION_ZMOVE_RANGE.start + 2])
 
     def test_action_to_order_uses_default_when_selected_move_is_unavailable(self):
+        # Only 2 moves are available => canonical move actions valid: 6,7; invalid: 8,9
         battle = SimpleNamespace(
             available_moves=[object(), object()],
             available_switches=[],
@@ -236,20 +236,24 @@ class ActionMaskTests(unittest.TestCase):
         )
         wrapper = object.__new__(PokemonRLWrapper)
 
+        invalid_canonical_move = ACTION_MOVE_RANGE.start + 3  # canonical "move slot 4" == 9
+
         with patch("poke_env.environment.singles_env.SinglesEnv.action_to_order", return_value="ok") as super_call:
-            result = wrapper.action_to_order(3, battle, fake=True, strict=False)
+            result = wrapper.action_to_order(invalid_canonical_move, battle, fake=True, strict=False)
 
         self.assertEqual(result, "ok")
         super_call.assert_called_once_with(ACTION_DEFAULT, battle, True, False)
 
-    def test_action_to_order_maps_move_indices_to_canonical_actions(self):
+    def test_action_to_order_passes_canonical_actions_through(self):
         battle = self._make_battle()
         wrapper = object.__new__(PokemonRLWrapper)
 
-        with patch("poke_env.environment.singles_env.SinglesEnv.action_to_order", return_value="ok") as super_call:
-            wrapper.action_to_order(1, battle, fake=False, strict=True)
+        canonical_action = ACTION_MOVE_RANGE.start + 1  # 7, should be valid given _make_battle has 3 moves
 
-        super_call.assert_called_once_with(ACTION_MOVE_RANGE.start + 1, battle, False, True)
+        with patch("poke_env.environment.singles_env.SinglesEnv.action_to_order", return_value="ok") as super_call:
+            wrapper.action_to_order(canonical_action, battle, fake=False, strict=True)
+
+        super_call.assert_called_once_with(canonical_action, battle, False, True)
 
 
 if __name__ == "__main__":
