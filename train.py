@@ -9,16 +9,39 @@ from sb3_contrib.common.maskable.utils import get_action_masks
 from poke_env import LocalhostServerConfiguration, RandomPlayer, MaxBasePowerPlayer
 from poke_env.environment import SingleAgentWrapper
 from stable_baselines3.common.utils import set_random_seed
+from sb3_contrib.common.wrappers import ActionMasker
 
 from env_wrapper import PokemonRLWrapper
 from teams.single_teams import ALL_SOLO_TEAMS, STEELIX_TEAM
 from teams.team_generators import load_pokemon_pool, single_simple_team_generator, split_pokemon_pool
 
 TEAM_BY_NAME = {name: team for name, team in ALL_SOLO_TEAMS}
+DEFAULT_DATA_PATH = "data/gen9randombattle_db.json"
 
 
 def _get_action_masks(env: SingleAgentWrapper) -> np.ndarray:
     return get_action_masks(env)
+
+
+def _wrap_action_masker(env, *, enabled: bool):
+    """
+    If enabled, attach ActionMasker so MaskablePPO (and others) can use masks.
+    If disabled, return env unchanged.
+    """
+    if not enabled:
+        return env
+
+    def mask_fn(e):
+        base = e
+        if hasattr(base, "unwrapped"):
+            base = base.unwrapped
+
+        if hasattr(base, "env") and hasattr(base.env, "unwrapped"):
+            base = base.env.unwrapped
+
+        return base.action_masks()
+
+    return ActionMasker(env, mask_fn)
 
 
 @dataclass
@@ -84,6 +107,7 @@ def _build_train_env(
         opponent_pool: list[str] = None,
         agent_team_generator=None,
         battle_team_generator=None,
+        use_action_masking: bool = False,
 ) -> SingleAgentWrapper:
     if not opponent_pool:
         opponent_pool = [TEAM_BY_NAME[name] for name in opponent_names]
@@ -105,7 +129,9 @@ def _build_train_env(
         strict=False,
     )
 
-    return SingleAgentWrapper(agent, opponent_policy)
+    env = SingleAgentWrapper(agent, opponent_policy)
+    env = _wrap_action_masker(env, enabled=use_action_masking)
+    return env
 
 
 def train_model(
@@ -126,6 +152,10 @@ def train_model(
     np.random.seed(seed)
     set_random_seed(seed)
 
+    # TODO: add from args
+    algo = "maskable_ppo"
+    use_action_masking = (algo == "maskable_ppo")
+
     train_env = _build_train_env(
         train_team,
         battle_format,
@@ -134,6 +164,7 @@ def train_model(
         rounds_per_opponent,
         agent_team_generator=agent_team_generator,
         battle_team_generator=battle_team_generator,
+        use_action_masking=use_action_masking,
     )
 
     model = MaskablePPO(
@@ -151,8 +182,13 @@ def train_model(
         seed=seed,
     )
 
+    team_label = (
+        next(name for name, team in TEAM_BY_NAME.items() if team == train_team)
+        if train_team is not None
+        else "generated"
+    )
     print(
-        f"Starting training: team={next(name for name, team in TEAM_BY_NAME.items() if team == train_team)} | pool={opponent_names} | "
+        f"Starting training: team={team_label} | pool={opponent_names} | "
         f"rounds_per_opponent={rounds_per_opponent}"
     )
     if eval_every_timesteps > 0 and eval_kwargs:
@@ -219,6 +255,10 @@ def evaluate_model(
     results: list[EvalResult] = []
     eval_opponents: list[tuple[str, str]] = []
 
+    # TODO: add from args
+    algo = "maskable_ppo"
+    use_action_masking = (algo == "maskable_ppo")
+
     if not opponent_names:
         opponent_pool = _generate_eval_pool(eval_pool, opponent_generator)
         opponent_names = [name.split("|")[0] for name in opponent_pool]
@@ -241,6 +281,7 @@ def evaluate_model(
             rounds_per_opponent=episodes_per_opponent,
             opponent_pool=[opponent_team],
             agent_team_generator=agent_team_generator,
+            use_action_masking=use_action_masking,
         )
 
         wins = 0
@@ -339,7 +380,6 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--split-seed", type=int, default=42)
 
-    # Optional: separate generator seeds (defaults to --seed)
     parser.add_argument("--train-generator-seed", type=int, default=None)
     parser.add_argument("--eval-generator-seed", type=int, default=None)
 
@@ -360,6 +400,13 @@ class OpponentsResolved:
     eval_agent_gen: Optional[Iterable]
 
 
+def _mix_seed(base: int | None, salt: str) -> int | None:
+    if base is None:
+        return None
+
+    return hash((base, salt)) & 0x7FFFFFFF
+
+
 def _resolve_opponents(args) -> OpponentsResolved:
     """
     Single source of truth for:
@@ -378,9 +425,14 @@ def _resolve_opponents(args) -> OpponentsResolved:
         train_seed = _resolve_seed(args.train_generator_seed, args.seed)
         eval_seed = _resolve_seed(args.eval_generator_seed, args.seed)
 
-        default_data_path = "data/gen9randombattle_db.json"
-        agent_data_path = args.agent_data_path or default_data_path
-        opponent_data_path = args.opponent_data_path or default_data_path
+        train_opp_seed = _mix_seed(train_seed, "train_opp")
+        train_agent_seed = _mix_seed(train_seed, "train_agent")
+
+        eval_opp_seed = _mix_seed(eval_seed, "eval_opp")
+        eval_agent_seed = _mix_seed(eval_seed, "eval_agent")
+
+        agent_data_path = args.agent_data_path or DEFAULT_DATA_PATH
+        opponent_data_path = args.opponent_data_path or DEFAULT_DATA_PATH
 
         if args.split_generated_pool:
             if agent_data_path == opponent_data_path:
@@ -414,12 +466,12 @@ def _resolve_opponents(args) -> OpponentsResolved:
             train_agent_pool = eval_agent_pool = shared_agent_pool
             train_opponent_pool = eval_opponent_pool = shared_opponent_pool
 
-        train_gen = single_simple_team_generator(pokemon_pool=train_opponent_pool, seed=train_seed)
-        eval_gen = single_simple_team_generator(pokemon_pool=eval_opponent_pool, seed=eval_seed)
+        train_gen = single_simple_team_generator(pokemon_pool=train_opponent_pool, seed=train_opp_seed)
+        eval_gen = single_simple_team_generator(pokemon_pool=eval_opponent_pool, seed=eval_opp_seed)
 
         if args.train_team is None:
-            train_agent_gen = single_simple_team_generator(pokemon_pool=train_agent_pool, seed=train_seed)
-            eval_agent_gen = single_simple_team_generator(pokemon_pool=eval_agent_pool, seed=eval_seed)
+            train_agent_gen = single_simple_team_generator(pokemon_pool=train_agent_pool, seed=train_agent_seed)
+            eval_agent_gen = single_simple_team_generator(pokemon_pool=eval_agent_pool, seed=eval_agent_seed)
     else:
         # name-based pools
         train_names = _parse_pool(args.pool, args.pool_all)

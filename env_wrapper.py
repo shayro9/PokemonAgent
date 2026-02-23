@@ -43,7 +43,7 @@ class PokemonRLWrapper(SinglesEnv):
         }
         self.observation_spaces = {
             agent: gym.spaces.Box(
-                low=-1.0, high=1.0, shape=(163,), dtype=np.float32
+                low=-1.0, high=1.0, shape=(164,), dtype=np.float32
             )
             for agent in self.possible_agents
         }
