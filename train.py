@@ -4,7 +4,8 @@ from dataclasses import dataclass
 from typing import Optional, Tuple, Iterable
 
 import numpy as np
-from stable_baselines3 import DQN
+from sb3_contrib import MaskablePPO
+from sb3_contrib.common.maskable.utils import get_action_masks
 from poke_env import LocalhostServerConfiguration, RandomPlayer, MaxBasePowerPlayer
 from poke_env.environment import SingleAgentWrapper
 from stable_baselines3.common.utils import set_random_seed
@@ -14,6 +15,10 @@ from teams.single_teams import ALL_SOLO_TEAMS, STEELIX_TEAM
 from teams.team_generators import load_pokemon_pool, single_simple_team_generator, split_pokemon_pool
 
 TEAM_BY_NAME = {name: team for name, team in ALL_SOLO_TEAMS}
+
+
+def _get_action_masks(env: SingleAgentWrapper) -> np.ndarray:
+    return get_action_masks(env)
 
 
 @dataclass
@@ -116,7 +121,7 @@ def train_model(
         agent_team_generator=None,
         battle_team_generator=None,
         seed: int = 42,
-) -> DQN:
+) -> MaskablePPO:
     random.seed(seed)
     np.random.seed(seed)
     set_random_seed(seed)
@@ -131,21 +136,16 @@ def train_model(
         battle_team_generator=battle_team_generator,
     )
 
-    model = DQN(
+    model = MaskablePPO(
         "MlpPolicy",
         train_env,
         learning_rate=3e-4,
-        buffer_size=100_000,
-        learning_starts=2_000,
+        n_steps=2048,
         batch_size=64,
-        tau=1.0,
         gamma=0.999,
-        train_freq=1,
-        gradient_steps=1,
-        target_update_interval=1000,
-        exploration_fraction=0.7,
-        exploration_initial_eps=1.0,
-        exploration_final_eps=0.05,
+        gae_lambda=0.95,
+        ent_coef=0.01,
+        clip_range=0.2,
         max_grad_norm=10.0,
         verbose=0,
         seed=seed,
@@ -174,14 +174,14 @@ def train_model(
     return model
 
 
-def _play_episode(eval_env: SingleAgentWrapper, model: DQN, max_steps: int) -> tuple[float, bool]:
+def _play_episode(eval_env: SingleAgentWrapper, model: MaskablePPO, max_steps: int) -> tuple[float, bool]:
     obs, _ = eval_env.reset()
     terminated = False
     truncated = False
     total_reward = 0.0
 
     for _ in range(max_steps):
-        action, _ = model.predict(obs, deterministic=True)
+        action, _ = model.predict(obs, deterministic=True, action_masks=_get_action_masks(eval_env))
         obs, reward, terminated, truncated, _ = eval_env.step(action)
         total_reward += float(reward)
 
@@ -206,7 +206,7 @@ def _generate_eval_pool(pool_size: int, opponent_generator) -> list[str]:
 
 
 def evaluate_model(
-        model: DQN,
+        model: MaskablePPO,
         train_team: str,
         battle_format: str,
         opponent_names: list[str],
@@ -274,7 +274,7 @@ def print_eval_summary(results: list[EvalResult]) -> None:
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Train a DQN Pokémon bot against a pool and run per-opponent evaluation."
+        description="Train a MaskablePPO Pokémon bot against a pool and run per-opponent evaluation."
     )
 
     # Core
