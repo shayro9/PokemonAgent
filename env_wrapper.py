@@ -35,6 +35,7 @@ class PokemonRLWrapper(SinglesEnv):
         self.agent_team_generator = agent_team_generator
         self.opponent_team_generator = opponent_team_generator
         self._last_team_update_round = None
+        self._latest_battle = None
 
         self._action_space = gym.spaces.Discrete(26)
         self.action_spaces = {
@@ -79,9 +80,20 @@ class PokemonRLWrapper(SinglesEnv):
 
         return super().action_to_order(canonical_action, battle, fake, strict)
 
+    def action_masks(self) -> np.ndarray:
+        """MaskablePPO-compatible action mask for the latest observed battle state."""
+        battle = self._latest_battle
+
+        if battle is None:
+            # Conservative fallback for the first call before embed_battle runs.
+            return np.ones(self._action_space.n, dtype=bool)
+
+        return get_valid_action_mask(battle)
+
     def reset(self, *args, **kwargs):
         self.last_hp = {}
         self.last_fainted = {}
+        self._latest_battle = None
         if (
                 self.rounds_played % self.rounds_per_opponents == 0
                 and self._last_team_update_round != self.rounds_played
@@ -103,6 +115,8 @@ class PokemonRLWrapper(SinglesEnv):
         return super().reset(*args, **kwargs)
 
     def embed_battle(self, battle):
+        # Keep the latest battle so MaskablePPO can query action masks via action_masks().
+        self._latest_battle = battle
         my = battle.active_pokemon
         opp = battle.opponent_active_pokemon
 
