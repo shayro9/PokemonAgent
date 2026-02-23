@@ -47,8 +47,6 @@ def _parse_pool(raw_pool: str | None, pool_all: bool) -> list[str]:
     return names
 
 
-
-
 def _resolve_generated_pools(
         data_path: str,
         train_split: float,
@@ -66,6 +64,7 @@ def _resolve_generated_pools(
         f"Generated pool split: train={len(train_pool)} samples, eval={len(eval_pool)} samples (seed={split_seed}, train_split={train_split})"
     )
     return train_pool, eval_pool
+
 
 def _build_train_env(
         agent_team: str,

@@ -9,19 +9,19 @@ from teams.team_generators import single_simple_team_generator
 
 
 async def main():
-    team = next(single_simple_team_generator(data_path='data/gen9nationaldex.json'))
+    team = next(single_simple_team_generator(data_path='data/gen9randombattle_db.json'))
 
     env = PokemonRLWrapper(
         battle_format="gen9nationaldex",
-        team=STEELIX_TEAM,
-        opponent_teams=STEELIX_TEAM,
+        team=DARMANITAN_TEAM,
+        opponent_teams=DARMANITAN_TEAM,
         strict=False,
     )
 
     debug_player = DebugRLPlayer(
         env,
         battle_format="gen9nationaldex",
-        team=STEELIX_TEAM,
+        team=DARMANITAN_TEAM,
     )
 
     print("Sending challenge...")
