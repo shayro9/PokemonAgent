@@ -214,6 +214,7 @@ def evaluate_model(
         episodes_per_opponent: int,
         max_steps: int,
         eval_pool: int,
+        agent_team_generator=None,
 ) -> list[EvalResult]:
     results: list[EvalResult] = []
     eval_opponents: list[tuple[str, str]] = []
@@ -239,6 +240,7 @@ def evaluate_model(
             opponent_generator=None,
             rounds_per_opponent=episodes_per_opponent,
             opponent_pool=[opponent_team],
+            agent_team_generator=agent_team_generator,
         )
 
         wins = 0
@@ -312,6 +314,18 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
     # Generated dataset split (only meaningful if --random-generated)
     parser.add_argument(
+        "--agent-data-path",
+        type=str,
+        default=None,
+        help="Path to generated dataset used for the agent team generator. Defaults to data/gen9randombattle_db.json.",
+    )
+    parser.add_argument(
+        "--opponent-data-path",
+        type=str,
+        default=None,
+        help="Path to generated dataset used for the opponent team generator. Defaults to data/gen9randombattle_db.json.",
+    )
+    parser.add_argument(
         "--split-generated-pool",
         action="store_true",
         default=False,
@@ -342,6 +356,8 @@ class OpponentsResolved:
     eval_names: list[str]
     train_gen: Optional[Iterable]
     eval_gen: Optional[Iterable]
+    train_agent_gen: Optional[Iterable]
+    eval_agent_gen: Optional[Iterable]
 
 
 def _resolve_opponents(args) -> OpponentsResolved:
@@ -354,24 +370,56 @@ def _resolve_opponents(args) -> OpponentsResolved:
     # ---- TRAIN opponents ----
     train_names: list[str] = []
     train_gen = None
+    train_agent_gen = None
+    eval_agent_gen = None
 
     if args.random_generated:
         # build generators (possibly split)
         train_seed = _resolve_seed(args.train_generator_seed, args.seed)
         eval_seed = _resolve_seed(args.eval_generator_seed, args.seed)
 
-        if args.split_generated_pool:
-            train_pool, eval_pool = _resolve_generated_pools(
-                data_path="data/gen9randombattle_db.json",
-                train_split=args.train_split,
-                split_seed=args.split_seed,
-            )
-        else:
-            shared_pool = load_pokemon_pool("data/gen9randombattle_db.json")
-            train_pool = eval_pool = shared_pool
+        default_data_path = "data/gen9randombattle_db.json"
+        agent_data_path = args.agent_data_path or default_data_path
+        opponent_data_path = args.opponent_data_path or default_data_path
 
-        train_gen = single_simple_team_generator(pokemon_pool=train_pool, seed=train_seed)
-        eval_gen = single_simple_team_generator(pokemon_pool=eval_pool, seed=eval_seed)
+        if args.split_generated_pool:
+            if agent_data_path == opponent_data_path:
+                train_pool, eval_pool = _resolve_generated_pools(
+                    data_path=agent_data_path,
+                    train_split=args.train_split,
+                    split_seed=args.split_seed,
+                )
+                train_agent_pool = train_pool
+                eval_agent_pool = eval_pool
+                train_opponent_pool = train_pool
+                eval_opponent_pool = eval_pool
+            else:
+                train_agent_pool, eval_agent_pool = _resolve_generated_pools(
+                    data_path=agent_data_path,
+                    train_split=args.train_split,
+                    split_seed=args.split_seed,
+                )
+                train_opponent_pool, eval_opponent_pool = _resolve_generated_pools(
+                    data_path=opponent_data_path,
+                    train_split=args.train_split,
+                    split_seed=args.split_seed,
+                )
+        else:
+            shared_agent_pool = load_pokemon_pool(agent_data_path)
+            shared_opponent_pool = (
+                shared_agent_pool
+                if agent_data_path == opponent_data_path
+                else load_pokemon_pool(opponent_data_path)
+            )
+            train_agent_pool = eval_agent_pool = shared_agent_pool
+            train_opponent_pool = eval_opponent_pool = shared_opponent_pool
+
+        train_gen = single_simple_team_generator(pokemon_pool=train_opponent_pool, seed=train_seed)
+        eval_gen = single_simple_team_generator(pokemon_pool=eval_opponent_pool, seed=eval_seed)
+
+        if args.train_team is None:
+            train_agent_gen = single_simple_team_generator(pokemon_pool=train_agent_pool, seed=train_seed)
+            eval_agent_gen = single_simple_team_generator(pokemon_pool=eval_agent_pool, seed=eval_seed)
     else:
         # name-based pools
         train_names = _parse_pool(args.pool, args.pool_all)
@@ -396,6 +444,8 @@ def _resolve_opponents(args) -> OpponentsResolved:
         eval_names=eval_names,
         train_gen=train_gen,
         eval_gen=eval_gen,
+        train_agent_gen=train_agent_gen,
+        eval_agent_gen=eval_agent_gen,
     )
 
 
@@ -415,6 +465,7 @@ def main():
         "episodes_per_opponent": args.eval_episodes,
         "max_steps": args.eval_max_steps,
         "eval_pool": args.eval_pool_size,
+        "agent_team_generator": opp.eval_agent_gen,
     }
 
     model = train_model(
@@ -427,6 +478,7 @@ def main():
         rounds_per_opponent=args.rounds_per_opponent,
         eval_every_timesteps=args.eval_every_timesteps,
         eval_kwargs=None if args.skip_eval else eval_kwargs,
+        agent_team_generator=opp.train_agent_gen,
         seed=args.seed,
     )
 
