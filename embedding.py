@@ -16,12 +16,11 @@ def _scale_m11(x: float, max_abs: float) -> float:
     return max(-1.0, min(1.0, x / max_abs)) if max_abs > 0 else 0.0
 
 
-def embed_move(move: Move) -> np.ndarray:
+def embed_move(move: Move, opp_types, gen) -> np.ndarray:
     """
     Embeds a poke_env Move object into a fixed-length vector.
     Fully based on poke-env enums (no hardcoded strings).
     """
-    print(move.boosts)
     vec: List[float] = []
     # ---------------------------------------------------
     # 2) Scalars
@@ -45,7 +44,9 @@ def embed_move(move: Move) -> np.ndarray:
     # ---------------------------------------------------
     # 3) Type multies
     # ---------------------------------------------------
-
+    type1, type2 = (opp_types + [None])[:2]
+    mult = move.type.damage_multiplier(type1, type2, type_chart=GenData.from_gen(gen).type_chart)
+    vec.append(-1.0 if mult == 0.0 else float(np.log2(mult) / 2.0))
     # ---------------------------------------------------
     # 4) Flags
     # ---------------------------------------------------
@@ -79,7 +80,8 @@ def embed_move(move: Move) -> np.ndarray:
     # ---------------------------------------------------
     # 8) Recoil / Drain
     # ---------------------------------------------------
-
+    vec.append(0 if not move.recoil else -move.recoil)
+    vec.append(move.drain)
     # ---------------------------------------------------
     # 9) Multihit
     # ---------------------------------------------------

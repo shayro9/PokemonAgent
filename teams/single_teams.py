@@ -31,6 +31,17 @@ Adamant Nature
 - Bulk Up
 """
 
+DARMANITAN_TEAM = """
+Darmanitan @ Choice Scarf  
+Ability: Sheer Force  
+EVs: 252 Atk / 4 SpD / 252 Spe  
+Jolly Nature  
+- Flare Blitz  
+- Rock Slide  
+- Earthquake  
+- U-turn
+"""
+
 ROTOM_WASH_TEAM = """
 Rotom-Wash  
 Ability: Levitate  

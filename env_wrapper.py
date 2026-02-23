@@ -94,7 +94,7 @@ class PokemonRLWrapper(SinglesEnv):
 
         my_moves = []
         for move in battle.available_moves:
-            my_moves.extend(embed_move(move))
+            my_moves.extend(embed_move(move, opp_types, battle.gen))
 
         opp_preparing = float(opp.preparing)
 
@@ -114,6 +114,17 @@ class PokemonRLWrapper(SinglesEnv):
         my = battle.active_pokemon
         opp = battle.opponent_active_pokemon
 
+        move_block = [
+            ("category", 3),
+            ("multiplier", 1),
+            ("status", 7),
+            ("boosts_target", 7),
+            ("boosts_self", 7),
+            ("recoil", 1),
+            ("drain", 1),
+            ("multi_hit", 2),
+        ]
+
         layout = [
             ("my_hp", 1),
             ("my_stats", len(my.stats)),
@@ -122,36 +133,17 @@ class PokemonRLWrapper(SinglesEnv):
             ("opp_base_stats", len(opp.base_stats)),
             ("opp_boosts", len(opp.boosts)),
             ("opp_preparing", 1),
-
-            ("move1", 4),
-            ("category", 3),
-            ("status", 7),
-            ("boosts_target", 7),
-            ("boosts_self", 7),
-            ("multi_hit", 2),
-            ("move2", 4),
-            ("category", 3),
-            ("status", 7),
-            ("boosts_target", 7),
-            ("boosts_self", 7),
-            ("multi_hit", 2),
-            ("move3", 4),
-            ("category", 3),
-            ("status", 7),
-            ("boosts_target", 7),
-            ("boosts_self", 7),
-            ("multi_hit", 2),
-            ("move4", 4),
-            ("category", 3),
-            ("status", 7),
-            ("boosts_target", 7),
-            ("boosts_self", 7),
-            ("multi_hit", 2),
-
-            ("type_multipliers (4)", 4),
-
-            ("weight_bucket (one-hot)", 6),
         ]
+
+        for i in range(1, 5):
+            layout.append((f"move{i}", 4))
+            layout.extend(move_block)
+
+        # Add final features
+        layout.extend([
+            ("type_multipliers (4)", 4),
+            ("weight_bucket (one-hot)", 6),
+        ])
 
         idx = 0
         lines = [f"{prefix} STATE BREAKDOWN"]
