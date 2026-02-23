@@ -2,11 +2,19 @@ import io
 import unittest
 from contextlib import redirect_stdout
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import numpy as np
 
 from embedding import calc_types_vector, embed_move
-from env_wrapper import MAX_MOVES, MOVE_EMBED_LEN, PokemonRLWrapper
+from env_wrapper import (
+    ACTION_DEFAULT,
+    ACTION_MOVE_RANGE,
+    ACTION_ZMOVE_RANGE,
+    MAX_MOVES,
+    MOVE_EMBED_LEN,
+    PokemonRLWrapper,
+)
 from poke_env.battle.move_category import MoveCategory
 from poke_env.battle.pokemon_type import PokemonType
 from poke_env.battle.status import Status
@@ -168,6 +176,80 @@ class StateEmbeddingTests(unittest.TestCase):
 
         self.assertIn(f"TOTAL DIMENSIONS: {expected_total}", message)
         self.assertIn(f"TOTAL DIMENSIONS: {expected_total}", printed)
+
+
+class ActionMaskTests(unittest.TestCase):
+    @staticmethod
+    def _make_battle():
+        return SimpleNamespace(
+            available_moves=[object(), object(), object()],
+            available_switches=[object()],
+            available_z_moves=[object(), object()],
+            can_mega_evolve=True,
+            can_z_move=True,
+            can_dynamax=False,
+            can_tera=False,
+        )
+
+    def test_get_valid_action_mask_move_only_for_1v1(self):
+        battle = self._make_battle()
+        wrapper = object.__new__(PokemonRLWrapper)
+
+        mask = wrapper.get_valid_action_mask(
+            battle,
+            allow_switches=False,
+            allow_moves=True,
+            allow_mega=False,
+            allow_zmove=False,
+            allow_dynamax=False,
+            allow_terastallize=False,
+        )
+
+        self.assertEqual(mask.dtype, np.bool_)
+        self.assertEqual(mask.shape, (26,))
+        self.assertTrue(np.array_equal(np.where(mask)[0], np.array([6, 7, 8])))
+
+    def test_get_valid_action_mask_supports_extended_action_types(self):
+        battle = self._make_battle()
+        wrapper = object.__new__(PokemonRLWrapper)
+
+        mask = wrapper.get_valid_action_mask(battle)
+
+        self.assertTrue(mask[0])
+        self.assertTrue(mask[6])
+        self.assertTrue(mask[8])
+        self.assertTrue(mask[10])
+        self.assertTrue(mask[12])
+        self.assertTrue(mask[ACTION_ZMOVE_RANGE.start])
+        self.assertTrue(mask[ACTION_ZMOVE_RANGE.start + 1])
+        self.assertFalse(mask[ACTION_ZMOVE_RANGE.start + 2])
+
+    def test_action_to_order_uses_default_when_selected_move_is_unavailable(self):
+        battle = SimpleNamespace(
+            available_moves=[object(), object()],
+            available_switches=[],
+            available_z_moves=[],
+            can_mega_evolve=False,
+            can_z_move=False,
+            can_dynamax=False,
+            can_tera=False,
+        )
+        wrapper = object.__new__(PokemonRLWrapper)
+
+        with patch("poke_env.environment.singles_env.SinglesEnv.action_to_order", return_value="ok") as super_call:
+            result = wrapper.action_to_order(3, battle, fake=True, strict=False)
+
+        self.assertEqual(result, "ok")
+        super_call.assert_called_once_with(ACTION_DEFAULT, battle, True, False)
+
+    def test_action_to_order_maps_move_indices_to_canonical_actions(self):
+        battle = self._make_battle()
+        wrapper = object.__new__(PokemonRLWrapper)
+
+        with patch("poke_env.environment.singles_env.SinglesEnv.action_to_order", return_value="ok") as super_call:
+            wrapper.action_to_order(1, battle, fake=False, strict=True)
+
+        super_call.assert_called_once_with(ACTION_MOVE_RANGE.start + 1, battle, False, True)
 
 
 if __name__ == "__main__":
