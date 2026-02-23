@@ -33,7 +33,11 @@ def split_pokemon_pool(
     return shuffled_pool[:split_index], shuffled_pool[split_index:]
 
 
-def single_simple_team_generator(data_path: str | None = None, pokemon_pool: list[dict] | None = None):
+def single_simple_team_generator(
+        data_path: str | None = None,
+        pokemon_pool: list[dict] | None = None,
+        seed: int | None = None,
+):
     if pokemon_pool is None:
         if data_path is None:
             raise ValueError("Either data_path or pokemon_pool must be provided.")
@@ -42,8 +46,10 @@ def single_simple_team_generator(data_path: str | None = None, pokemon_pool: lis
     if not pokemon_pool:
         raise ValueError("The database is empty. Run the Node.js script first!")
 
+    rng = random.Random(seed) if seed is not None else random
+
     while True:
-        sampled_mon = random.choice(pokemon_pool)
+        sampled_mon = rng.choice(pokemon_pool)
 
         yield generate_team(
             nickname=sampled_mon.get('name'),
