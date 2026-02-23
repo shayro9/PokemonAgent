@@ -1,9 +1,12 @@
 import argparse
+import random
 from dataclasses import dataclass
 
+import numpy as np
 from stable_baselines3 import DQN
 from poke_env import LocalhostServerConfiguration, RandomPlayer, MaxBasePowerPlayer
 from poke_env.environment import SingleAgentWrapper
+from stable_baselines3.common.utils import set_random_seed
 
 from env_wrapper import PokemonRLWrapper
 from teams.single_teams import ALL_SOLO_TEAMS, STEELIX_TEAM
@@ -107,9 +110,16 @@ def train_model(
         opponent_generator,
         timesteps: int,
         rounds_per_opponent: int,
+        eval_every_timesteps: int,
+        eval_kwargs: dict | None = None,
         agent_team_generator=None,
         battle_team_generator=None,
+        seed: int = 42,
 ) -> DQN:
+    random.seed(seed)
+    np.random.seed(seed)
+    set_random_seed(seed)
+
     train_env = _build_train_env(
         train_team,
         battle_format,
@@ -137,13 +147,26 @@ def train_model(
         exploration_final_eps=0.05,
         max_grad_norm=10.0,
         verbose=0,
+        seed=seed,
     )
 
     print(
         f"Starting training: team={next(name for name, team in TEAM_BY_NAME.items() if team == train_team)} | pool={opponent_names} | "
         f"rounds_per_opponent={rounds_per_opponent}"
     )
-    model.learn(total_timesteps=timesteps)
+    if eval_every_timesteps > 0 and eval_kwargs:
+        trained_steps = 0
+        while trained_steps < timesteps:
+            step_chunk = min(eval_every_timesteps, timesteps - trained_steps)
+            model.learn(total_timesteps=step_chunk, reset_num_timesteps=False)
+            trained_steps += step_chunk
+
+            eval_results = evaluate_model(model=model, **eval_kwargs)
+            print(f"\n[Eval @ {trained_steps} training timesteps]")
+            print_eval_summary(eval_results)
+    else:
+        model.learn(total_timesteps=timesteps)
+
     model.save(model_path)
     print(f"Training complete! Model saved as {model_path}.zip")
 
@@ -289,7 +312,61 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Random seed for generated dataset splitting.",
     )
     parser.add_argument("--format", type=str, default="gen9customgame")
+    parser.add_argument("--seed", type=int, default=42, help="Global random seed for reproducible training/evaluation.")
+    parser.add_argument(
+        "--train-generator-seed",
+        type=int,
+        default=None,
+        help="Seed used by random-generated training opponent sampler (defaults to --seed).",
+    )
+    parser.add_argument(
+        "--eval-generator-seed",
+        type=int,
+        default=None,
+        help="Seed used by random-generated evaluation opponent sampler (defaults to --seed).",
+    )
+    parser.add_argument(
+        "--eval-every-timesteps",
+        type=int,
+        default=0,
+        help="If > 0, run evaluation every N training timesteps and print progress.",
+    )
     return parser
+
+
+def _resolve_generator_seed(explicit_seed: int | None, fallback_seed: int) -> int:
+    if explicit_seed is not None:
+        return explicit_seed
+    return fallback_seed
+
+
+def _build_generated_opponent_generators(
+        split_generated_pool: bool,
+        train_split: float,
+        split_seed: int,
+        train_generator_seed: int,
+        eval_generator_seed: int,
+        data_path: str = 'data/gen9randombattle_db.json',
+):
+    if split_generated_pool:
+        train_pool, eval_pool = _resolve_generated_pools(
+            data_path=data_path,
+            train_split=train_split,
+            split_seed=split_seed,
+        )
+    else:
+        shared_pool = load_pokemon_pool(data_path)
+        train_pool, eval_pool = shared_pool, shared_pool
+
+    train_opponent_generator = single_simple_team_generator(
+        pokemon_pool=train_pool,
+        seed=train_generator_seed,
+    )
+    eval_opponent_generator = single_simple_team_generator(
+        pokemon_pool=eval_pool,
+        seed=eval_generator_seed,
+    )
+    return train_opponent_generator, eval_opponent_generator
 
 
 def main():
@@ -303,19 +380,26 @@ def main():
     train_opponent_generator = None
     eval_opponent_generator = None
     if args.random_generated:
-        data_path = 'data/gen9randombattle_db.json'
-        if args.split_generated_pool:
-            train_pool, eval_pool = _resolve_generated_pools(
-                data_path=data_path,
-                train_split=args.train_split,
-                split_seed=args.split_seed,
-            )
-            train_opponent_generator = single_simple_team_generator(pokemon_pool=train_pool)
-            eval_opponent_generator = single_simple_team_generator(pokemon_pool=eval_pool)
-        else:
-            shared_pool = load_pokemon_pool(data_path)
-            train_opponent_generator = single_simple_team_generator(pokemon_pool=shared_pool)
-            eval_opponent_generator = single_simple_team_generator(pokemon_pool=shared_pool)
+        train_generator_seed = _resolve_generator_seed(args.train_generator_seed, args.seed)
+        eval_generator_seed = _resolve_generator_seed(args.eval_generator_seed, args.seed)
+        train_opponent_generator, eval_opponent_generator = _build_generated_opponent_generators(
+            split_generated_pool=args.split_generated_pool,
+            train_split=args.train_split,
+            split_seed=args.split_seed,
+            train_generator_seed=train_generator_seed,
+            eval_generator_seed=eval_generator_seed,
+        )
+
+    eval_opponent_names = _parse_pool(args.pool, args.eval_pool_all) if not opponent_names else opponent_names
+    eval_kwargs = {
+        "battle_format": battle_format,
+        "train_team": train_team,
+        "opponent_names": eval_opponent_names,
+        "opponent_generator": eval_opponent_generator,
+        "episodes_per_opponent": args.eval_episodes,
+        "max_steps": args.eval_max_steps,
+        "eval_pool": args.eval_pool,
+    }
 
     model = train_model(
         model_path=args.model_path,
@@ -325,22 +409,15 @@ def main():
         opponent_generator=train_opponent_generator,
         timesteps=args.timesteps,
         rounds_per_opponent=args.rounds_per_opponent,
+        eval_every_timesteps=args.eval_every_timesteps,
+        eval_kwargs=None if args.skip_eval else eval_kwargs,
+        seed=args.seed,
     )
 
     if args.skip_eval:
         return
 
-    eval_opponent_names = _parse_pool(args.pool, args.eval_pool_all) if not opponent_names else opponent_names
-    eval_results = evaluate_model(
-        model=model,
-        battle_format=battle_format,
-        train_team=train_team,
-        opponent_names=eval_opponent_names,
-        opponent_generator=eval_opponent_generator,
-        episodes_per_opponent=args.eval_episodes,
-        max_steps=args.eval_max_steps,
-        eval_pool=args.eval_pool,
-    )
+    eval_results = evaluate_model(model=model, **eval_kwargs)
     print_eval_summary(eval_results)
 
 
