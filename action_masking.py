@@ -22,10 +22,10 @@ def get_valid_action_mask(
         *,
         allow_switches: bool = True,
         allow_moves: bool = True,
-        allow_mega: bool = True,
-        allow_zmove: bool = True,
-        allow_dynamax: bool = True,
-        allow_terastallize: bool = True,
+        allow_mega: bool = False,
+        allow_zmove: bool = False,
+        allow_dynamax: bool = False,
+        allow_terastallize: bool = False,
 ) -> np.ndarray:
     """Returns a mask over the canonical action space [0..25]."""
     mask = np.zeros(26, dtype=bool)
@@ -37,8 +37,12 @@ def get_valid_action_mask(
 
     if allow_moves:
         available_moves = getattr(battle, "available_moves", [])
+        all_moves = getattr(battle.active_pokemon, "moves", []).values()
+        move_mask = [move in available_moves for move in all_moves]
+        if not any(move_mask):
+            move_mask = [1, 0, 0, 0]
         for slot, action in enumerate(ACTION_MOVE_RANGE):
-            mask[action] = _slot_is_available(available_moves, slot)
+            mask[action] = move_mask[slot]
 
         if allow_mega and getattr(battle, "can_mega_evolve", False):
             for slot, action in enumerate(ACTION_MEGA_RANGE):

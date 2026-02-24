@@ -1,4 +1,5 @@
 import argparse
+import time
 import random
 from dataclasses import dataclass
 from typing import Optional, Tuple, Iterable
@@ -6,7 +7,7 @@ from typing import Optional, Tuple, Iterable
 import numpy as np
 from sb3_contrib import MaskablePPO
 from sb3_contrib.common.maskable.utils import get_action_masks
-from poke_env import LocalhostServerConfiguration, RandomPlayer, MaxBasePowerPlayer
+from poke_env import LocalhostServerConfiguration, AccountConfiguration, MaxBasePowerPlayer
 from poke_env.environment import SingleAgentWrapper
 from stable_baselines3.common.utils import set_random_seed
 from sb3_contrib.common.wrappers import ActionMasker
@@ -112,6 +113,8 @@ def _build_train_env(
     if not opponent_pool:
         opponent_pool = [TEAM_BY_NAME[name] for name in opponent_names]
 
+    unique_id = int(time.time() * 1000) % 100000
+
     opponent_policy = MaxBasePowerPlayer(
         battle_format=battle_format,
         server_configuration=LocalhostServerConfiguration,
@@ -126,7 +129,9 @@ def _build_train_env(
         opponent_team_generator=opponent_generator,
         rounds_per_opponents=rounds_per_opponent,
         server_configuration=LocalhostServerConfiguration,
-        strict=False,
+        account_configuration1=AccountConfiguration(f"Player_{unique_id}", None),
+        account_configuration2=AccountConfiguration(f"Opponent_{unique_id}", None),
+        strict=True,
     )
 
     env = SingleAgentWrapper(agent, opponent_policy)
@@ -169,7 +174,7 @@ def train_model(
 
     model = MaskablePPO(
         "MlpPolicy",
-        train_env,
+        env=train_env,
         learning_rate=3e-4,
         n_steps=2048,
         batch_size=64,

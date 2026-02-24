@@ -64,6 +64,10 @@ Impish Nature
 - Bulk Up
 """
 
+MAGCARGO_TEAM = """
+Magcargo
+"""
+
 TOXAPEX_TEAM = """
 Toxapex  
 Ability: Regenerator  

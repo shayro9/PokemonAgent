@@ -53,17 +53,23 @@ class PokemonRLWrapper(SinglesEnv):
         self.rounds_played = 0
         self.rounds_per_opponents = rounds_per_opponents
 
+    def _is_agent1_battle(self, battle) -> bool:
+        return getattr(battle, "player_username", None) == self.agent1.username
+
     def action_to_order(self, action, battle, fake=False, strict=True):
+        if not self._is_agent1_battle(battle=battle):
+            return super().action_to_order(action, battle, fake, strict)
+
         canonical_action = action
 
         mask = get_valid_action_mask(
             battle=battle,
-            allow_switches=True,
+            allow_switches=False,
             allow_moves=True,
-            allow_mega=True,
-            allow_zmove=True,
-            allow_dynamax=True,
-            allow_terastallize=True,
+            allow_mega=False,
+            allow_zmove=False,
+            allow_dynamax=False,
+            allow_terastallize=False,
         )
 
         if not (0 <= canonical_action < len(mask)):
@@ -88,7 +94,8 @@ class PokemonRLWrapper(SinglesEnv):
             # Conservative fallback for the first call before embed_battle runs.
             return np.ones(self._action_space.n, dtype=bool)
 
-        return get_valid_action_mask(battle)
+        action_masks = get_valid_action_mask(battle)
+        return action_masks
 
     def reset(self, *args, **kwargs):
         self.last_hp = {}
@@ -115,8 +122,10 @@ class PokemonRLWrapper(SinglesEnv):
         return super().reset(*args, **kwargs)
 
     def embed_battle(self, battle):
-        # Keep the latest battle so MaskablePPO can query action masks via action_masks().
-        self._latest_battle = battle
+        if self._is_agent1_battle(battle):
+            self._latest_battle = battle
+        else:
+            return None
         my = battle.active_pokemon
         opp = battle.opponent_active_pokemon
 
