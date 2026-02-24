@@ -8,7 +8,6 @@ from poke_env.battle.pokemon_type import PokemonType
 from poke_env.battle.move_category import MoveCategory
 from poke_env.battle.status import Status
 
-
 BOOST_KEYS = ("atk", "def", "spa", "spd", "spe", "accuracy", "evasion")
 MOVE_CATEGORIES = tuple(MoveCategory)
 MOVE_STATUSES = tuple(Status)
@@ -38,6 +37,13 @@ def _scale_m11(x: float, max_abs: float) -> float:
     return max(-1.0, min(1.0, x / max_abs)) if max_abs > 0 else 0.0
 
 
+def _safe_int(x, default=0):
+    try:
+        return int(x)
+    except (TypeError, ValueError):
+        return default
+
+
 def embed_move(move: Move, opp_types, gen) -> np.ndarray:
     """
     Embeds a poke_env Move object into a fixed-length vector.
@@ -55,7 +61,7 @@ def embed_move(move: Move, opp_types, gen) -> np.ndarray:
         vec.append(_scale_01(move.accuracy or 0))
 
     vec.append(_scale_01(move.max_pp or 0, 40.0))
-    vec.append(_scale_m11(move.priority or 0, 7.0))
+    vec.append(_scale_m11(_safe_int(getattr(move, "priority", 0)), 7.0))
 
     # ---------------------------------------------------
     # 2) Category one-hot
