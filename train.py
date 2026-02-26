@@ -405,13 +405,6 @@ class OpponentsResolved:
     eval_agent_gen: Optional[Iterable]
 
 
-def _mix_seed(base: int | None, salt: str) -> int | None:
-    if base is None:
-        return None
-
-    return hash((base, salt)) & 0x7FFFFFFF
-
-
 def _resolve_opponents(args) -> OpponentsResolved:
     """
     Single source of truth for:
@@ -429,12 +422,6 @@ def _resolve_opponents(args) -> OpponentsResolved:
         # build generators (possibly split)
         train_seed = _resolve_seed(args.train_generator_seed, args.seed)
         eval_seed = _resolve_seed(args.eval_generator_seed, args.seed)
-
-        train_opp_seed = _mix_seed(train_seed, "train_opp")
-        train_agent_seed = _mix_seed(train_seed, "train_agent")
-
-        eval_opp_seed = _mix_seed(eval_seed, "eval_opp")
-        eval_agent_seed = _mix_seed(eval_seed, "eval_agent")
 
         agent_data_path = args.agent_data_path or DEFAULT_DATA_PATH
         opponent_data_path = args.opponent_data_path or DEFAULT_DATA_PATH
@@ -471,19 +458,18 @@ def _resolve_opponents(args) -> OpponentsResolved:
             train_agent_pool = eval_agent_pool = shared_agent_pool
             train_opponent_pool = eval_opponent_pool = shared_opponent_pool
 
-        train_gen = single_simple_team_generator(pokemon_pool=train_opponent_pool, seed=train_opp_seed)
-        eval_gen = single_simple_team_generator(pokemon_pool=eval_opponent_pool, seed=eval_opp_seed)
+        train_gen = single_simple_team_generator(pokemon_pool=train_opponent_pool, seed=train_seed)
+        eval_gen = single_simple_team_generator(pokemon_pool=eval_opponent_pool, seed=eval_seed)
 
         if args.train_team is None:
-            train_agent_gen = single_simple_team_generator(pokemon_pool=train_agent_pool, seed=train_agent_seed)
-            eval_agent_gen = single_simple_team_generator(pokemon_pool=eval_agent_pool, seed=eval_agent_seed)
+            train_agent_gen = train_gen
+            eval_agent_gen = eval_gen
     else:
         # name-based pools
         train_names = _parse_pool(args.pool, args.pool_all)
         eval_gen = None
 
     # ---- EVAL opponents ----
-    # If user explicitly provided an eval pool override, use it.
     if args.eval_pool is not None or args.eval_pool_all:
         eval_names = _parse_pool(args.eval_pool, args.eval_pool_all)
     else:

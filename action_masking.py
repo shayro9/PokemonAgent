@@ -62,18 +62,3 @@ def get_valid_action_mask(
                 mask[action] = _slot_is_available(available_moves, slot)
 
     return mask
-
-
-def get_move_only_action_mask(self, battle) -> np.ndarray:
-    """Returns a local [0..3] mask for the current 1v1 move-only setup."""
-    canonical_mask = self.get_valid_action_mask(
-        battle,
-        allow_switches=False,
-        allow_moves=True,
-        allow_mega=False,
-        allow_zmove=False,
-        allow_dynamax=False,
-        allow_terastallize=False,
-    )
-    return canonical_mask[ACTION_MOVE_RANGE.start:ACTION_MOVE_RANGE.stop]
-
