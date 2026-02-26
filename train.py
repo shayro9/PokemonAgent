@@ -252,9 +252,8 @@ def evaluate_model(
         battle_format: str,
         opponent_names: list[str],
         opponent_generator,
-        episodes_per_opponent: int,
+        eval_opponents: int,
         max_steps: int,
-        eval_pool: int,
         agent_team_generator=None,
 ) -> list[EvalResult]:
     results: list[EvalResult] = []
@@ -265,16 +264,20 @@ def evaluate_model(
     use_action_masking = (algo == "maskable_ppo")
 
     if not opponent_names:
-        opponent_pool = _generate_eval_pool(eval_pool, opponent_generator)
+        opponent_pool = _generate_eval_pool(eval_opponents, opponent_generator)
         opponent_names = [name.split("|")[0] for name in opponent_pool]
         eval_opponents = [
             (f"{name}", opponent_team)
             for (i, opponent_team), name in zip(enumerate(opponent_pool), opponent_names)
         ]
     else:
+        if eval_opponents > 0:
+            sampled_names = random.sample(opponent_names, k=min(eval_opponents, len(opponent_names)))
+        else:
+            sampled_names = opponent_names
         eval_opponents = [
             (opponent_name, TEAM_BY_NAME[opponent_name])
-            for opponent_name in opponent_names
+            for opponent_name in sampled_names
         ]
 
     for opponent_name, opponent_team in eval_opponents:
@@ -283,7 +286,7 @@ def evaluate_model(
             battle_format=battle_format,
             opponent_names=[],
             opponent_generator=None,
-            rounds_per_opponent=episodes_per_opponent,
+            rounds_per_opponent=1,
             opponent_pool=[opponent_team],
             agent_team_generator=agent_team_generator,
             use_action_masking=use_action_masking,
@@ -293,16 +296,15 @@ def evaluate_model(
         losses = 0
         draws = 0
 
-        for _ in range(episodes_per_opponent):
-            total_reward, truncated = _play_episode(eval_env, model, max_steps=max_steps)
-            if truncated:
-                draws += 1
-            elif total_reward > 0:
-                wins += 1
-            elif total_reward < 0:
-                losses += 1
-            else:
-                draws += 1
+        total_reward, truncated = _play_episode(eval_env, model, max_steps=max_steps)
+        if truncated:
+            draws += 1
+        elif total_reward > 0:
+            wins += 1
+        elif total_reward < 0:
+            losses += 1
+        else:
+            draws += 1
 
         results.append(EvalResult(opponent=opponent_name, wins=wins, losses=losses, draws=draws))
 
@@ -313,16 +315,29 @@ def print_eval_summary(results: list[EvalResult]) -> None:
     print("\nEvaluation results (deterministic policy):")
     print("Opponent       Wins  Losses  Draws  Win rate")
     print("-" * 44)
+    total_wins = 0
+    total_losses = 0
+    total_draws = 0
     for result in results:
+        total_wins += result.wins
+        total_losses += result.losses
+        total_draws += result.draws
         print(
             f"{result.opponent:12} {result.wins:4d} {result.losses:7d} "
             f"{result.draws:6d} {100 * result.win_rate:7.2f}%"
         )
 
+    total_episodes = total_wins + total_losses + total_draws
+    overall_win_rate = (100 * total_wins / total_episodes) if total_episodes else 0.0
+    print("-" * 44)
+    print(
+        f"Overall        {total_wins:4d} {total_losses:7d} {total_draws:6d} {overall_win_rate:7.2f}%"
+    )
+
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Train a MaskablePPO Pokémon bot against a pool and run per-opponent evaluation."
+        description="Train a MaskablePPO Pokémon bot against a pool and evaluate win rate over an opponent set."
     )
 
     # Core
@@ -338,14 +353,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
     # Evaluation
     parser.add_argument("--skip-eval", action="store_true", help="Only train and save model, skip evaluation.")
-    parser.add_argument("--eval-episodes", type=int, default=10)
-    parser.add_argument("--eval-max-steps", type=int, default=500)
     parser.add_argument(
-        "--eval-pool-size",
+        "--eval-opponents",
         type=int,
         default=10,
-        help="How many opponents to sample for evaluation (when using a large pool).",
+        help="How many opponents to evaluate against (one battle per opponent).",
     )
+    parser.add_argument("--eval-max-steps", type=int, default=500)
 
     # Opponent selection: TRAIN
     train_src = parser.add_mutually_exclusive_group()
@@ -519,9 +533,8 @@ def main():
         "train_team": train_team,
         "opponent_names": opp.eval_names,
         "opponent_generator": opp.eval_gen,
-        "episodes_per_opponent": args.eval_episodes,
+        "eval_opponents": args.eval_opponents,
         "max_steps": args.eval_max_steps,
-        "eval_pool": args.eval_pool_size,
         "agent_team_generator": opp.eval_agent_gen,
     }
 
