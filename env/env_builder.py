@@ -10,10 +10,11 @@ from env.singles_env_wrapper import PokemonRLWrapper
 
 
 def _wrap_action_masker(env, *, enabled: bool):
-    """
-    If enabled, attach ActionMasker so MaskablePPO (and others) can use masks.
-    If disabled, return env unchanged.
-    """
+    """Attach an action-mask wrapper when masking is enabled.
+    
+    :param env: Environment instance to potentially wrap.
+    :param enabled: Whether action masking should be applied.
+    :returns: The original environment or an ``ActionMasker``-wrapped environment."""
     if not enabled:
         return env
 
@@ -41,6 +42,18 @@ def build_env(
         battle_team_generator=None,
         use_action_masking: bool = False,
 ) -> SingleAgentWrapper:
+    """Construct the single-agent battle environment.
+    
+    :param agent_team: Packed team string for the learning agent.
+    :param battle_format: Showdown battle format name.
+    :param opponent_names: Named predefined opponents.
+    :param opponent_generator: Optional generator for opponent teams.
+    :param rounds_per_opponent: Battles played before rotating opponent teams.
+    :param opponent_pool: Optional prebuilt pool of packed opponent teams.
+    :param agent_team_generator: Optional generator for agent teams.
+    :param battle_team_generator: Optional generator yielding both teams.
+    :param use_action_masking: Whether to wrap the env with ``ActionMasker``.
+    :returns: A configured ``SingleAgentWrapper`` environment."""
     if not opponent_pool:
         opponent_pool = [TEAM_BY_NAME[name] for name in opponent_names]
 

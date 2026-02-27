@@ -18,10 +18,18 @@ MOVE_EMBED_LEN = 4 + len(MoveCategory) + 1 + len(Status) + 7 + 7 + 2 + 2
 
 @lru_cache(maxsize=None)
 def _type_chart_for_gen(gen: int):
+    """Return cached type chart data for a generation.
+    
+    :param gen: Pokémon generation number.
+    :returns: The generation-specific type chart mapping."""
     return GenData.from_gen(gen).type_chart
 
 
 def _iter_scaled_boosts(boosts: dict | None):
+    """Yield normalized stat-boost values in canonical key order.
+    
+    :param boosts: Optional mapping of boost names to stage values.
+    :returns: An iterator of scaled float boost values."""
     if not boosts:
         for _ in BOOST_KEYS:
             yield 0.0
@@ -31,14 +39,30 @@ def _iter_scaled_boosts(boosts: dict | None):
 
 
 def _scale_01(x: float, max_x: float = 1) -> float:
+    """Scale a value into the inclusive ``[0, 1]`` range.
+    
+    :param x: Input value.
+    :param max_x: Maximum absolute value used for normalization.
+    :returns: The normalized and clamped value."""
     return min(1.0, max(0.0, x / max_x)) if max_x > 0 else 0.0
 
 
 def _scale_m11(x: float, max_abs: float) -> float:
+    """Scale a value into the inclusive ``[-1, 1]`` range.
+    
+    :param x: Input value.
+    :param max_abs: Maximum absolute value used for normalization.
+    :returns: The normalized and clamped value."""
     return max(-1.0, min(1.0, x / max_abs)) if max_abs > 0 else 0.0
 
 
 def _safe_int(move, key, default=0):
+    """Safely read an integer field from a move entry dictionary.
+    
+    :param move: Move object containing optional ``entry`` metadata.
+    :param key: Field name to read from ``entry``.
+    :param default: Value returned when the field is unavailable.
+    :returns: The extracted integer value."""
     entry = getattr(move, "entry", None)
     if isinstance(entry, dict):
         return int(entry.get(key, 0) or 0)
@@ -46,6 +70,12 @@ def _safe_int(move, key, default=0):
 
 
 def embed_move(move: Move, opp_types, gen: int) -> np.ndarray:
+    """Encode a move into a fixed-length numeric feature vector.
+    
+    :param move: Move instance to embed.
+    :param opp_types: Defender typing iterable.
+    :param gen: Battle generation number.
+    :returns: A NumPy vector with ``MOVE_EMBED_LEN`` float features."""
     vec: List[float] = list()
 
     # Scalars
@@ -94,10 +124,20 @@ def embed_move(move: Move, opp_types, gen: int) -> np.ndarray:
 
 
 def embed_status(status) -> np.ndarray:
+    """One-hot encode a battle status value.
+    
+    :param status: Status value to encode.
+    :returns: A NumPy one-hot vector over known status values."""
     return np.array([1.0 if status == s else 0.0 for s in MOVE_STATUSES], dtype=np.float32)
 
 
 def calc_types_vector(my_types: list[PokemonType], opp_types: list[PokemonType], gen: int) -> np.ndarray:
+    """Encode pairwise attacker-vs-defender type interactions.
+    
+    :param my_types: Attacker type list.
+    :param opp_types: Defender type list.
+    :param gen: Battle generation number.
+    :returns: A NumPy vector containing matchup multipliers in log2 space."""
     my_types = (list(my_types) + [None])[:2]
     opp_types = (list(opp_types) + [None])[:2]
     type_chart = _type_chart_for_gen(gen)

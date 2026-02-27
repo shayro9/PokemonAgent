@@ -10,6 +10,11 @@ DEFAULT_DATA_PATH = "data/gen9randombattle_db.json"
 
 
 def parse_pool(raw_pool: str | None, pool_all: bool) -> list[str]:
+    """Parse and validate a comma-separated pool of opponent names.
+    
+    :param raw_pool: Comma-separated opponent names.
+    :param pool_all: Whether all predefined solo teams should be used.
+    :returns: A list of validated opponent names."""
     if pool_all:
         return [name for name, _ in ALL_SOLO_TEAMS]
 
@@ -27,6 +32,11 @@ def parse_pool(raw_pool: str | None, pool_all: bool) -> list[str]:
 
 
 def resolve_seed(explicit: Optional[int], fallback: int) -> int:
+    """Resolve the effective seed value.
+    
+    :param explicit: User-provided seed, if any.
+    :param fallback: Default seed to use when ``explicit`` is ``None``.
+    :returns: The effective seed value."""
     return fallback if explicit is None else explicit
 
 
@@ -35,6 +45,12 @@ def _resolve_generated_pools(
         train_split: float,
         split_seed: int,
 ) -> tuple[list[dict], list[dict]]:
+    """Load generated data and split it into train and evaluation pools.
+    
+    :param data_path: Path to the generated dataset.
+    :param train_split: Fraction of examples used for training.
+    :param split_seed: Random seed used for deterministic splitting.
+    :returns: A tuple of ``(train_pool, eval_pool)`` lists."""
     pokemon_pool = load_pokemon_pool(data_path)
 
     train_pool, eval_pool = split_pokemon_pool(
@@ -61,11 +77,10 @@ class OpponentsResolved:
 
 
 def resolve_opponents(args) -> OpponentsResolved:
-    """
-    Single source of truth for:
-      - train opponent names or generator
-      - eval opponent names or generator
-    """
+    """Resolve train/eval opponent names and generators from CLI args.
+    
+    :param args: Parsed command-line arguments namespace.
+    :returns: An ``OpponentsResolved`` object with train/eval pools and generators."""
 
     # ---- TRAIN opponents ----
     train_names: list[str] = []

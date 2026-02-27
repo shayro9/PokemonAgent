@@ -8,6 +8,11 @@ from env.reward import calc_reward
 
 
 def print_state(battle, *, prefix="[PokemonRLWrapper]") -> str:
+    """Render and print a human-readable battle state snapshot.
+    
+    :param battle: Battle object to describe.
+    :param prefix: Message prefix shown before the state details.
+    :returns: The formatted state message that was printed."""
     state_obj = BattleState.from_battle(battle)
     message = f"{prefix}\n" + state_obj.describe()
     print(message)
