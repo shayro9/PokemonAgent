@@ -124,5 +124,6 @@ def generate_team(
 
     # Showdown Packed Format:
     # Nickname|Species|Item|Ability|Moves|Nature|EVs|Gender|IVs|Shiny|Level|Happiness,Pokeball,HPType,Gmax,Dmax,Tera
-    team = f"{display_nickname}|{display_species}|{display_item}|{display_ability}|{display_moves}|{display_nature}|{display_evs}|{display_gender}|{display_ivs}|{display_shiny}|{display_level}|{trailing_part}"
+    team = (f"{display_nickname}|{display_species}|{display_item}|{display_ability}|{display_moves}|{display_nature}|"
+            f"{display_evs}|{display_gender}|{display_ivs}|{display_shiny}|{display_level}|{trailing_part}")
     return team

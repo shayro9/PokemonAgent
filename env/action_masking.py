@@ -1,4 +1,4 @@
-from embedding import *
+from .embed import *
 
 MAX_MOVES = 4
 MOVE_EMBED_LEN = 4 + len(MoveCategory) + 1 + len(Status) + 7 + 7 + 2 + 2

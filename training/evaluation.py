@@ -1,0 +1,140 @@
+import random
+from dataclasses import dataclass
+
+from poke_env.environment import SingleAgentWrapper
+
+from sb3_contrib import MaskablePPO
+from sb3_contrib.common.maskable.utils import get_action_masks
+
+from config.config import TEAM_BY_NAME
+from env.env_builder import build_env
+
+
+@dataclass
+class EvalResult:
+    timestep: int
+    wins: int
+    losses: int
+    draws: int
+
+    @property
+    def episodes(self) -> int:
+        return self.wins + self.losses + self.draws
+
+    @property
+    def win_rate(self) -> float:
+        if self.episodes == 0:
+            return 0.0
+        return self.wins / self.episodes
+
+
+def _play_episode(eval_env: SingleAgentWrapper, model: MaskablePPO, max_steps: int) -> tuple[float, bool]:
+    obs, _ = eval_env.reset()
+    terminated = False
+    truncated = False
+    total_reward = 0.0
+
+    for _ in range(max_steps):
+        action, _ = model.predict(obs, deterministic=True, action_masks=get_action_masks(eval_env))
+        obs, reward, terminated, truncated, _ = eval_env.step(action)
+        total_reward += float(reward)
+
+        if terminated or truncated:
+            break
+
+    if not (terminated or truncated):
+        truncated = True
+
+    return total_reward, truncated
+
+
+def _generate_eval_pool(pool_size: int, opponent_generator) -> list[str]:
+    if opponent_generator is None:
+        raise ValueError("Cannot generate eval pool without an opponent team generator.")
+
+    return [next(opponent_generator) for _ in range(pool_size)]
+
+
+def evaluate_model(
+        model: MaskablePPO,
+        timestep: int,
+        train_team: str,
+        battle_format: str,
+        opponent_names: list[str],
+        opponent_generator,
+        eval_episodes: int,
+        max_steps: int,
+        agent_team_generator=None,
+) -> list[EvalResult]:
+    results: list[EvalResult] = []
+
+    # TODO: add from args
+    algo = "maskable_ppo"
+    use_action_masking = (algo == "maskable_ppo")
+
+    if not opponent_names:
+        opponent_pool = _generate_eval_pool(eval_episodes, opponent_generator)
+    else:
+        if eval_episodes > 0:
+            sampled_names = random.sample(opponent_names, k=min(eval_episodes, len(opponent_names)))
+        else:
+            sampled_names = opponent_names
+        opponent_pool = [
+            TEAM_BY_NAME[opponent_name]
+            for opponent_name in sampled_names
+        ]
+
+    eval_env = build_env(
+        agent_team=train_team,
+        battle_format=battle_format,
+        opponent_names=[],
+        opponent_generator=None,
+        rounds_per_opponent=1,
+        opponent_pool=opponent_pool,
+        agent_team_generator=agent_team_generator,
+        use_action_masking=use_action_masking,
+    )
+
+    wins = 0
+    losses = 0
+    draws = 0
+
+    for _ in range(eval_episodes):
+
+        total_reward, truncated = _play_episode(eval_env, model, max_steps=max_steps)
+        if truncated:
+            draws += 1
+        elif total_reward > 0:
+            wins += 1
+        elif total_reward < 0:
+            losses += 1
+        else:
+            draws += 1
+
+    results.append(EvalResult(timestep=timestep, wins=wins, losses=losses, draws=draws))
+
+    return results
+
+
+def print_eval_summary(results: list[EvalResult]) -> None:
+    print("\nEvaluation results (deterministic policy):")
+    print("Timestep Wins  Losses  Draws  Win rate")
+    print("-" * 44)
+    total_wins = 0
+    total_losses = 0
+    total_draws = 0
+    for result in results:
+        total_wins += result.wins
+        total_losses += result.losses
+        total_draws += result.draws
+        print(
+            f"{result.timestep:12} {result.wins:4d} {result.losses:7d} "
+            f"{result.draws:6d} {100 * result.win_rate:7.2f}%"
+        )
+
+    total_episodes = total_wins + total_losses + total_draws
+    overall_win_rate = (100 * total_wins / total_episodes) if total_episodes else 0.0
+    print("-" * 44)
+    print(
+        f"Overall        {total_wins:4d} {total_losses:7d} {total_draws:6d} {overall_win_rate:7.2f}%"
+    )

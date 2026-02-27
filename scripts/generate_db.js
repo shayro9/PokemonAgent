@@ -3,7 +3,7 @@
  * Run: node generate_db.js
  */
 const fs = require('fs');
-const { Teams } = require('./pokemon-showdown/dist/sim/teams');
+const { Teams } = require('../pokemon-showdown/dist/sim/teams');
 
 // CONFIG
 const FORMAT = 'gen9randombattle';

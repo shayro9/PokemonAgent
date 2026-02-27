@@ -1,0 +1,47 @@
+import numpy as np
+
+DAMAGE_CLIP = 1.0
+WIN_BONUS = 5.0
+LOSS_PENALTY = -5.0
+
+
+def calc_reward(
+        battle,
+        last_hp: dict,
+        *,
+        is_agent_battle: bool,
+) -> tuple[float, bool]:
+    """
+    Stateless reward function for a single battle step.
+
+    Args:
+        battle:           poke-env battle object.
+        last_hp:          mutable dict keyed by battle.battle_tag -> (my_hp, opp_hp).
+                          Caller owns this dict and passes it in each step.
+        is_agent_battle:  True if this battle belongs to the learning agent.
+
+    Returns:
+        (reward, done) where done is True if the battle has finished.
+    """
+    if not is_agent_battle:
+        return 0.0, battle.finished
+
+    my_hp = battle.active_pokemon.current_hp_fraction
+    opp_hp = battle.opponent_active_pokemon.current_hp_fraction
+
+    last_my_hp, last_opp_hp = last_hp.get(battle.battle_tag, (1.0, 1.0))
+
+    damage_to_opp = last_opp_hp - opp_hp
+    damage_to_me = last_my_hp - my_hp
+
+    last_hp[battle.battle_tag] = (my_hp, opp_hp)
+
+    reward = float(np.clip(damage_to_opp - damage_to_me, -DAMAGE_CLIP, DAMAGE_CLIP))
+
+    if battle.finished:
+        if battle.won:
+            reward += WIN_BONUS
+        elif battle.lost:
+            reward += LOSS_PENALTY
+
+    return reward, battle.finished

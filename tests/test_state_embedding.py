@@ -3,12 +3,12 @@ import unittest
 from contextlib import redirect_stdout
 from types import SimpleNamespace
 from unittest.mock import patch
-from action_masking import get_valid_action_mask
+from env.action_masking import get_valid_action_mask
 
 import numpy as np
 
-from embedding import calc_types_vector, embed_move
-from env_wrapper import (
+from env.embed import calc_types_vector, embed_move
+from env.singles_env_wrapper import (
     ACTION_DEFAULT,
     ACTION_MOVE_RANGE,
     ACTION_ZMOVE_RANGE,
@@ -168,7 +168,7 @@ class StateEmbeddingTests(unittest.TestCase):
 
     def test_print_state_includes_dynamic_total_dimensions(self):
         battle = self._make_battle(available_moves=[])
-        wrapper = object.__new__(PokemonRLWrapper)
+        wrapper = object
         expected_total = self._expected_state_length(battle)
 
         with io.StringIO() as buf, redirect_stdout(buf):
