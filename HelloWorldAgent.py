@@ -13,15 +13,15 @@ async def main():
 
     env = PokemonRLWrapper(
         battle_format="gen9nationaldex",
-        team=DARMANITAN_TEAM,
-        opponent_teams=DARMANITAN_TEAM,
+        team=STEELIX_TEAM,
+        opponent_teams=STEELIX_TEAM,
         strict=False,
     )
 
     debug_player = DebugRLPlayer(
         env,
         battle_format="gen9nationaldex",
-        team=DARMANITAN_TEAM,
+        team=STEELIX_TEAM,
     )
 
     print("Sending challenge...")

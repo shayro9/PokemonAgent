@@ -9,10 +9,14 @@ class DebugRLPlayer(RandomPlayer):
         self.env = env
 
     def choose_move(self, battle):
-        self.env.print_state(battle)
-        print("=" * 50)
-        mask = self.env.action_masks()
-        print(mask)
-        print("=" * 50)
+        # self.env.print_state(battle)
+        # print("=" * 50)
+        # mask = self.env.action_masks()
+        # print(mask)
+        # print("=" * 50)
+        print(battle.active_pokemon.name)
+        print(battle.active_pokemon.stats)
+        print(battle.active_pokemon.base_stats)
+        print(battle.active_pokemon.boosts)
 
         return self.choose_random_move(battle)

@@ -43,7 +43,7 @@ class PokemonRLWrapper(SinglesEnv):
         }
         self.observation_spaces = {
             agent: gym.spaces.Box(
-                low=-1.0, high=1.0, shape=(164,), dtype=np.float32
+                low=-1.0, high=1.0, shape=(171,), dtype=np.float32
             )
             for agent in self.possible_agents
         }
@@ -124,8 +124,7 @@ class PokemonRLWrapper(SinglesEnv):
     def embed_battle(self, battle):
         if self._is_agent1_battle(battle):
             self._latest_battle = battle
-        else:
-            return None
+
         my = battle.active_pokemon
         opp = battle.opponent_active_pokemon
 
@@ -133,6 +132,8 @@ class PokemonRLWrapper(SinglesEnv):
         opp_hp = opp.current_hp_fraction
 
         my_stats = np.minimum(np.array(list(my.stats.values())) / 255.0, 1.0)
+        my_boosts = np.array(list(my.boosts.values())) / 6.0
+
         opp_boosts = np.array(list(opp.boosts.values())) / 6.0
         opp_base_stats = np.array(list(opp.base_stats.values())) / 255.0
 
@@ -154,7 +155,7 @@ class PokemonRLWrapper(SinglesEnv):
         opp_preparing = float(opp.preparing)
 
         state = np.concatenate([
-            [my_hp], my_stats,
+            [my_hp], my_stats, my_boosts,
             [opp_hp], opp_base_stats, opp_boosts, [opp_preparing],
             my_moves,
             types_multipliers,
@@ -183,6 +184,7 @@ class PokemonRLWrapper(SinglesEnv):
         layout = [
             ("my_hp", 1),
             ("my_stats", len(my.stats)),
+            ("my_boosts"), len(my.boosts),
 
             ("opp_hp", 1),
             ("opp_base_stats", len(opp.base_stats)),
@@ -228,13 +230,15 @@ class PokemonRLWrapper(SinglesEnv):
         opp_hp = battle.opponent_active_pokemon.current_hp_fraction
 
         last_my_hp, last_opp_hp = self.last_hp.get(
-            battle, (1.0, 1.0)
+            battle.battle_tag, (1.0, 1.0)
         )
 
         damage_to_opp = last_opp_hp - opp_hp
         damage_to_me = last_my_hp - my_hp
         reward = damage_to_opp - damage_to_me
-        self.last_hp[battle] = (my_hp, opp_hp)
+        self.last_hp[battle.battle_tag] = (my_hp, opp_hp)
+
+        reward = np.clip(reward, -1.0, 1.0)
 
         if battle.finished:
             self.rounds_played += 1
@@ -242,7 +246,5 @@ class PokemonRLWrapper(SinglesEnv):
                 reward += 5.0
             elif battle.lost:
                 reward -= 5.0
-
-        reward = np.clip(reward, -1.0, 1.0)
 
         return reward

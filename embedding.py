@@ -37,11 +37,11 @@ def _scale_m11(x: float, max_abs: float) -> float:
     return max(-1.0, min(1.0, x / max_abs)) if max_abs > 0 else 0.0
 
 
-def _safe_int(x, default=0):
-    try:
-        return int(x)
-    except (TypeError, ValueError):
-        return default
+def _safe_int(move, key, default=0):
+    entry = getattr(move, "entry", None)
+    if isinstance(entry, dict):
+        return int(entry.get(key, 0) or 0)
+    return default
 
 
 def embed_move(move: Move, opp_types, gen) -> np.ndarray:
@@ -61,7 +61,7 @@ def embed_move(move: Move, opp_types, gen) -> np.ndarray:
         vec.append(_scale_01(move.accuracy or 0))
 
     vec.append(_scale_01(move.max_pp or 0, 40.0))
-    vec.append(_scale_m11(_safe_int(getattr(move, "priority", 0)), 7.0))
+    vec.append(_scale_m11(_safe_int(move, "priority", 0), 7.0))
 
     # ---------------------------------------------------
     # 2) Category one-hot

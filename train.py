@@ -7,7 +7,7 @@ from typing import Optional, Tuple, Iterable
 import numpy as np
 from sb3_contrib import MaskablePPO
 from sb3_contrib.common.maskable.utils import get_action_masks
-from poke_env import LocalhostServerConfiguration, AccountConfiguration, MaxBasePowerPlayer
+from poke_env import LocalhostServerConfiguration, AccountConfiguration, MaxBasePowerPlayer, RandomPlayer
 from poke_env.environment import SingleAgentWrapper
 from stable_baselines3.common.utils import set_random_seed
 from sb3_contrib.common.wrappers import ActionMasker
@@ -18,10 +18,6 @@ from teams.team_generators import load_pokemon_pool, single_simple_team_generato
 
 TEAM_BY_NAME = {name: team for name, team in ALL_SOLO_TEAMS}
 DEFAULT_DATA_PATH = "data/gen9randombattle_db.json"
-
-
-def _get_action_masks(env: SingleAgentWrapper) -> np.ndarray:
-    return get_action_masks(env)
 
 
 def _wrap_action_masker(env, *, enabled: bool):
@@ -47,7 +43,7 @@ def _wrap_action_masker(env, *, enabled: bool):
 
 @dataclass
 class EvalResult:
-    opponent: str
+    timestep: int
     wins: int
     losses: int
     draws: int
@@ -115,7 +111,7 @@ def _build_train_env(
 
     unique_id = int(time.time() * 1000) % 100000
 
-    opponent_policy = MaxBasePowerPlayer(
+    opponent_policy = RandomPlayer(
         battle_format=battle_format,
         server_configuration=LocalhostServerConfiguration,
     )
@@ -176,11 +172,11 @@ def train_model(
         "MlpPolicy",
         env=train_env,
         learning_rate=3e-4,
-        n_steps=2048,
-        batch_size=64,
+        n_steps=4096,
+        batch_size=32,
         gamma=0.999,
         gae_lambda=0.95,
-        ent_coef=0.01,
+        ent_coef=0.05,
         clip_range=0.2,
         max_grad_norm=10.0,
         verbose=0,
@@ -198,12 +194,13 @@ def train_model(
     )
     if eval_every_timesteps > 0 and eval_kwargs:
         trained_steps = 0
+        eval_results = []
         while trained_steps < timesteps:
             step_chunk = min(eval_every_timesteps, timesteps - trained_steps)
             model.learn(total_timesteps=step_chunk, reset_num_timesteps=False)
             trained_steps += step_chunk
 
-            eval_results = evaluate_model(model=model, **eval_kwargs)
+            eval_results.extend(evaluate_model(model=model, timestep=trained_steps, **eval_kwargs))
             print(f"\n[Eval @ {trained_steps} training timesteps]")
             print_eval_summary(eval_results)
     else:
@@ -222,7 +219,7 @@ def _play_episode(eval_env: SingleAgentWrapper, model: MaskablePPO, max_steps: i
     total_reward = 0.0
 
     for _ in range(max_steps):
-        action, _ = model.predict(obs, deterministic=True, action_masks=_get_action_masks(eval_env))
+        action, _ = model.predict(obs, deterministic=True, action_masks=get_action_masks(eval_env))
         obs, reward, terminated, truncated, _ = eval_env.step(action)
         total_reward += float(reward)
 
@@ -239,62 +236,54 @@ def _generate_eval_pool(pool_size: int, opponent_generator) -> list[str]:
     if opponent_generator is None:
         raise ValueError("Cannot generate eval pool without an opponent team generator.")
 
-    pool = []
-    for _ in range(pool_size):
-        pool.append(next(opponent_generator))
-
-    return pool
+    return [next(opponent_generator) for _ in range(pool_size)]
 
 
 def evaluate_model(
         model: MaskablePPO,
+        timestep: int,
         train_team: str,
         battle_format: str,
         opponent_names: list[str],
         opponent_generator,
-        eval_opponents: int,
+        eval_episodes: int,
         max_steps: int,
         agent_team_generator=None,
 ) -> list[EvalResult]:
     results: list[EvalResult] = []
-    eval_opponents: list[tuple[str, str]] = []
 
     # TODO: add from args
     algo = "maskable_ppo"
     use_action_masking = (algo == "maskable_ppo")
 
     if not opponent_names:
-        opponent_pool = _generate_eval_pool(eval_opponents, opponent_generator)
-        opponent_names = [name.split("|")[0] for name in opponent_pool]
-        eval_opponents = [
-            (f"{name}", opponent_team)
-            for (i, opponent_team), name in zip(enumerate(opponent_pool), opponent_names)
-        ]
+        opponent_pool = _generate_eval_pool(eval_episodes, opponent_generator)
     else:
-        if eval_opponents > 0:
-            sampled_names = random.sample(opponent_names, k=min(eval_opponents, len(opponent_names)))
+        if eval_episodes > 0:
+            sampled_names = random.sample(opponent_names, k=min(eval_episodes, len(opponent_names)))
         else:
             sampled_names = opponent_names
-        eval_opponents = [
-            (opponent_name, TEAM_BY_NAME[opponent_name])
+        opponent_pool = [
+            TEAM_BY_NAME[opponent_name]
             for opponent_name in sampled_names
         ]
 
-    for opponent_name, opponent_team in eval_opponents:
-        eval_env = _build_train_env(
-            agent_team=train_team,
-            battle_format=battle_format,
-            opponent_names=[],
-            opponent_generator=None,
-            rounds_per_opponent=1,
-            opponent_pool=[opponent_team],
-            agent_team_generator=agent_team_generator,
-            use_action_masking=use_action_masking,
-        )
+    eval_env = _build_train_env(
+        agent_team=train_team,
+        battle_format=battle_format,
+        opponent_names=[],
+        opponent_generator=None,
+        rounds_per_opponent=1,
+        opponent_pool=opponent_pool,
+        agent_team_generator=agent_team_generator,
+        use_action_masking=use_action_masking,
+    )
 
-        wins = 0
-        losses = 0
-        draws = 0
+    wins = 0
+    losses = 0
+    draws = 0
+
+    for _ in range(eval_episodes):
 
         total_reward, truncated = _play_episode(eval_env, model, max_steps=max_steps)
         if truncated:
@@ -306,14 +295,14 @@ def evaluate_model(
         else:
             draws += 1
 
-        results.append(EvalResult(opponent=opponent_name, wins=wins, losses=losses, draws=draws))
+    results.append(EvalResult(timestep=timestep, wins=wins, losses=losses, draws=draws))
 
     return results
 
 
 def print_eval_summary(results: list[EvalResult]) -> None:
     print("\nEvaluation results (deterministic policy):")
-    print("Opponent       Wins  Losses  Draws  Win rate")
+    print("Timestep Wins  Losses  Draws  Win rate")
     print("-" * 44)
     total_wins = 0
     total_losses = 0
@@ -323,7 +312,7 @@ def print_eval_summary(results: list[EvalResult]) -> None:
         total_losses += result.losses
         total_draws += result.draws
         print(
-            f"{result.opponent:12} {result.wins:4d} {result.losses:7d} "
+            f"{result.timestep:12} {result.wins:4d} {result.losses:7d} "
             f"{result.draws:6d} {100 * result.win_rate:7.2f}%"
         )
 
@@ -354,10 +343,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
     # Evaluation
     parser.add_argument("--skip-eval", action="store_true", help="Only train and save model, skip evaluation.")
     parser.add_argument(
-        "--eval-opponents",
+        "--eval-episodes",
         type=int,
-        default=10,
-        help="How many opponents to evaluate against (one battle per opponent).",
+        default=100,
+        help="How many episodes to evaluate against (one battle per opponent).",
     )
     parser.add_argument("--eval-max-steps", type=int, default=500)
 
@@ -519,7 +508,7 @@ def main():
         "train_team": train_team,
         "opponent_names": opp.eval_names,
         "opponent_generator": opp.eval_gen,
-        "eval_opponents": args.eval_opponents,
+        "eval_episodes": args.eval_episodes,
         "max_steps": args.eval_max_steps,
         "agent_team_generator": opp.eval_agent_gen,
     }
@@ -541,7 +530,9 @@ def main():
     if args.skip_eval:
         return
 
-    eval_results = evaluate_model(model=model, **eval_kwargs)
+    eval_kwargs["eval_episodes"] = 10_000
+
+    eval_results = evaluate_model(model=model, timestep=args.timesteps, **eval_kwargs)
     print_eval_summary(eval_results)
 
 
