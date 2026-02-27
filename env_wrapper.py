@@ -131,6 +131,9 @@ class PokemonRLWrapper(SinglesEnv):
         my_hp = my.current_hp_fraction
         opp_hp = opp.current_hp_fraction
 
+        my_status = embed_status(my.status)
+        opp_status = embed_status(opp.status)
+
         my_stats = np.minimum(np.array(list(my.stats.values())) / 255.0, 1.0)
         my_boosts = np.array(list(my.boosts.values())) / 6.0
 

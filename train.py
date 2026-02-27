@@ -11,6 +11,9 @@ from poke_env import LocalhostServerConfiguration, AccountConfiguration, MaxBase
 from poke_env.environment import SingleAgentWrapper
 from stable_baselines3.common.utils import set_random_seed
 from sb3_contrib.common.wrappers import ActionMasker
+from stable_baselines3.common.callbacks import BaseCallback, CallbackList
+import wandb
+from wandb.integration.sb3 import WandbCallback
 
 from env_wrapper import PokemonRLWrapper
 from teams.single_teams import ALL_SOLO_TEAMS, STEELIX_TEAM
@@ -135,6 +138,45 @@ def _build_train_env(
     return env
 
 
+class BattleMetricsCallback(BaseCallback):
+    def __init__(self, env: SingleAgentWrapper, log_freq: int = 100, verbose=0):
+        super().__init__(verbose)
+        self.env = env
+        self.log_freq = log_freq
+        self._episode_rewards = []
+        self._episode_lengths = []
+        self._wins = 0
+        self._losses = 0
+        self._draws = 0
+
+    def _on_step(self) -> bool:
+        infos = self.locals.get("infos", [{}])
+        for info in infos:
+            if "episode" in info:
+                ep_reward = info["episode"]["r"]
+                ep_length = info["episode"]["l"]
+                self._episode_rewards.append(ep_reward)
+                self._episode_lengths.append(ep_length)
+
+                if ep_reward > 0:
+                    self._wins += 1
+                elif ep_reward < 0:
+                    self._losses += 1
+                else:
+                    self._draws += 1
+
+        if self.n_calls % self.log_freq == 0 and self._episode_rewards:
+            total = self._wins + self._losses + self._draws
+            win_rate = self._wins / total if total > 0 else 0.0
+            wandb.log({
+                "win_rate": win_rate,
+                "mean_episode_reward": np.mean(self._episode_rewards[-50:]),
+                "mean_episode_length": np.mean(self._episode_lengths[-50:]),
+            }, step=self.num_timesteps)
+
+        return True
+
+
 def train_model(
         model_path: str,
         battle_format: str,
@@ -152,6 +194,23 @@ def train_model(
     random.seed(seed)
     np.random.seed(seed)
     set_random_seed(seed)
+
+    run = wandb.init(
+        project="pokemon-rl",
+        name=f"{battle_format}__{int(time.time())}",
+        config={
+            "timesteps": timesteps,
+            "rounds_per_opponent": rounds_per_opponent,
+            "battle_format": battle_format,
+            "learning_rate": 3e-4,
+            "n_steps": 4096,
+            "batch_size": 32,
+            "gamma": 0.999,
+            "ent_coef": 0.1,
+        },
+        sync_tensorboard=False,
+        save_code=True,
+    )
 
     # TODO: add from args
     algo = "maskable_ppo"
@@ -176,7 +235,7 @@ def train_model(
         batch_size=32,
         gamma=0.999,
         gae_lambda=0.95,
-        ent_coef=0.05,
+        ent_coef=0.1,
         clip_range=0.2,
         max_grad_norm=10.0,
         verbose=0,
@@ -197,16 +256,29 @@ def train_model(
         eval_results = []
         while trained_steps < timesteps:
             step_chunk = min(eval_every_timesteps, timesteps - trained_steps)
-            model.learn(total_timesteps=step_chunk, reset_num_timesteps=False)
+            model.learn(
+                total_timesteps=step_chunk,
+                reset_num_timesteps=False,
+                callback=CallbackList([
+                    WandbCallback(gradient_save_freq=100, verbose=0),
+                    BattleMetricsCallback(env=train_env, log_freq=100),
+                ]))
             trained_steps += step_chunk
 
             eval_results.extend(evaluate_model(model=model, timestep=trained_steps, **eval_kwargs))
             print(f"\n[Eval @ {trained_steps} training timesteps]")
             print_eval_summary(eval_results)
     else:
-        model.learn(total_timesteps=timesteps)
+        model.learn(
+            total_timesteps=timesteps,
+            callback=CallbackList([
+                WandbCallback(gradient_save_freq=100, verbose=0),
+                BattleMetricsCallback(env=train_env, log_freq=100),
+            ])
+        )
 
     model.save(model_path)
+    run.finish()
     print(f"Training complete! Model saved as {model_path}.zip")
 
     return model
@@ -529,8 +601,6 @@ def main():
 
     if args.skip_eval:
         return
-
-    eval_kwargs["eval_episodes"] = 10_000
 
     eval_results = evaluate_model(model=model, timestep=args.timesteps, **eval_kwargs)
     print_eval_summary(eval_results)

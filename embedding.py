@@ -13,6 +13,11 @@ MOVE_CATEGORIES = tuple(MoveCategory)
 MOVE_STATUSES = tuple(Status)
 
 
+def embed_status(status) -> np.ndarray:
+    vec = [1.0 if status == s else 0.0 for s in MOVE_STATUSES]
+    return np.array(vec, dtype=np.float32)
+
+
 @lru_cache(maxsize=None)
 def _type_chart_for_gen(gen: int):
     """Cache generation type charts to avoid repeated GenData lookups per move."""
