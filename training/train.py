@@ -27,6 +27,21 @@ def train_model(
         battle_team_generator=None,
         seed: int = 42,
 ) -> MaskablePPO:
+    """Train a MaskablePPO agent and optionally run periodic evaluation.
+    
+    :param model_path: Output path for the saved model.
+    :param battle_format: Showdown format used for battles.
+    :param train_team: Packed team string used by the agent.
+    :param opponent_names: Predefined opponent team names.
+    :param opponent_generator: Optional generator of opponent teams.
+    :param timesteps: Total training timesteps.
+    :param rounds_per_opponent: Battles played before rotating opponents.
+    :param eval_every_timesteps: Interval for periodic evaluation.
+    :param eval_kwargs: Optional keyword arguments for evaluation calls.
+    :param agent_team_generator: Optional generator for agent team rotation.
+    :param battle_team_generator: Optional generator yielding both battle teams.
+    :param seed: Random seed.
+    :returns: The trained ``MaskablePPO`` model."""
     random.seed(seed)
     np.random.seed(seed)
     set_random_seed(seed)
@@ -121,6 +136,9 @@ def train_model(
 
 
 def main():
+    """Parse arguments, run training, and print evaluation summaries.
+    
+    :returns: ``None``."""
     args = build_arg_parser().parse_args()
 
     battle_format = args.format

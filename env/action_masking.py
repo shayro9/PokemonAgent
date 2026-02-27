@@ -14,6 +14,11 @@ ACTION_TERASTALLIZE_RANGE = range(22, 26)
 
 
 def _slot_is_available(sequence, slot: int) -> bool:
+    """Check whether a slot index exists in a sequence.
+    
+    :param sequence: Sequence of available actions.
+    :param slot: Zero-based slot index.
+    :returns: ``True`` when the slot exists, otherwise ``False``."""
     return 0 <= slot < len(sequence)
 
 
@@ -27,7 +32,16 @@ def get_valid_action_mask(
         allow_dynamax: bool = False,
         allow_terastallize: bool = False,
 ) -> np.ndarray:
-    """Returns a mask over the canonical action space [0..25]."""
+    """Build a boolean mask over the canonical action space ``[0..25]``.
+    
+    :param battle: Battle instance containing currently available actions.
+    :param allow_switches: Whether switch actions should be considered valid.
+    :param allow_moves: Whether move actions should be considered valid.
+    :param allow_mega: Whether mega-evolution move variants are allowed.
+    :param allow_zmove: Whether Z-move variants are allowed.
+    :param allow_dynamax: Whether dynamax move variants are allowed.
+    :param allow_terastallize: Whether terastallized move variants are allowed.
+    :returns: A NumPy boolean vector where ``True`` entries indicate valid actions."""
     mask = np.zeros(26, dtype=bool)
 
     if allow_switches:

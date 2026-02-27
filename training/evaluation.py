@@ -29,6 +29,12 @@ class EvalResult:
 
 
 def _play_episode(eval_env: SingleAgentWrapper, model: MaskablePPO, max_steps: int) -> tuple[float, bool]:
+    """Run one evaluation episode.
+    
+    :param eval_env: Evaluation environment wrapper.
+    :param model: Trained policy model.
+    :param max_steps: Maximum number of steps before truncation.
+    :returns: A tuple of ``(total_reward, truncated)``."""
     obs, _ = eval_env.reset()
     terminated = False
     truncated = False
@@ -49,6 +55,11 @@ def _play_episode(eval_env: SingleAgentWrapper, model: MaskablePPO, max_steps: i
 
 
 def _generate_eval_pool(pool_size: int, opponent_generator) -> list[str]:
+    """Build an evaluation opponent pool from a generator.
+    
+    :param pool_size: Number of teams to sample.
+    :param opponent_generator: Generator yielding packed opponent teams.
+    :returns: A list of packed opponent team strings."""
     if opponent_generator is None:
         raise ValueError("Cannot generate eval pool without an opponent team generator.")
 
@@ -66,6 +77,18 @@ def evaluate_model(
         max_steps: int,
         agent_team_generator=None,
 ) -> list[EvalResult]:
+    """Evaluate a trained model against a selected opponent pool.
+    
+    :param model: Trained model to evaluate.
+    :param timestep: Training timestep associated with this evaluation.
+    :param train_team: Agent team used for evaluation.
+    :param battle_format: Showdown format used for evaluation battles.
+    :param opponent_names: Optional predefined opponent names.
+    :param opponent_generator: Optional generator for opponent teams.
+    :param eval_episodes: Number of episodes to evaluate.
+    :param max_steps: Maximum steps per episode.
+    :param agent_team_generator: Optional generator for agent team rotation.
+    :returns: A list containing one ``EvalResult`` summary."""
     results: list[EvalResult] = []
 
     # TODO: add from args
@@ -117,6 +140,10 @@ def evaluate_model(
 
 
 def print_eval_summary(results: list[EvalResult]) -> None:
+    """Print per-timestep and aggregate evaluation statistics.
+    
+    :param results: Evaluation summaries to print.
+    :returns: ``None``."""
     print("\nEvaluation results (deterministic policy):")
     print("Timestep Wins  Losses  Draws  Win rate")
     print("-" * 44)

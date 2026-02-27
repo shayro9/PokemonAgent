@@ -4,6 +4,9 @@ from config.config import TEAM_BY_NAME
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
+    """Create the command-line parser for training and evaluation.
+    
+    :returns: Configured ``argparse.ArgumentParser`` instance."""
     parser = argparse.ArgumentParser(
         description="Train a MaskablePPO Pokémon bot against a pool and evaluate win rate over an opponent set."
     )

@@ -11,17 +11,12 @@ def calc_reward(
         *,
         is_agent_battle: bool,
 ) -> tuple[float, bool]:
-    """
-    Stateless reward function for a single battle step.
+    """Stateless reward function for a single battle step.
 
-    Args:
-        battle:           poke-env battle object.
-        last_hp:          mutable dict keyed by battle.battle_tag -> (my_hp, opp_hp).
-                          Caller owns this dict and passes it in each step.
-        is_agent_battle:  True if this battle belongs to the learning agent.
-
-    Returns:
-        (reward, done) where done is True if the battle has finished.
+    :param battle: poke-env battle object.
+    :param last_hp: Mutable dict keyed by ``battle.battle_tag`` to ``(my_hp, opp_hp)``.
+    :param is_agent_battle: ``True`` when this battle belongs to the learning agent.
+    :returns: ``(reward, done)`` where ``done`` is ``True`` once the battle has finished.
     """
     if not is_agent_battle:
         return 0.0, battle.finished

@@ -4,6 +4,10 @@ from typing import List, Optional
 
 
 def load_pokemon_pool(data_path: str) -> list[dict]:
+    """Load the generated Pokémon pool JSON file.
+    
+    :param data_path: Path to the generated JSON dataset.
+    :returns: The list stored in the dataset's ``pool`` field."""
     with open(data_path, 'r', encoding='utf-8') as f:
         pokemon_pool = json.load(f)['pool']
 
@@ -18,6 +22,12 @@ def split_pokemon_pool(
         train_fraction: float,
         seed: int,
 ) -> tuple[list[dict], list[dict]]:
+    """Shuffle and split a Pokémon pool into train and evaluation subsets.
+    
+    :param pokemon_pool: Full list of generated Pokémon entries.
+    :param train_fraction: Fraction of entries allocated to the train split.
+    :param seed: Random seed used for deterministic shuffling.
+    :returns: A tuple of ``(train_pool, eval_pool)``."""
     if not 0 < train_fraction < 1:
         raise ValueError("train_fraction must be between 0 and 1.")
 
@@ -38,6 +48,12 @@ def single_simple_team_generator(
         pokemon_pool: list[dict] | None = None,
         seed: int | None = None,
 ):
+    """Yield packed Showdown teams sampled from the provided pool.
+    
+    :param data_path: Optional path to a generated dataset file.
+    :param pokemon_pool: Optional in-memory pool of Pokémon entries.
+    :param seed: Optional random seed for deterministic sampling.
+    :returns: An infinite generator of packed team strings."""
     if pokemon_pool is None:
         if data_path is None:
             raise ValueError("Either data_path or pokemon_pool must be provided.")
@@ -68,7 +84,10 @@ def single_simple_team_generator(
 
 
 def format_stats_dict(stats: Optional[dict]) -> str:
-    """Helper to convert {hp: 252, atk: 0...} to '252,0,0,0,0,0'"""
+    """Convert a stats mapping into packed EV/IV CSV order.
+    
+    :param stats: Mapping with stat keys (hp, atk, def, spa, spd, spe).
+    :returns: Comma-separated stat values in canonical showdown order."""
     if not stats:
         return ""
     keys = ['hp', 'atk', 'def', 'spa', 'spd', 'spe']
@@ -94,6 +113,26 @@ def generate_team(
         dynamaxlevel: Optional[int] = None,
         teratype: Optional[str] = None,
 ) -> str:
+    """Build a Showdown packed-team string from team member attributes.
+    
+    :param nickname: Display nickname of the Pokémon.
+    :param species: Base species name.
+    :param item: Held item name.
+    :param ability: Ability name.
+    :param moves: Ordered move names.
+    :param nature: Nature name.
+    :param evs: Comma-separated EV values.
+    :param gender: Gender marker.
+    :param ivs: Comma-separated IV values.
+    :param shiny: Whether the Pokémon is shiny.
+    :param level: Level value.
+    :param happiness: Happiness value.
+    :param pokeball: Pokéball name.
+    :param hiddenpowertype: Hidden Power type.
+    :param gigantamax: Whether the Pokémon is Gigantamax-capable.
+    :param dynamaxlevel: Dynamax level.
+    :param teratype: Tera type.
+    :returns: A packed Showdown team segment string."""
     display_nickname = nickname or species
     display_species = "" if species == display_nickname else (species or "")
     display_item = item or ""
