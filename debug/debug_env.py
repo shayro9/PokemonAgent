@@ -22,7 +22,7 @@ def debug_run(n_steps=20):
 
         print(f"\n[step {step}]")
         print(f"  reward={reward:.4f}")
-        print(f"  opp_protect_chance={obs[-1]:.3f}")
+        print(f"  opp_protect_belief={obs[-1]:.3f}")
         print(f"  done={terminated or truncated}")
 
         if terminated or truncated:

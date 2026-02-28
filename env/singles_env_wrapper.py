@@ -4,7 +4,7 @@ from poke_env.environment import SinglesEnv
 
 from env.action_masking import get_valid_action_mask, ACTION_DEFAULT
 from env.battle_state import BattleState, OBS_SIZE
-from env.combat_utils import did_no_damage, protect_chance, estimate_protect_attempt_prior
+from env.combat_utils import *
 from env.reward import calc_reward
 
 
@@ -49,8 +49,11 @@ class PokemonRLWrapper(SinglesEnv):
         }
 
         self.last_hp: dict = {}
-        self.last_move: dict = {}
+        self.my_last_move: dict = {}
+        self.last_opp_pp: dict = {}
+
         self.last_protect_chance: dict = {}
+        self.protect_belief = 1.0
 
         self.rounds_played: int = 0
         self.rounds_per_opponents = rounds_per_opponents
@@ -111,8 +114,7 @@ class PokemonRLWrapper(SinglesEnv):
             self._latest_battle = battle
             self._update_battle_state(battle)
 
-        opp_protect_chance = self.last_protect_chance.get(battle.battle_tag, 1.0)
-        return BattleState.from_battle(battle, opp_protect_chance=opp_protect_chance).to_array()
+        return BattleState.from_battle(battle, opp_protect_belief=self.protect_belief).to_array()
 
     # ------------------------------------------------------------------
     # Reward
@@ -137,6 +139,8 @@ class PokemonRLWrapper(SinglesEnv):
 
     def reset(self, *args, **kwargs):
         self.last_hp = {}
+        self.last_opp_pp = {}
+        self.protect_belief = estimate_protect_attempt_prior(None)
         self._latest_battle = None
 
         if (
@@ -162,29 +166,44 @@ class PokemonRLWrapper(SinglesEnv):
     def _update_battle_state(self, battle) -> None:
         """Update per-turn bookkeeping. Call once per step before embed_battle."""
         tag = battle.battle_tag
-        last_move = self.last_move.get(tag)
-        no_damage = did_no_damage(battle, self.last_hp, last_move)
-        current = self.last_protect_chance.get(tag, 1.0)
-        prior_estimate = estimate_protect_attempt_prior(battle)
 
-        if last_move is not None:
-            self.last_protect_chance[tag] = protect_chance(
-                last_move=last_move,
-                last_chance=current,
-                no_damage=no_damage,
-                protect_attempt_prior=prior_estimate,
+        my_last_move = self.my_last_move.get(tag)
+        opp_last_move = detect_opponent_move(battle, self.last_opp_pp.get(tag, {}))
+
+        no_damage = did_no_damage(battle, self.last_hp, my_last_move)
+
+        if opp_last_move is not None:
+            protected = opp_last_move.is_protect_move
+        elif not no_damage:
+            protected = False
+        else:
+            protected = None
+
+        last_protect_chance = self.last_protect_chance.get(tag, 1.0)
+        prior_protect_estimate = estimate_protect_attempt_prior(battle)
+
+        self.last_opp_pp[tag] = snapshot_opponent_pp(battle)
+
+        if my_last_move is not None:
+            protect_belief = build_protect_belief(
+                my_last_move=my_last_move,
+                last_chance=last_protect_chance,
+                protect_attempt_prior=prior_protect_estimate,
+                protected=protected,
             )
+            self.last_protect_chance[tag] = protect_belief.expected_next_protect_chance()
+            self.protect_belief = protect_belief.expected_next_protect_belief()
 
     def _update_last_move(self, battle, canonical_action):
         if 6 <= canonical_action <= 25:
             move_index = (canonical_action - 6) % 4
-            self.last_move[battle.battle_tag] = (
+            self.my_last_move[battle.battle_tag] = (
                 battle.available_moves[move_index]
                 if move_index < len(battle.available_moves)
                 else None
             )
         else:
-            self.last_move[battle.battle_tag] = None
+            self.my_last_move[battle.battle_tag] = None
 
     def _update_last_hp(self, battle):
         my_hp = battle.active_pokemon.current_hp_fraction

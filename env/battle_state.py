@@ -41,7 +41,7 @@ class BattleState:
 
     type_multipliers: np.ndarray   # (4,)
     weight_bucket: np.ndarray      # (6,)  one-hot
-    opp_protect_chance: float      # (1)
+    opp_protect_belief: float      # (1)
 
     def to_array(self) -> np.ndarray:
         state = np.concatenate([
@@ -60,7 +60,7 @@ class BattleState:
             self.opp_moves,
             self.type_multipliers,
             self.weight_bucket,
-            [self.opp_protect_chance],
+            [self.opp_protect_belief],
         ]).astype(np.float32)
 
         assert len(state) == OBS_SIZE, (
@@ -70,7 +70,7 @@ class BattleState:
         return state
 
     @classmethod
-    def from_battle(cls, battle, opp_protect_chance: float = 1.0) -> "BattleState":
+    def from_battle(cls, battle, opp_protect_belief: float = 1.0) -> "BattleState":
         """Build a BattleState from a poke-env battle object."""
         my = battle.active_pokemon
         opp = battle.opponent_active_pokemon
@@ -115,7 +115,7 @@ class BattleState:
 
             type_multipliers=calc_types_vector(my_types, opp_types, battle.gen),
             weight_bucket=weight_bucket,
-            opp_protect_chance=opp_protect_chance,
+            opp_protect_belief=opp_protect_belief,
         )
 
     def describe(self) -> str:
@@ -151,7 +151,7 @@ class BattleState:
 
         for i in range(1, MAX_MOVES + 1):
             layout.extend([(f"opp_move{i}.{name}", size) for name, size in move_block])
-        layout += [("type_multipliers", 4), ("weight_bucket", 6), ("opp_protect_chance", 1)]
+        layout += [("type_multipliers", 4), ("weight_bucket", 6), ("opp_protect_belief", 1)]
 
         lines = ["[BattleState] OBSERVATION BREAKDOWN"]
         idx = 0
