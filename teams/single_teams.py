@@ -9,6 +9,17 @@ Impish Nature
 - Toxic
 """
 
+REGIGIGAS_TEAM = """
+Regigigas
+Ability: Slow Start
+Level: 100
+EVs: 252 HP / 252 Atk / 4 Spe
+- Protect
+- Hyper Beam
+- Return
+- Earthquake
+"""
+
 SMEARGLE_TEAM = """
 Smeargle @ Focus Sash
 Ability: Technician

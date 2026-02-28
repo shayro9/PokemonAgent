@@ -14,7 +14,7 @@ from env.embed import (
 )
 
 # Update this constant whenever embed_battle changes.
-OBS_SIZE = 192  # 1 + 6 + 7 + 7 + 1 + 6 + 7 + 1 + (4 * MOVE_EMBED_LEN) + 4 + 6 + (2 * TRACKED_EFFECTS)
+OBS_SIZE = 339  # 1 + 6 + 7 + 7 + 1 + 6 + 7 + 1 + (4 * MOVE_EMBED_LEN) + 4 + 6 + (2 * TRACKED_EFFECTS)
 
 
 @dataclass
@@ -37,6 +37,7 @@ class BattleState:
     opp_preparing: float           # 0 or 1
 
     my_moves: np.ndarray           # (MAX_MOVES * MOVE_EMBED_LEN,)
+    opp_moves: np.ndarray          # (MAX_MOVES * MOVE_EMBED_LEN,)
 
     type_multipliers: np.ndarray   # (4,)
     weight_bucket: np.ndarray      # (6,)  one-hot
@@ -47,7 +48,7 @@ class BattleState:
             self.my_stats,
             self.my_boosts,
             self.my_status,
-            self.my_effects
+            self.my_effects,
             [self.opp_hp],
             self.opp_base_stats,
             self.opp_boosts,
@@ -55,6 +56,7 @@ class BattleState:
             self.opp_effects,
             [self.opp_preparing],
             self.my_moves,
+            self.opp_moves,
             self.type_multipliers,
             self.weight_bucket,
         ]).astype(np.float32)
@@ -68,7 +70,6 @@ class BattleState:
     @classmethod
     def from_battle(cls, battle) -> "BattleState":
         """Build a BattleState from a poke-env battle object."""
-        observation = battle.current_observation()
         my = battle.active_pokemon
         opp = battle.opponent_active_pokemon
 
@@ -80,6 +81,12 @@ class BattleState:
         for i, move in enumerate(battle.available_moves[:MAX_MOVES]):
             emb = embed_move(move, opp_types, battle.gen)
             my_moves[i * MOVE_EMBED_LEN: (i + 1) * MOVE_EMBED_LEN] = emb
+
+        opp_moves = np.zeros(MAX_MOVES * MOVE_EMBED_LEN, dtype=np.float32)
+        opp_moves_list = list((opp.moves or {}).values())[:MAX_MOVES]
+        for i, move in enumerate(opp_moves_list):
+            emb = embed_move(move, my_types, battle.gen)
+            opp_moves[i * MOVE_EMBED_LEN: (i + 1) * MOVE_EMBED_LEN] = emb
 
         # --- weight bucket ---
         bucket = int(my.weight // opp.weight) if opp.weight else 0
@@ -102,6 +109,8 @@ class BattleState:
             opp_preparing=float(opp.preparing),
 
             my_moves=my_moves,
+            opp_moves=opp_moves,
+
             type_multipliers=calc_types_vector(my_types, opp_types, battle.gen),
             weight_bucket=weight_bucket,
         )
@@ -136,6 +145,9 @@ class BattleState:
         ]
         for i in range(1, MAX_MOVES + 1):
             layout.extend([(f"move{i}.{name}", size) for name, size in move_block])
+
+        for i in range(1, MAX_MOVES + 1):
+            layout.extend([(f"opp_move{i}.{name}", size) for name, size in move_block])
         layout += [("type_multipliers", 4), ("weight_bucket", 6)]
 
         lines = ["[BattleState] OBSERVATION BREAKDOWN"]

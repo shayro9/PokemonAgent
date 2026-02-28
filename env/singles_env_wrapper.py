@@ -23,8 +23,8 @@ class PokemonRLWrapper(SinglesEnv):
     def __init__(
             self,
             *,
-            team,
-            opponent_teams: list[str] | None,
+            team=None,
+            opponent_teams: list[str] | None = None,
             rounds_per_opponents: int = 2_000,
             battle_team_generator=None,
             agent_team_generator=None,
@@ -48,6 +48,7 @@ class PokemonRLWrapper(SinglesEnv):
         }
 
         self.last_hp: dict = {}
+        self.last_move = {}
         self.rounds_played: int = 0
         self.rounds_per_opponents = rounds_per_opponents
 
@@ -67,6 +68,8 @@ class PokemonRLWrapper(SinglesEnv):
             return super().action_to_order(action, battle, fake, strict)
 
         canonical_action = action
+        self.last_move[battle.battle_tag] = battle.available_moves[canonical_action] \
+            if canonical_action < len(battle.available_moves) else None
         mask = get_valid_action_mask(
             battle=battle,
             allow_switches=False,
