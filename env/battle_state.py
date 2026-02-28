@@ -14,7 +14,7 @@ from env.embed import (
 )
 
 # Update this constant whenever embed_battle changes.
-OBS_SIZE = 191  # 1 + 6 + 7 + 7 + 1 + 6 + 7 + 1 + (4 * MOVE_EMBED_LEN) + 4 + 6 + (2 * TRACKED_EFFECTS)
+OBS_SIZE = 192  # 1 + 6 + 7 + 7 + 1 + 6 + 7 + 1 + (4 * MOVE_EMBED_LEN) + 4 + 6 + (2 * TRACKED_EFFECTS)
 
 
 @dataclass
@@ -125,6 +125,8 @@ class BattleState:
         move_block = [
             ("scalars", 4),
             ("category", len(list(__import__('poke_env.battle.move_category', fromlist=['MoveCategory']).MoveCategory))),
+            ("is_protect", 1),
+            ("breaks_protect", 1),
             ("multiplier", 1),
             ("status", len(MOVE_STATUSES)),
             ("boosts_target", 7),

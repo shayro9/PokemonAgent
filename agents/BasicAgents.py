@@ -20,7 +20,7 @@ class DebugRLPlayer(RandomPlayer):
         # print(battle.active_pokemon.identifier('p2'))
         # battle.opponent_active_pokemon.stats = battle.opponent_active_pokemon.base_stats
         # print(calculate_damage(battle.active_pokemon.identifier('p1'), battle.opponent_active_pokemon.identifier('p2'), battle.available_moves[0], battle))
-        print(battle.active_pokemon.effects, battle.opponent_active_pokemon.effects)
+        print(battle.active_pokemon.moves, battle.opponent_active_pokemon.moves)
 
 
         return self.choose_random_move(battle)
