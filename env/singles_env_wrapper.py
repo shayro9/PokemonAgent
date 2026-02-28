@@ -4,6 +4,7 @@ from poke_env.environment import SinglesEnv
 
 from env.action_masking import get_valid_action_mask, ACTION_DEFAULT
 from env.battle_state import BattleState, OBS_SIZE
+from env.combat_utils import did_no_damage, protect_chance, estimate_protect_attempt_prior
 from env.reward import calc_reward
 
 
@@ -48,7 +49,9 @@ class PokemonRLWrapper(SinglesEnv):
         }
 
         self.last_hp: dict = {}
-        self.last_move = {}
+        self.last_move: dict = {}
+        self.last_protect_chance: dict = {}
+
         self.rounds_played: int = 0
         self.rounds_per_opponents = rounds_per_opponents
 
@@ -68,8 +71,7 @@ class PokemonRLWrapper(SinglesEnv):
             return super().action_to_order(action, battle, fake, strict)
 
         canonical_action = action
-        self.last_move[battle.battle_tag] = battle.available_moves[canonical_action] \
-            if canonical_action < len(battle.available_moves) else None
+
         mask = get_valid_action_mask(
             battle=battle,
             allow_switches=False,
@@ -91,6 +93,8 @@ class PokemonRLWrapper(SinglesEnv):
                 )
             canonical_action = ACTION_DEFAULT
 
+        self._update_last_move(battle, canonical_action)
+
         return super().action_to_order(canonical_action, battle, fake, strict)
 
     def action_masks(self) -> np.ndarray:
@@ -105,8 +109,10 @@ class PokemonRLWrapper(SinglesEnv):
     def embed_battle(self, battle) -> np.ndarray:
         if self._is_agent1_battle(battle):
             self._latest_battle = battle
+            self._update_battle_state(battle)
 
-        return BattleState.from_battle(battle).to_array()
+        opp_protect_chance = self.last_protect_chance.get(battle.battle_tag, 1.0)
+        return BattleState.from_battle(battle, opp_protect_chance=opp_protect_chance).to_array()
 
     # ------------------------------------------------------------------
     # Reward
@@ -118,6 +124,9 @@ class PokemonRLWrapper(SinglesEnv):
             self.last_hp,
             is_agent_battle=self._is_agent1_battle(battle),
         )
+
+        self._update_last_hp(battle)
+
         if done and self._is_agent1_battle(battle):
             self.rounds_played += 1
         return reward
@@ -149,3 +158,37 @@ class PokemonRLWrapper(SinglesEnv):
             self._last_team_update_round = self.rounds_played
 
         return super().reset(*args, **kwargs)
+
+    def _update_battle_state(self, battle) -> None:
+        """Update per-turn bookkeeping. Call once per step before embed_battle."""
+        tag = battle.battle_tag
+        last_move = self.last_move.get(tag)
+        no_damage = did_no_damage(battle, self.last_hp, last_move)
+        current = self.last_protect_chance.get(tag, 1.0)
+        prior_estimate = estimate_protect_attempt_prior(battle)
+
+        if last_move is not None:
+            self.last_protect_chance[tag] = protect_chance(
+                last_move=last_move,
+                last_chance=current,
+                no_damage=no_damage,
+                protect_attempt_prior=prior_estimate,
+            )
+
+    def _update_last_move(self, battle, canonical_action):
+        if 6 <= canonical_action <= 25:
+            move_index = (canonical_action - 6) % 4
+            self.last_move[battle.battle_tag] = (
+                battle.available_moves[move_index]
+                if move_index < len(battle.available_moves)
+                else None
+            )
+        else:
+            self.last_move[battle.battle_tag] = None
+
+    def _update_last_hp(self, battle):
+        my_hp = battle.active_pokemon.current_hp_fraction
+        opp_hp = battle.opponent_active_pokemon.current_hp_fraction
+        opp_key = f"opp_{battle.opponent_active_pokemon.species}"
+
+        self.last_hp[opp_key] = (my_hp, opp_hp)

@@ -23,13 +23,12 @@ def calc_reward(
 
     my_hp = battle.active_pokemon.current_hp_fraction
     opp_hp = battle.opponent_active_pokemon.current_hp_fraction
+    opp_key = f"opp_{battle.opponent_active_pokemon.species}"
 
-    last_my_hp, last_opp_hp = last_hp.get(battle.battle_tag, (1.0, 1.0))
+    last_my_hp, last_opp_hp = last_hp.get(opp_key, (1.0, 1.0))
 
     damage_to_opp = last_opp_hp - opp_hp
     damage_to_me = last_my_hp - my_hp
-
-    last_hp[battle.battle_tag] = (my_hp, opp_hp)
 
     reward = float(np.clip(damage_to_opp - damage_to_me, -DAMAGE_CLIP, DAMAGE_CLIP))
 

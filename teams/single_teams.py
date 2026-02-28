@@ -142,6 +142,18 @@ Modest Nature
 - Quiver Dance
 """
 
+VIKAVOLT_TEAM = """
+Vikavolt @ Choice Specs
+Ability: Levitate
+Level: 100
+EVs: 252 SpA / 4 SpD / 252 Spe
+Modest Nature
+- Zap Cannon
+- Bug Buzz
+- Energy Ball
+- Volt Switch
+"""
+
 ALL_SOLO_TEAMS = [
     ("steelix", STEELIX_TEAM),
     ("garchomp", GARCHOMP_TEAM),
@@ -153,4 +165,5 @@ ALL_SOLO_TEAMS = [
     ("hippowdon", HIPPOWDON_TEAM),
     ("breloom", BRELOOM_TEAM),
     ("volcarona", VOLCARONA_TEAM),
+    ("regigigas", REGIGIGAS_TEAM),
 ]

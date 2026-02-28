@@ -14,7 +14,7 @@ from env.embed import (
 )
 
 # Update this constant whenever embed_battle changes.
-OBS_SIZE = 339  # 1 + 6 + 7 + 7 + 1 + 6 + 7 + 1 + (4 * MOVE_EMBED_LEN) + 4 + 6 + (2 * TRACKED_EFFECTS)
+OBS_SIZE = 340  # 1 + 6 + 7 + 7 + 1 + 6 + 7 + 1 + (4 * MOVE_EMBED_LEN) + 4 + 6 + (2 * TRACKED_EFFECTS) + 1
 
 
 @dataclass
@@ -41,6 +41,7 @@ class BattleState:
 
     type_multipliers: np.ndarray   # (4,)
     weight_bucket: np.ndarray      # (6,)  one-hot
+    opp_protect_chance: float      # (1)
 
     def to_array(self) -> np.ndarray:
         state = np.concatenate([
@@ -59,6 +60,7 @@ class BattleState:
             self.opp_moves,
             self.type_multipliers,
             self.weight_bucket,
+            [self.opp_protect_chance],
         ]).astype(np.float32)
 
         assert len(state) == OBS_SIZE, (
@@ -68,7 +70,7 @@ class BattleState:
         return state
 
     @classmethod
-    def from_battle(cls, battle) -> "BattleState":
+    def from_battle(cls, battle, opp_protect_chance: float = 1.0) -> "BattleState":
         """Build a BattleState from a poke-env battle object."""
         my = battle.active_pokemon
         opp = battle.opponent_active_pokemon
@@ -113,6 +115,7 @@ class BattleState:
 
             type_multipliers=calc_types_vector(my_types, opp_types, battle.gen),
             weight_bucket=weight_bucket,
+            opp_protect_chance=opp_protect_chance,
         )
 
     def describe(self) -> str:
@@ -148,7 +151,7 @@ class BattleState:
 
         for i in range(1, MAX_MOVES + 1):
             layout.extend([(f"opp_move{i}.{name}", size) for name, size in move_block])
-        layout += [("type_multipliers", 4), ("weight_bucket", 6)]
+        layout += [("type_multipliers", 4), ("weight_bucket", 6), ("opp_protect_chance", 1)]
 
         lines = ["[BattleState] OBSERVATION BREAKDOWN"]
         idx = 0

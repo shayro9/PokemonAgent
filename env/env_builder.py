@@ -41,9 +41,12 @@ def build_env(
         agent_team_generator=None,
         battle_team_generator=None,
         use_action_masking: bool = False,
+        strict: bool = True,
 ) -> SingleAgentWrapper:
     """Construct the single-agent battle environment.
     
+    :param strict: If true, action-order converters will throw an error if the move is
+            illegal. Otherwise, it will return default. Defaults to True.
     :param agent_team: Packed team string for the learning agent.
     :param battle_format: Showdown battle format name.
     :param opponent_names: Named predefined opponents.
@@ -75,7 +78,7 @@ def build_env(
         server_configuration=LocalhostServerConfiguration,
         account_configuration1=AccountConfiguration(f"Player_{unique_id}", None),
         account_configuration2=AccountConfiguration(f"Opponent_{unique_id}", None),
-        strict=True,
+        strict=strict,
     )
 
     env = SingleAgentWrapper(agent, opponent_policy)

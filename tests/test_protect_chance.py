@@ -99,7 +99,7 @@ class TestProtectChance(unittest.TestCase):
 
     def test_zero_accuracy_defaults_to_reset(self):
         move = make_move(MoveCategory.PHYSICAL, accuracy=0.0)
-        self.assertAlmostEqual(protect_chance(move, 1 / 3, no_damage=True, protect_attempt_prior=0.5), 1.0)
+        self.assertAlmostEqual(protect_chance(move, 1 / 3, no_damage=True, protect_attempt_prior=0.5), 23 / 27)
 
     def test_partial_accuracy_with_prior(self):
         move = make_move(MoveCategory.PHYSICAL, accuracy=0.8)

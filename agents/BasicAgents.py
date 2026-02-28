@@ -1,9 +1,12 @@
+import asyncio
+
+from poke_env.concurrency import POKE_LOOP
 from poke_env.player import RandomPlayer, Player
 import numpy as np
 from stable_baselines3 import DQN
 from poke_env.calc.damage_calc_gen9 import calculate_damage
 from poke_env.battle import Battle
-from env.singles_env_wrapper import print_state
+from env.singles_env_wrapper import print_state, PokemonRLWrapper
 
 
 class DebugRLPlayer(RandomPlayer):
@@ -21,7 +24,4 @@ class DebugRLPlayer(RandomPlayer):
         # print(battle.active_pokemon.identifier('p2'))
         # battle.opponent_active_pokemon.stats = battle.opponent_active_pokemon.base_stats
         # print(calculate_damage(battle.active_pokemon.identifier('p1'), battle.opponent_active_pokemon.identifier('p2'), battle.available_moves[0], battle))
-
-
-
         return self.choose_random_move(battle)

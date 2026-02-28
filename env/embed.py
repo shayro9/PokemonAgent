@@ -83,7 +83,7 @@ def embed_move(move: Move, opp_types, gen: int) -> np.ndarray:
     # Scalars
     vec.append(_scale_01(move.base_power or 0, 200.0))
     vec.append(1.0 if move.accuracy is True else _scale_01(move.accuracy or 0))
-    vec.append(_scale_01(move.max_pp or 0, 40.0))
+    vec.append(_scale_01(move.current_pp or 0, 40.0))
     vec.append(_scale_m11(_safe_int(move, "priority", 0), 7.0))
 
     # Category one-hot

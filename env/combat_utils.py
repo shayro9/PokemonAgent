@@ -2,8 +2,10 @@ from dataclasses import dataclass
 
 from poke_env.battle import MoveCategory, Move
 
+from .embed import MAX_MOVES
 
-def did_no_damage(battle, last_hp: dict, last_move, eps = 1e-6) -> bool:
+
+def did_no_damage(battle, last_hp: dict, last_move, eps=1e-6) -> bool:
     """
     Returns True if our last action did no damage to the opponent.
     Requires last_move to be a physical or special move (not status).
@@ -14,12 +16,10 @@ def did_no_damage(battle, last_hp: dict, last_move, eps = 1e-6) -> bool:
         return False
 
     opp = battle.opponent_active_pokemon
-    opp_key = f"opp_{opp.species}"
 
+    opp_key = f"opp_{battle.opponent_active_pokemon.species}"
     current_hp = opp.current_hp_fraction
-    previous_hp = last_hp.get(opp_key)
-    if previous_hp is None or current_hp is None:
-        return False
+    _, previous_hp = last_hp.get(opp_key, (1.0, 1.0))
 
     # True if HP did not drop (within tolerance)
     return current_hp >= previous_hp - eps
@@ -37,7 +37,7 @@ class ProtectBelief:
     Notation:
       - ``a``: move accuracy, ``m = 1 - a`` (miss probability)
       - ``p``: current Protect success chance if they attempted this turn
-      - ``q``: prior probability they attempted Protect this turn
+      - ``q``: prior probability they attempted to Protect this turn
 
     Core equations:
       - ``P(no_damage) = q*p + m*(1 - q*p)``
@@ -47,7 +47,7 @@ class ProtectBelief:
     Parameters:
         accuracy: chance our move hits (a)
         last_chance: chance Protect would have succeeded if attempted this turn (p)
-        protect_attempt_prior: prior that opponent attempted Protect this turn (q)
+        protect_attempt_prior: prior that opponent attempted to Protect this turn (q)
     """
 
     accuracy: float
@@ -83,7 +83,8 @@ class ProtectBelief:
         return posterior * next_if_protect_succeeded + (1.0 - posterior) * next_if_reset
 
 
-def build_protect_belief(last_move: Move, last_chance: float = 1.0, protect_attempt_prior: float = 1.0) -> ProtectBelief:
+def build_protect_belief(last_move: Move, last_chance: float = 1.0,
+                         protect_attempt_prior: float = 1.0) -> ProtectBelief:
     accuracy = last_move.accuracy
     if not isinstance(accuracy, (int, float)):
         accuracy = 1.0
@@ -96,10 +97,10 @@ def build_protect_belief(last_move: Move, last_chance: float = 1.0, protect_atte
 
 
 def protect_chance(
-    last_move: Move,
-    last_chance: float = 1.0,
-    no_damage: bool = False,
-    protect_attempt_prior: float = 1.0,
+        last_move: Move,
+        last_chance: float = 1.0,
+        no_damage: bool = False,
+        protect_attempt_prior: float = 1.0,
 ) -> float:
     """Return ``E[next Protect success chance]`` from the Bayesian belief model.
 
@@ -117,3 +118,30 @@ def protect_chance(
         protect_attempt_prior=protect_attempt_prior,
     )
     return belief.expected_next_protect_chance_given_no_damage()
+
+
+def estimate_protect_attempt_prior(battle) -> float:
+    """Estimate the prior probability that the opponent will attempt to Protect this turn.
+
+    Computed as the fraction of the opponent's remaining PP that belongs to
+    Protect-category moves. If no moves have been revealed yet, returns ``1.0``
+    as an uninformative prior (assume Protect is possible).
+
+    :param battle: The current battle state.
+    :returns: A value in ``[0, 1]`` representing the estimated probability
+              that the opponent attempts a Protect move this turn.
+    """
+    moves = list((battle.opponent_active_pokemon.moves or {}).values())
+    if not moves:
+        return 1.0
+
+    pp_sum = sum(move.current_pp for move in moves)
+    if pp_sum == 0:
+        return 0.0
+
+    protect_pp = sum(move.current_pp for move in moves if move.is_protect_move)
+
+    if len(moves) < MAX_MOVES and protect_pp == 0:
+        return 1.0 - len(moves) / MAX_MOVES
+
+    return protect_pp / pp_sum
