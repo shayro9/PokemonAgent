@@ -3,17 +3,19 @@ from functools import lru_cache
 from typing import List
 
 from poke_env.data import GenData
-from poke_env.battle import Move
+from poke_env.battle import Move, effect
 from poke_env.battle.pokemon_type import PokemonType
 from poke_env.battle.move_category import MoveCategory
 from poke_env.battle.status import Status
+from poke_env.battle.effect import Effect
 
 BOOST_KEYS = ("atk", "def", "spa", "spd", "spe", "accuracy", "evasion")
 MOVE_CATEGORIES = tuple(MoveCategory)
 MOVE_STATUSES = tuple(Status)
+TRACKED_EFFECTS = [Effect.CONFUSION, Effect.MUST_RECHARGE, Effect.ENCORE]
 
 MAX_MOVES = 4
-MOVE_EMBED_LEN = 4 + len(MoveCategory) + 1 + len(Status) + 7 + 7 + 2 + 2
+MOVE_EMBED_LEN = 33  # 4 + len(MoveCategory) + 1 + len(Status) + 7 + 7 + 2 + 2
 
 
 @lru_cache(maxsize=None)
@@ -129,6 +131,14 @@ def embed_status(status) -> np.ndarray:
     :param status: Status value to encode.
     :returns: A NumPy one-hot vector over known status values."""
     return np.array([1.0 if status == s else 0.0 for s in MOVE_STATUSES], dtype=np.float32)
+
+
+def embed_effects(effects) -> np.ndarray:
+    """One-hot encode a battle effect vector
+
+    :param effects: List of battle effects to encode
+    :returns: A NumPy one-hot vector over tracked effect values."""
+    return np.array([int(e in effects) for e in TRACKED_EFFECTS])
 
 
 def calc_types_vector(my_types: list[PokemonType], opp_types: list[PokemonType], gen: int) -> np.ndarray:

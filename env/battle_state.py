@@ -6,14 +6,15 @@ import numpy as np
 from env.embed import (
     embed_move,
     embed_status,
+    embed_effects,
     calc_types_vector,
     MAX_MOVES,
     MOVE_EMBED_LEN,
-    MOVE_STATUSES,
+    MOVE_STATUSES, TRACKED_EFFECTS,
 )
 
 # Update this constant whenever embed_battle changes.
-OBS_SIZE = 185  # 1 + 6 + 7 + 7 + 1 + 6 + 7 + 1 + (4 * MOVE_EMBED_LEN) + 4 + 6
+OBS_SIZE = 191  # 1 + 6 + 7 + 7 + 1 + 6 + 7 + 1 + (4 * MOVE_EMBED_LEN) + 4 + 6 + (2 * TRACKED_EFFECTS)
 
 
 @dataclass
@@ -26,14 +27,17 @@ class BattleState:
     my_stats: np.ndarray           # (6),  base stats normalised
     my_boosts: np.ndarray          # (7)  in-battle boosts normalised
     my_status: np.ndarray          # (7)  one-hot Status
+    my_effects: np.ndarray         # (3)  one-hot Tracked effects
 
     opp_hp: float
     opp_base_stats: np.ndarray     # (6,)
     opp_boosts: np.ndarray         # (7,)
     opp_status: np.ndarray         # (7,)
+    opp_effects: np.ndarray        # (3)  one-hot Tracked effects
     opp_preparing: float           # 0 or 1
 
     my_moves: np.ndarray           # (MAX_MOVES * MOVE_EMBED_LEN,)
+
     type_multipliers: np.ndarray   # (4,)
     weight_bucket: np.ndarray      # (6,)  one-hot
 
@@ -43,10 +47,12 @@ class BattleState:
             self.my_stats,
             self.my_boosts,
             self.my_status,
+            self.my_effects
             [self.opp_hp],
             self.opp_base_stats,
             self.opp_boosts,
             self.opp_status,
+            self.opp_effects,
             [self.opp_preparing],
             self.my_moves,
             self.type_multipliers,
@@ -62,6 +68,7 @@ class BattleState:
     @classmethod
     def from_battle(cls, battle) -> "BattleState":
         """Build a BattleState from a poke-env battle object."""
+        observation = battle.current_observation()
         my = battle.active_pokemon
         opp = battle.opponent_active_pokemon
 
@@ -85,11 +92,13 @@ class BattleState:
             my_stats=np.minimum(np.array(list(my.stats.values())) / 255.0, 1.0),
             my_boosts=np.array(list(my.boosts.values())) / 6.0,
             my_status=embed_status(my.status),
+            my_effects=embed_effects(my.effects),
 
             opp_hp=opp.current_hp_fraction,
             opp_base_stats=np.array(list(opp.base_stats.values())) / 255.0,
             opp_boosts=np.array(list(opp.boosts.values())) / 6.0,
             opp_status=embed_status(opp.status),
+            opp_effects=embed_effects(opp.effects),
             opp_preparing=float(opp.preparing),
 
             my_moves=my_moves,
@@ -105,10 +114,12 @@ class BattleState:
             ("my_stats", 6),
             ("my_boosts", 7),
             ("my_status", len(MOVE_STATUSES)),
+            ("my_effects", len(TRACKED_EFFECTS)),
             ("opp_hp", 1),
             ("opp_base_stats", 6),
             ("opp_boosts", 7),
             ("opp_status", len(MOVE_STATUSES)),
+            ("opp_effects", len(TRACKED_EFFECTS)),
             ("opp_preparing", 1),
         ]
         move_block = [

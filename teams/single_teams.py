@@ -9,6 +9,18 @@ Impish Nature
 - Toxic
 """
 
+SMEARGLE_TEAM = """
+Smeargle @ Focus Sash
+Ability: Technician
+Level: 100
+EVs: 252 HP / 4 Def / 252 Spe
+Timid Nature
+- Leech Seed
+- Confuse Ray
+- Taunt
+- Encore
+"""
+
 GARCHOMP_TEAM = """
 Garchomp   
 Ability: Rough Skin  
