@@ -14,7 +14,7 @@ from env.embed import (
 )
 
 # Update this constant whenever embed_battle changes.
-OBS_SIZE = 339  # 1 + 6 + 7 + 7 + 1 + 6 + 7 + 1 + (4 * MOVE_EMBED_LEN) + 4 + 6 + (2 * TRACKED_EFFECTS)
+OBS_SIZE = 341  # prior features + protect belief posterior and expected next chance
 
 
 @dataclass
@@ -35,6 +35,8 @@ class BattleState:
     opp_status: np.ndarray         # (7,)
     opp_effects: np.ndarray        # (3)  one-hot Tracked effects
     opp_preparing: float           # 0 or 1
+    protect_posterior: float       # P(protect_success | no_damage)
+    protect_next_chance: float     # E[next protect success chance]
 
     my_moves: np.ndarray           # (MAX_MOVES * MOVE_EMBED_LEN,)
     opp_moves: np.ndarray          # (MAX_MOVES * MOVE_EMBED_LEN,)
@@ -55,6 +57,8 @@ class BattleState:
             self.opp_status,
             self.opp_effects,
             [self.opp_preparing],
+            [self.protect_posterior],
+            [self.protect_next_chance],
             self.my_moves,
             self.opp_moves,
             self.type_multipliers,
@@ -68,7 +72,13 @@ class BattleState:
         return state
 
     @classmethod
-    def from_battle(cls, battle) -> "BattleState":
+    def from_battle(
+        cls,
+        battle,
+        *,
+        protect_posterior: float = 0.0,
+        protect_next_chance: float = 1.0,
+    ) -> "BattleState":
         """Build a BattleState from a poke-env battle object."""
         my = battle.active_pokemon
         opp = battle.opponent_active_pokemon
@@ -107,6 +117,8 @@ class BattleState:
             opp_status=embed_status(opp.status),
             opp_effects=embed_effects(opp.effects),
             opp_preparing=float(opp.preparing),
+            protect_posterior=float(protect_posterior),
+            protect_next_chance=float(protect_next_chance),
 
             my_moves=my_moves,
             opp_moves=opp_moves,
@@ -130,6 +142,8 @@ class BattleState:
             ("opp_status", len(MOVE_STATUSES)),
             ("opp_effects", len(TRACKED_EFFECTS)),
             ("opp_preparing", 1),
+            ("protect_posterior", 1),
+            ("protect_next_chance", 1),
         ]
         move_block = [
             ("scalars", 4),

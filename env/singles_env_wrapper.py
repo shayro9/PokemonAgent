@@ -1,10 +1,12 @@
 import numpy as np
 import gymnasium as gym
 from poke_env.environment import SinglesEnv
+from poke_env.battle import MoveCategory
 
 from env.action_masking import get_valid_action_mask, ACTION_DEFAULT
 from env.battle_state import BattleState, OBS_SIZE
 from env.reward import calc_reward
+from env.combat_utils import build_protect_belief
 
 
 def print_state(battle, *, prefix="[PokemonRLWrapper]") -> str:
@@ -49,6 +51,9 @@ class PokemonRLWrapper(SinglesEnv):
 
         self.last_hp: dict = {}
         self.last_move = {}
+        self._protect_next_chance: dict = {}
+        self._protect_posterior: dict = {}
+        self.protect_attempt_prior: float = 1.0
         self.rounds_played: int = 0
         self.rounds_per_opponents = rounds_per_opponents
 
@@ -106,18 +111,75 @@ class PokemonRLWrapper(SinglesEnv):
         if self._is_agent1_battle(battle):
             self._latest_battle = battle
 
-        return BattleState.from_battle(battle).to_array()
+        tag = getattr(battle, "battle_tag", None)
+        protect_posterior = self._protect_posterior.get(tag, 0.0)
+        protect_next_chance = self._protect_next_chance.get(tag, 1.0)
+
+        return BattleState.from_battle(
+            battle,
+            protect_posterior=protect_posterior,
+            protect_next_chance=protect_next_chance,
+        ).to_array()
 
     # ------------------------------------------------------------------
     # Reward
     # ------------------------------------------------------------------
 
+    def _update_protect_belief(self, battle, previous_opp_hp: float | None) -> None:
+        """Update per-battle Protect belief after a completed turn."""
+        tag = battle.battle_tag
+        last_move = self.last_move.get(tag)
+
+        if last_move is None or previous_opp_hp is None:
+            self._protect_posterior[tag] = 0.0
+            self._protect_next_chance[tag] = 1.0
+            return
+
+        if getattr(last_move, "category", None) is None or last_move.category == MoveCategory.STATUS:
+            self._protect_posterior[tag] = 0.0
+            self._protect_next_chance[tag] = 1.0
+            return
+
+        current_opp_hp = battle.opponent_active_pokemon.current_hp_fraction
+        if current_opp_hp is None:
+            self._protect_posterior[tag] = 0.0
+            self._protect_next_chance[tag] = 1.0
+            return
+
+        no_damage = current_opp_hp >= previous_opp_hp - 1e-6
+        last_chance = self._protect_next_chance.get(tag, 1.0)
+
+        if not no_damage:
+            self._protect_posterior[tag] = 0.0
+            self._protect_next_chance[tag] = 1.0
+            return
+
+        belief = build_protect_belief(
+            last_move=last_move,
+            last_chance=last_chance,
+            protect_attempt_prior=self.protect_attempt_prior,
+        )
+        posterior = belief.posterior_protect_success_given_no_damage()
+        next_chance = belief.expected_next_protect_chance_given_no_damage()
+
+        self._protect_posterior[tag] = posterior
+        self._protect_next_chance[tag] = next_chance
+
+
     def calc_reward(self, battle) -> float:
+        previous_opp_hp = None
+        if self._is_agent1_battle(battle):
+            previous_opp_hp = self.last_hp.get(battle.battle_tag, (None, None))[1]
+
         reward, done = calc_reward(
             battle,
             self.last_hp,
             is_agent_battle=self._is_agent1_battle(battle),
         )
+
+        if self._is_agent1_battle(battle):
+            self._update_protect_belief(battle, previous_opp_hp)
+
         if done and self._is_agent1_battle(battle):
             self.rounds_played += 1
         return reward
@@ -129,6 +191,8 @@ class PokemonRLWrapper(SinglesEnv):
     def reset(self, *args, **kwargs):
         self.last_hp = {}
         self._latest_battle = None
+        self._protect_next_chance = {}
+        self._protect_posterior = {}
 
         if (
                 self.rounds_played % self.rounds_per_opponents == 0
