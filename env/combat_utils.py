@@ -146,7 +146,8 @@ def detect_opponent_move(battle, last_pp: dict) -> Move | None:
     """
     moves = (battle.opponent_active_pokemon.moves or {}).values()
     for move in moves:
-        if last_pp.get(move.id, move.current_pp) > move.current_pp or move.id not in last_pp.keys():
+        previous_pp = last_pp.get(move.id)
+        if previous_pp is not None and previous_pp > move.current_pp:
             return move
 
     return None
