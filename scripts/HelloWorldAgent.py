@@ -10,8 +10,6 @@ async def main():
     """Create a debug player and send a single challenge.
     
     :returns: ``None``."""
-    team = next(single_simple_team_generator(data_path='data/gen9randombattle_db.json'))
-
     env = PokemonRLWrapper(
         battle_format="gen9nationaldex",
         strict=False,
