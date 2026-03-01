@@ -76,73 +76,105 @@ class OpponentsResolved:
     eval_agent_gen: Optional[Iterable]
 
 
-def resolve_opponents(args) -> OpponentsResolved:
-    """Resolve train/eval opponent names and generators from CLI args.
-    
-    :param args: Parsed command-line arguments namespace.
-    :returns: An ``OpponentsResolved`` object with train/eval pools and generators."""
+def _resolve_train_eval_pools(
+    *,
+    data_path: str,
+    do_split: bool,
+    train_split: float,
+    split_seed: int,
+):
+    """Return (train_pool, eval_pool). If not split -> same pool for both."""
+    if do_split:
+        return _resolve_generated_pools(
+            data_path=data_path,
+            train_split=train_split,
+            split_seed=split_seed,
+        )
+    pool = load_pokemon_pool(data_path)
+    return pool, pool
 
-    # ---- TRAIN opponents ----
+
+def resolve_opponents(args) -> OpponentsResolved:
+    """Resolve train/eval opponent names and generators from CLI args."""
     train_names: list[str] = []
+    eval_names: list[str] = []
     train_gen = None
+    eval_gen = None
     train_agent_gen = None
     eval_agent_gen = None
 
-    if args.random_generated:
-        # build generators (possibly split)
-        train_seed = resolve_seed(args.train_generator_seed, args.seed)
-        eval_seed = resolve_seed(args.eval_generator_seed, args.seed)
-
-        agent_data_path = args.agent_data_path or DEFAULT_DATA_PATH
-        opponent_data_path = args.opponent_data_path or DEFAULT_DATA_PATH
-
-        if args.split_generated_pool:
-            if agent_data_path == opponent_data_path:
-                train_pool, eval_pool = _resolve_generated_pools(
-                    data_path=agent_data_path,
-                    train_split=args.train_split,
-                    split_seed=args.split_seed,
-                )
-                train_opponent_pool = train_pool
-                eval_opponent_pool = eval_pool
-            else:
-                train_opponent_pool, eval_opponent_pool = _resolve_generated_pools(
-                    data_path=opponent_data_path,
-                    train_split=args.train_split,
-                    split_seed=args.split_seed,
-                )
-        else:
-            shared_agent_pool = load_pokemon_pool(agent_data_path)
-            shared_opponent_pool = (
-                shared_agent_pool
-                if agent_data_path == opponent_data_path
-                else load_pokemon_pool(opponent_data_path)
-            )
-            train_opponent_pool = eval_opponent_pool = shared_opponent_pool
-
-        train_gen = single_simple_team_generator(pokemon_pool=train_opponent_pool, seed=train_seed)
-        eval_gen = single_simple_team_generator(pokemon_pool=eval_opponent_pool, seed=eval_seed)
-
-        if args.train_team is None:
-            train_agent_gen = train_gen
-            eval_agent_gen = eval_gen
-    else:
-        # name-based pools
-        train_names = parse_pool(args.pool, args.pool_all)
-        eval_gen = None
-
-    # ---- EVAL opponents ----
-    if args.eval_pool is not None or args.eval_pool_all:
-        eval_names = parse_pool(args.eval_pool, args.eval_pool_all)
-    else:
-        # Otherwise:
-        # - if training used names => eval uses same names
-        # - if training used generated => eval will use generator (handled above)
-        eval_names = train_names
-
-    # if not generated, eval_gen must be None
     if not args.random_generated:
-        eval_gen = None
+        # ---- NAME-BASED TRAIN opponents ----
+        train_names = parse_pool(args.pool, args.pool_all)
+
+        # ---- NAME-BASED EVAL opponents ----
+        if args.eval_pool is not None or args.eval_pool_all:
+            eval_names = parse_pool(args.eval_pool, args.eval_pool_all)
+        else:
+            eval_names = train_names
+
+        # Generators must be None in name-based mode
+        return OpponentsResolved(
+            train_names=train_names,
+            eval_names=eval_names,
+            train_gen=None,
+            eval_gen=None,
+            train_agent_gen=None,
+            eval_agent_gen=None,
+        )
+
+    # ---- GENERATED MODE ----
+    train_seed = resolve_seed(args.train_generator_seed, args.seed)
+    eval_seed = resolve_seed(args.eval_generator_seed, args.seed)
+
+    # “none” means default
+    agent_data_path = args.agent_data_path or DEFAULT_DATA_PATH
+    opponent_data_path = args.opponent_data_path or DEFAULT_DATA_PATH
+
+    do_split = bool(args.split_generated_pool)
+
+    # Resolve pools with “same path” optimization
+    if agent_data_path == opponent_data_path:
+        train_pool, eval_pool = _resolve_train_eval_pools(
+            data_path=agent_data_path,
+            do_split=do_split,
+            train_split=args.train_split,
+            split_seed=args.split_seed,
+        )
+        train_agent_pool = train_opp_pool = train_pool
+        eval_agent_pool = eval_opp_pool = eval_pool
+    else:
+        train_agent_pool, eval_agent_pool = _resolve_train_eval_pools(
+            data_path=agent_data_path,
+            do_split=do_split,
+            train_split=args.train_split,
+            split_seed=args.split_seed,
+        )
+        train_opp_pool, eval_opp_pool = _resolve_train_eval_pools(
+            data_path=opponent_data_path,
+            do_split=do_split,
+            train_split=args.train_split,
+            split_seed=args.split_seed,
+        )
+
+    # Opponent generators always exist in generated mode
+    train_gen = single_simple_team_generator(pokemon_pool=train_opp_pool, seed=train_seed)
+    eval_gen = single_simple_team_generator(pokemon_pool=eval_opp_pool, seed=eval_seed)
+
+    # Agent generators only when you did NOT provide an explicit --train-team
+    if args.train_team is None:
+        train_agent_gen = single_simple_team_generator(pokemon_pool=train_agent_pool, seed=train_seed)
+        eval_agent_gen = single_simple_team_generator(pokemon_pool=eval_agent_pool, seed=eval_seed)
+
+    # Names are irrelevant in generated mode, but keep them consistent/empty
+    if args.eval_pool is not None or args.eval_pool_all:
+        # If you *also* allow mixing “generated train” + “name eval”, keep this:
+        eval_names = parse_pool(args.eval_pool, args.eval_pool_all)
+        # In that mixed case, you probably want eval_gen = None, because eval uses names:
+        # (Uncomment if that’s your intended CLI meaning.)
+        # eval_gen = None
+    else:
+        eval_names = train_names  # usually empty
 
     return OpponentsResolved(
         train_names=train_names,

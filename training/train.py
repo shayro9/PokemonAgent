@@ -127,7 +127,8 @@ def train_model(
                 ]))
             trained_steps += step_chunk
 
-            eval_results.extend(evaluate_model(model=model, timestep=trained_steps, **eval_kwargs))
+            eval_res = evaluate_model(model=model, timestep=trained_steps, **eval_kwargs)
+            eval_results.extend(eval_res)
             print(f"\n[Eval @ {trained_steps} training timesteps]")
             print_eval_summary(eval_results)
     else:

@@ -8,12 +8,13 @@ const { Teams } = require('../pokemon-showdown/dist/sim/teams');
 // CONFIG
 const FORMAT = 'gen9randombattle';
 const NUM_TEAMS_TO_GENERATE = 20000;
-const OUTPUT_FILE = './data/gen9randombattle_db.json';
+const OUTPUT_FILE = '../data/gen9randombattle_bellibolt_db.json';
 
 // Optional knobs
 const ONE_MON_PER_TEAM = true;        // Step-1 recommendation
 const MAX_PER_SPECIES = 60;           // prevent a few species dominating the DB
 const DEDUPE_EXACT_SETS = true;       // remove identical sets
+const FILTER_SPECIES = 'Bellibolt';
 
 // Helpers
 function setKey(s) {
@@ -42,6 +43,9 @@ try {
 
     for (const mon of picks) {
       const sp = mon.species;
+
+      if (FILTER_SPECIES && sp !== FILTER_SPECIES) continue;
+
       const cnt = perSpeciesCount.get(sp) || 0;
       if (cnt >= MAX_PER_SPECIES) continue;
 

@@ -154,6 +154,18 @@ Modest Nature
 - Volt Switch
 """
 
+BELLIBOLT_TEAM = """
+Bellibolt @ Leftovers
+Ability: Electromorphosis
+Level: 84
+EVs: 85 Hp / 85 Def / 85 SpA / 85 SpD / 85 Spe
+Modest Nature
+- muddywater
+- thunderbolt
+- toxic
+- slackoff
+"""
+
 ALL_SOLO_TEAMS = [
     ("steelix", STEELIX_TEAM),
     ("garchomp", GARCHOMP_TEAM),
@@ -166,4 +178,5 @@ ALL_SOLO_TEAMS = [
     ("breloom", BRELOOM_TEAM),
     ("volcarona", VOLCARONA_TEAM),
     ("regigigas", REGIGIGAS_TEAM),
+    ("bellibolt", BELLIBOLT_TEAM),
 ]

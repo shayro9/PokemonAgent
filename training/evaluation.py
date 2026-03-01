@@ -8,6 +8,7 @@ from sb3_contrib.common.maskable.utils import get_action_masks
 
 from config.config import TEAM_BY_NAME
 from env.env_builder import build_env
+from env.singles_env_wrapper import PokemonRLWrapper
 
 
 @dataclass
@@ -25,7 +26,7 @@ class EvalResult:
     def win_rate(self) -> float:
         if self.episodes == 0:
             return 0.0
-        return self.wins / self.episodes
+        return (self.wins + self.draws/2) / self.episodes
 
 
 def _play_episode(eval_env: SingleAgentWrapper, model: MaskablePPO, max_steps: int) -> tuple[float, bool]:
@@ -170,4 +171,7 @@ def print_eval_summary(results: list[EvalResult]) -> None:
 def _get_last_battle(env):
     while hasattr(env, "env"):
         env = env.env
-    return env.get_last_battle()
+    if isinstance(env, PokemonRLWrapper):
+        battle = env.get_last_battle()
+        return battle
+    return None
