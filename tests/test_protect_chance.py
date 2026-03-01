@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 from poke_env.battle import MoveCategory
 
-from env.combat_utils import (
+from combat.combat_utils import (
     ProtectBelief,
     build_protect_belief,
     did_no_damage,

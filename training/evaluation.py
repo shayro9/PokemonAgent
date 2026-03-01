@@ -125,14 +125,14 @@ def evaluate_model(
     for _ in range(eval_episodes):
 
         total_reward, truncated = _play_episode(eval_env, model, max_steps=max_steps)
-        if truncated:
-            draws += 1
-        elif total_reward > 0:
-            wins += 1
-        elif total_reward < 0:
-            losses += 1
-        else:
-            draws += 1
+        battle = _get_last_battle(eval_env)
+        if battle is not None and battle.finished:
+            if battle.won:
+                wins += 1
+            elif battle.lost:
+                losses += 1
+            else:
+                draws += 1
 
     results.append(EvalResult(timestep=timestep, wins=wins, losses=losses, draws=draws))
 
@@ -165,3 +165,9 @@ def print_eval_summary(results: list[EvalResult]) -> None:
     print(
         f"Overall        {total_wins:4d} {total_losses:7d} {total_draws:6d} {overall_win_rate:7.2f}%"
     )
+
+
+def _get_last_battle(env):
+    while hasattr(env, "env"):
+        env = env.env
+    return env.get_last_battle()

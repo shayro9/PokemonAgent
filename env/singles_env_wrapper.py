@@ -4,7 +4,8 @@ from poke_env.environment import SinglesEnv
 
 from env.action_masking import get_valid_action_mask, ACTION_DEFAULT
 from env.battle_state import BattleState, OBS_SIZE
-from env.combat_utils import *
+from combat.combat_utils import *
+from combat.protect import *
 from env.reward import calc_reward
 
 
@@ -40,6 +41,7 @@ class PokemonRLWrapper(SinglesEnv):
         self.opponent_team_generator = opponent_team_generator
         self._last_team_update_round = None
         self._latest_battle = None
+        self._last_finished_battle = None
 
         self._action_space = gym.spaces.Discrete(26)
         self.action_spaces = {agent: self._action_space for agent in self.possible_agents}
@@ -131,6 +133,7 @@ class PokemonRLWrapper(SinglesEnv):
 
         if done and self._is_agent1_battle(battle):
             self.rounds_played += 1
+            self._last_finished_battle = battle
         return reward
 
     # ------------------------------------------------------------------
@@ -211,3 +214,6 @@ class PokemonRLWrapper(SinglesEnv):
         opp_key = f"opp_{battle.opponent_active_pokemon.species}"
 
         self.last_hp[opp_key] = (my_hp, opp_hp)
+
+    def get_last_battle(self):
+        return self._last_finished_battle

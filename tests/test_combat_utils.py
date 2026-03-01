@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 from poke_env.battle import MoveCategory
 
-from env.combat_utils import did_no_damage
+from combat.combat_utils import did_no_damage
 
 
 def _make_battle(species: str, current_hp_fraction: float):

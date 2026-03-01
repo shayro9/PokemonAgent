@@ -12,6 +12,13 @@ from .logs import *
 from env.env_builder import build_env
 from .evaluation import evaluate_model, print_eval_summary
 
+LR = 3e-4
+N_STEPS = 2048
+BATCH_SIZE = 256
+GAMMA = 0.9
+ENT_COEF = 0.01
+LOG_FREQ = 500
+
 
 def train_model(
         model_path: str,
@@ -53,11 +60,11 @@ def train_model(
             "timesteps": timesteps,
             "rounds_per_opponent": rounds_per_opponent,
             "battle_format": battle_format,
-            "learning_rate": 3e-4,
-            "n_steps": 4096,
-            "batch_size": 32,
-            "gamma": 0.999,
-            "ent_coef": 0.1,
+            "learning_rate": LR,
+            "n_steps": N_STEPS,
+            "batch_size": BATCH_SIZE,
+            "gamma": GAMMA,
+            "ent_coef": ENT_COEF,
         },
         sync_tensorboard=False,
         save_code=True,
@@ -81,16 +88,19 @@ def train_model(
     model = MaskablePPO(
         "MlpPolicy",
         env=train_env,
-        learning_rate=3e-4,
-        n_steps=4096,
-        batch_size=32,
-        gamma=0.999,
+        learning_rate=LR,
+        n_steps=N_STEPS,
+        batch_size=BATCH_SIZE,
+        gamma=GAMMA,
         gae_lambda=0.95,
-        ent_coef=0.1,
+        ent_coef=ENT_COEF,
         clip_range=0.2,
         max_grad_norm=10.0,
         verbose=0,
         seed=seed,
+        normalize_advantage=True,
+        clip_range_vf=0.2,
+        n_epochs=5,
     )
 
     team_label = (
@@ -105,6 +115,7 @@ def train_model(
     if eval_every_timesteps > 0 and eval_kwargs:
         trained_steps = 0
         eval_results = []
+        metrics_cb = BattleMetricsCallback(env=train_env, log_freq=LOG_FREQ)
         while trained_steps < timesteps:
             step_chunk = min(eval_every_timesteps, timesteps - trained_steps)
             model.learn(
@@ -112,7 +123,7 @@ def train_model(
                 reset_num_timesteps=False,
                 callback=CallbackList([
                     WandbCallback(gradient_save_freq=100, verbose=0),
-                    BattleMetricsCallback(env=train_env, log_freq=100),
+                    metrics_cb,
                 ]))
             trained_steps += step_chunk
 
@@ -124,7 +135,7 @@ def train_model(
             total_timesteps=timesteps,
             callback=CallbackList([
                 WandbCallback(gradient_save_freq=100, verbose=0),
-                BattleMetricsCallback(env=train_env, log_freq=100),
+                BattleMetricsCallback(env=train_env, log_freq=LOG_FREQ),
             ])
         )
 
