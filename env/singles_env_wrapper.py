@@ -55,7 +55,7 @@ class PokemonRLWrapper(SinglesEnv):
         self.last_opp_pp: dict = {}
 
         self.last_protect_chance: dict = {}
-        self.protect_belief = 1.0
+        self.protect_belief: dict = {}
 
         self.rounds_played: int = 0
         self.rounds_per_opponents = rounds_per_opponents
@@ -116,7 +116,10 @@ class PokemonRLWrapper(SinglesEnv):
             self._latest_battle = battle
             self._update_battle_state(battle)
 
-        return BattleState.from_battle(battle, opp_protect_belief=self.protect_belief).to_array()
+        return BattleState.from_battle(
+            battle,
+            opp_protect_belief=self.protect_belief.get(battle.battle_tag, 1.0),
+        ).to_array()
 
     # ------------------------------------------------------------------
     # Reward
@@ -142,8 +145,10 @@ class PokemonRLWrapper(SinglesEnv):
 
     def reset(self, *args, **kwargs):
         self.last_hp = {}
+        self.my_last_move = {}
         self.last_opp_pp = {}
-        self.protect_belief = estimate_protect_attempt_prior(None)
+        self.last_protect_chance = {}
+        self.protect_belief = {}
         self._latest_battle = None
 
         if (
@@ -195,7 +200,9 @@ class PokemonRLWrapper(SinglesEnv):
                 protected=protected,
             )
             self.last_protect_chance[tag] = protect_belief.expected_next_protect_chance()
-            self.protect_belief = protect_belief.expected_next_protect_belief()
+            self.protect_belief[tag] = protect_belief.expected_next_protect_belief()
+        else:
+            self.protect_belief[tag] = prior_protect_estimate
 
     def _update_last_move(self, battle, canonical_action):
         if 6 <= canonical_action <= 25:

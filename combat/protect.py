@@ -112,3 +112,31 @@ def estimate_protect_attempt_prior(battle) -> float:
         return 1.0 - len(moves) / MAX_MOVES
 
     return (protect_moves + MAX_MOVES - len(moves)) / MAX_MOVES
+
+
+def detect_opponent_move(battle, last_pp: dict) -> Move | None:
+    """Detect which move the opponent used by comparing PP to last turn's snapshot.
+
+    :param battle: The current battle state.
+    :param last_pp: Dict mapping move_id -> pp from the previous turn.
+    :returns: The Move that was used, or None if no change was detected.
+    """
+    moves = (battle.opponent_active_pokemon.moves or {}).values()
+    for move in moves:
+        previous_pp = last_pp.get(move.id)
+        if previous_pp is not None and previous_pp > move.current_pp:
+            return move
+
+    return None
+
+
+def snapshot_opponent_pp(battle) -> dict:
+    """Snapshot the opponent's current PP for all revealed moves.
+
+    :param battle: The current battle state.
+    :returns: Dict mapping move_id -> current_pp.
+    """
+    return {
+        move.id: move.current_pp
+        for move in (battle.opponent_active_pokemon.moves or {}).values()
+    }
