@@ -13,10 +13,10 @@ from poke_env.battle import MoveCategory
 from combat.combat_utils import did_no_damage
 
 
-def _make_battle(species: str, current_hp_fraction: float):
+def _make_battle(species: str, current_hp_fraction: float, battle_tag: str = "battle-1"):
     """Create a minimal battle stub with the opponent active pokemon."""
     opponent = SimpleNamespace(species=species, current_hp_fraction=current_hp_fraction)
-    return SimpleNamespace(opponent_active_pokemon=opponent)
+    return SimpleNamespace(opponent_active_pokemon=opponent, battle_tag=battle_tag)
 
 
 def _make_move(category: MoveCategory):
@@ -27,14 +27,14 @@ def _make_move(category: MoveCategory):
 def test_did_no_damage_returns_false_when_last_move_is_none():
     """It should return False if there is no previous move to evaluate."""
     battle = _make_battle("pikachu", 1.0)
-    assert did_no_damage(battle, {"opp_pikachu": 1.0}, None) is False
+    assert did_no_damage(battle, {"battle-1|pikachu": (1.0, 1.0)}, None) is False
 
 
 def test_did_no_damage_returns_false_for_status_moves():
     """It should ignore status-category moves for damage checks."""
     battle = _make_battle("pikachu", 1.0)
     status_move = _make_move(MoveCategory.STATUS)
-    assert did_no_damage(battle, {"opp_pikachu": 1.0}, status_move) is False
+    assert did_no_damage(battle, {"battle-1|pikachu": (1.0, 1.0)}, status_move) is False
 
 
 def test_did_no_damage_returns_false_when_previous_hp_is_missing():
@@ -48,18 +48,18 @@ def test_did_no_damage_returns_false_when_opponent_hp_decreases():
     """It should return False when current HP is lower than the previous value."""
     battle = _make_battle("pikachu", 0.4)
     damaging_move = _make_move(MoveCategory.PHYSICAL)
-    assert did_no_damage(battle, {"opp_pikachu": 0.7}, damaging_move) is False
+    assert did_no_damage(battle, {"battle-1|pikachu": (1.0, 0.7)}, damaging_move) is False
 
 
 def test_did_no_damage_returns_true_when_opponent_hp_is_unchanged():
     """It should return True when current HP is equal to the previous value."""
     battle = _make_battle("pikachu", 0.7)
     damaging_move = _make_move(MoveCategory.PHYSICAL)
-    assert did_no_damage(battle, {"opp_pikachu": 0.7}, damaging_move) is True
+    assert did_no_damage(battle, {"battle-1|pikachu": (1.0, 0.7)}, damaging_move) is True
 
 
 def test_did_no_damage_returns_true_when_opponent_hp_increases():
     """It should return True when current HP is greater than the previous value."""
     battle = _make_battle("pikachu", 0.8)
     damaging_move = _make_move(MoveCategory.SPECIAL)
-    assert did_no_damage(battle, {"opp_pikachu": 0.5}, damaging_move) is True
+    assert did_no_damage(battle, {"battle-1|pikachu": (1.0, 0.5)}, damaging_move) is True
