@@ -4,7 +4,7 @@ from poke_env.environment import SinglesEnv
 
 from env.action_masking import get_valid_action_mask, ACTION_DEFAULT
 from env.battle_state import BattleState, OBS_SIZE
-from combat.combat_utils import detect_opponent_move, did_no_damage, snapshot_opponent_pp
+from combat.combat_utils import detect_opponent_move, did_no_damage, snapshot_opponent_pp, hp_history_key
 from combat.protect import estimate_protect_attempt_prior, build_protect_belief
 from env.reward import calc_reward
 
