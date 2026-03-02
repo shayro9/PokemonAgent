@@ -5,6 +5,12 @@ from poke_env.battle import MoveCategory, Move
 from env.embed import MAX_MOVES
 
 
+def hp_history_key(battle) -> str:
+    """Build a stable HP-history key scoped to battle and opponent species."""
+    species = getattr(getattr(battle, "opponent_active_pokemon", None), "species", None) or "unknown"
+    return f"{battle.battle_tag}|{species}"
+
+
 def did_no_damage(battle, last_hp: dict, my_last_move, eps=1e-6) -> bool:
     """
     Returns True if our last action did no damage to the opponent.
@@ -17,9 +23,9 @@ def did_no_damage(battle, last_hp: dict, my_last_move, eps=1e-6) -> bool:
 
     opp = battle.opponent_active_pokemon
 
-    opp_key = f"opp_{battle.opponent_active_pokemon.species}"
+    battle_key = hp_history_key(battle)
     current_hp = opp.current_hp_fraction
-    _, previous_hp = last_hp.get(opp_key, (1.0, 1.0))
+    _, previous_hp = last_hp.get(battle_key, (1.0, 1.0))
 
     # True if HP did not drop (within tolerance)
     return current_hp >= previous_hp - eps

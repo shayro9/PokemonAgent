@@ -218,9 +218,7 @@ class PokemonRLWrapper(SinglesEnv):
     def _update_last_hp(self, battle):
         my_hp = battle.active_pokemon.current_hp_fraction
         opp_hp = battle.opponent_active_pokemon.current_hp_fraction
-        opp_key = f"opp_{battle.opponent_active_pokemon.species}"
-
-        self.last_hp[opp_key] = (my_hp, opp_hp)
+        self.last_hp[hp_history_key(battle)] = (my_hp, opp_hp)
 
     def get_last_battle(self):
         return self._last_finished_battle
