@@ -10,13 +10,18 @@ async def main():
     """Create a debug player and send a single challenge.
     
     :returns: ``None``."""
-    env = DebugRLPlayer(
+    env = PokemonRLWrapper(
+
+    )
+
+    player = DebugRLPlayer(
         battle_format="gen9nationaldex",
-        team=REGIGIGAS_TEAM,
+        team=BELLIBOLT_TEAM,
+        env=env,
     )
 
     print("Sending challenge...")
-    await env.send_challenges("shayromelech", n_challenges=1)
+    await player.send_challenges("shayromelech", n_challenges=1)
     print("Done!")
 
 

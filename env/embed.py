@@ -15,7 +15,7 @@ MOVE_STATUSES = tuple(Status)
 TRACKED_EFFECTS = [Effect.CONFUSION, Effect.MUST_RECHARGE, Effect.ENCORE]
 
 MAX_MOVES = 4
-MOVE_EMBED_LEN = 35  # 4 + len(MoveCategory) + 2 + 1 + len(Status) + 7 + 7 + 2 + 2
+MOVE_EMBED_LEN = 36
 
 
 @lru_cache(maxsize=None)
@@ -83,8 +83,9 @@ def embed_move(move: Move, opp_types, gen: int) -> np.ndarray:
     # Scalars
     vec.append(_scale_01(move.base_power or 0, 200.0))
     vec.append(1.0 if move.accuracy is True else _scale_01(move.accuracy or 0))
-    vec.append(_scale_01(move.current_pp or 0, 40.0))
+    vec.append(_scale_01(move.max_pp or 0, 40.0))
     vec.append(_scale_m11(_safe_int(move, "priority", 0), 7.0))
+    vec.append(_scale_01(move.heal or 0, 1))
 
     # Category one-hot
     for cat in MOVE_CATEGORIES:

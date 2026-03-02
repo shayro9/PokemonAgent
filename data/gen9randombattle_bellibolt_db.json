@@ -1,6 +1,6 @@
 {
   "format": "gen9randombattle",
-  "generatedTeams": 20000,
+  "generatedTeams": 100000,
   "oneMonPerTeam": true,
   "maxPerSpecies": 60,
   "dedupeExactSets": true,
@@ -9,47 +9,14 @@
     {
       "name": "Bellibolt",
       "species": "Bellibolt",
-      "gender": "M",
-      "shiny": false,
-      "level": 84,
-      "moves": [
-        "muddywater",
-        "thunderbolt",
-        "toxic",
-        "slackoff"
-      ],
-      "ability": "Electromorphosis",
-      "evs": {
-        "hp": 85,
-        "atk": 0,
-        "def": 85,
-        "spa": 85,
-        "spd": 85,
-        "spe": 85
-      },
-      "ivs": {
-        "hp": 31,
-        "atk": 0,
-        "def": 31,
-        "spa": 31,
-        "spd": 31,
-        "spe": 31
-      },
-      "item": "Leftovers",
-      "teraType": "Water",
-      "role": "Bulky Attacker"
-    },
-    {
-      "name": "Bellibolt",
-      "species": "Bellibolt",
       "gender": "F",
       "shiny": false,
       "level": 84,
       "moves": [
-        "toxic",
+        "muddywater",
+        "voltswitch",
         "thunderbolt",
-        "slackoff",
-        "muddywater"
+        "slackoff"
       ],
       "ability": "Electromorphosis",
       "evs": {
@@ -75,46 +42,13 @@
     {
       "name": "Bellibolt",
       "species": "Bellibolt",
-      "gender": "M",
-      "shiny": false,
-      "level": 84,
-      "moves": [
-        "thunderbolt",
-        "voltswitch",
-        "slackoff",
-        "muddywater"
-      ],
-      "ability": "Electromorphosis",
-      "evs": {
-        "hp": 85,
-        "atk": 0,
-        "def": 85,
-        "spa": 85,
-        "spd": 85,
-        "spe": 85
-      },
-      "ivs": {
-        "hp": 31,
-        "atk": 0,
-        "def": 31,
-        "spa": 31,
-        "spd": 31,
-        "spe": 31
-      },
-      "item": "Leftovers",
-      "teraType": "Water",
-      "role": "Bulky Attacker"
-    },
-    {
-      "name": "Bellibolt",
-      "species": "Bellibolt",
       "gender": "F",
       "shiny": false,
       "level": 84,
       "moves": [
-        "slackoff",
-        "muddywater",
         "thunderbolt",
+        "muddywater",
+        "slackoff",
         "voltswitch"
       ],
       "ability": "Electromorphosis",
@@ -135,7 +69,7 @@
         "spe": 31
       },
       "item": "Leftovers",
-      "teraType": "Electric",
+      "teraType": "Water",
       "role": "Bulky Attacker"
     },
     {
@@ -145,76 +79,109 @@
       "shiny": false,
       "level": 84,
       "moves": [
-        "muddywater",
-        "slackoff",
-        "voltswitch",
-        "thunderbolt"
-      ],
-      "ability": "Electromorphosis",
-      "evs": {
-        "hp": 85,
-        "atk": 0,
-        "def": 85,
-        "spa": 85,
-        "spd": 85,
-        "spe": 85
-      },
-      "ivs": {
-        "hp": 31,
-        "atk": 0,
-        "def": 31,
-        "spa": 31,
-        "spd": 31,
-        "spe": 31
-      },
-      "item": "Leftovers",
-      "teraType": "Electric",
-      "role": "Bulky Attacker"
-    },
-    {
-      "name": "Bellibolt",
-      "species": "Bellibolt",
-      "gender": "F",
-      "shiny": false,
-      "level": 84,
-      "moves": [
-        "slackoff",
-        "voltswitch",
-        "muddywater",
-        "thunderbolt"
-      ],
-      "ability": "Electromorphosis",
-      "evs": {
-        "hp": 85,
-        "atk": 0,
-        "def": 85,
-        "spa": 85,
-        "spd": 85,
-        "spe": 85
-      },
-      "ivs": {
-        "hp": 31,
-        "atk": 0,
-        "def": 31,
-        "spa": 31,
-        "spd": 31,
-        "spe": 31
-      },
-      "item": "Leftovers",
-      "teraType": "Water",
-      "role": "Bulky Attacker"
-    },
-    {
-      "name": "Bellibolt",
-      "species": "Bellibolt",
-      "gender": "F",
-      "shiny": false,
-      "level": 84,
-      "moves": [
+        "toxic",
         "thunderbolt",
+        "slackoff",
+        "muddywater"
+      ],
+      "ability": "Electromorphosis",
+      "evs": {
+        "hp": 85,
+        "atk": 0,
+        "def": 85,
+        "spa": 85,
+        "spd": 85,
+        "spe": 85
+      },
+      "ivs": {
+        "hp": 31,
+        "atk": 0,
+        "def": 31,
+        "spa": 31,
+        "spd": 31,
+        "spe": 31
+      },
+      "item": "Leftovers",
+      "teraType": "Electric",
+      "role": "Bulky Attacker"
+    },
+    {
+      "name": "Bellibolt",
+      "species": "Bellibolt",
+      "gender": "M",
+      "shiny": false,
+      "level": 84,
+      "moves": [
+        "slackoff",
+        "muddywater",
+        "voltswitch",
+        "thunderbolt"
+      ],
+      "ability": "Electromorphosis",
+      "evs": {
+        "hp": 85,
+        "atk": 0,
+        "def": 85,
+        "spa": 85,
+        "spd": 85,
+        "spe": 85
+      },
+      "ivs": {
+        "hp": 31,
+        "atk": 0,
+        "def": 31,
+        "spa": 31,
+        "spd": 31,
+        "spe": 31
+      },
+      "item": "Leftovers",
+      "teraType": "Electric",
+      "role": "Bulky Attacker"
+    },
+    {
+      "name": "Bellibolt",
+      "species": "Bellibolt",
+      "gender": "F",
+      "shiny": false,
+      "level": 84,
+      "moves": [
+        "toxic",
+        "thunderbolt",
+        "slackoff",
+        "muddywater"
+      ],
+      "ability": "Electromorphosis",
+      "evs": {
+        "hp": 85,
+        "atk": 0,
+        "def": 85,
+        "spa": 85,
+        "spd": 85,
+        "spe": 85
+      },
+      "ivs": {
+        "hp": 31,
+        "atk": 0,
+        "def": 31,
+        "spa": 31,
+        "spd": 31,
+        "spe": 31
+      },
+      "item": "Leftovers",
+      "teraType": "Electric",
+      "role": "Bulky Attacker"
+    },
+    {
+      "name": "Bellibolt",
+      "species": "Bellibolt",
+      "gender": "F",
+      "shiny": false,
+      "level": 84,
+      "moves": [
+        "slackoff",
         "muddywater",
         "toxic",
-        "slackoff"
+        "thunderbolt"
       ],
       "ability": "Electromorphosis",
       "evs": {
@@ -244,9 +211,9 @@
       "shiny": false,
       "level": 84,
       "moves": [
-        "toxic",
         "muddywater",
         "slackoff",
+        "voltswitch",
         "thunderbolt"
       ],
       "ability": "Electromorphosis",
@@ -267,7 +234,40 @@
         "spe": 31
       },
       "item": "Leftovers",
-      "teraType": "Electric",
+      "teraType": "Water",
+      "role": "Bulky Attacker"
+    },
+    {
+      "name": "Bellibolt",
+      "species": "Bellibolt",
+      "gender": "M",
+      "shiny": false,
+      "level": 84,
+      "moves": [
+        "slackoff",
+        "muddywater",
+        "toxic",
+        "thunderbolt"
+      ],
+      "ability": "Electromorphosis",
+      "evs": {
+        "hp": 85,
+        "atk": 0,
+        "def": 85,
+        "spa": 85,
+        "spd": 85,
+        "spe": 85
+      },
+      "ivs": {
+        "hp": 31,
+        "atk": 0,
+        "def": 31,
+        "spa": 31,
+        "spd": 31,
+        "spe": 31
+      },
+      "item": "Leftovers",
+      "teraType": "Water",
       "role": "Bulky Attacker"
     }
   ]
