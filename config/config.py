@@ -163,16 +163,17 @@ def resolve_opponents(args) -> OpponentsResolved:
 
     # Agent generators only when you did NOT provide an explicit --train-team
     if args.train_team is None:
-        train_agent_gen = single_simple_team_generator(pokemon_pool=train_agent_pool, seed=train_seed)
-        eval_agent_gen = single_simple_team_generator(pokemon_pool=eval_agent_pool, seed=eval_seed)
+        if agent_data_path == opponent_data_path:
+            train_agent_gen = train_gen
+            eval_agent_gen = eval_gen
+        else:
+            train_agent_gen = single_simple_team_generator(pokemon_pool=train_agent_pool, seed=train_seed)
+            eval_agent_gen = single_simple_team_generator(pokemon_pool=eval_agent_pool, seed=eval_seed)
 
     # Names are irrelevant in generated mode, but keep them consistent/empty
     if args.eval_pool is not None or args.eval_pool_all:
-        # If you *also* allow mixing “generated train” + “name eval”, keep this:
         eval_names = parse_pool(args.eval_pool, args.eval_pool_all)
-        # In that mixed case, you probably want eval_gen = None, because eval uses names:
-        # (Uncomment if that’s your intended CLI meaning.)
-        # eval_gen = None
+        eval_gen = None
     else:
         eval_names = train_names  # usually empty
 

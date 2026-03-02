@@ -16,8 +16,8 @@ from .evaluation import evaluate_model, print_eval_summary
 LR = 3e-4
 N_STEPS = 2048
 BATCH_SIZE = 256
-GAMMA = 0.9
-ENT_COEF = 0.01
+GAMMA = 0.95
+ENT_COEF = 0.02
 LOG_FREQ = 500
 
 
