@@ -18,13 +18,14 @@ def make_move(category: MoveCategory, accuracy=1.0):
     return move
 
 
-def make_battle(species: str, current_hp_fraction: float):
+def make_battle(species: str, current_hp_fraction: float, battle_tag: str = "battle-1"):
     opp = MagicMock()
     opp.species = species
     opp.current_hp_fraction = current_hp_fraction
 
     battle = MagicMock()
     battle.opponent_active_pokemon = opp
+    battle.battle_tag = battle_tag
     return battle
 
 
@@ -32,12 +33,12 @@ class TestDidNoDamage(unittest.TestCase):
 
     def test_none_move_returns_false(self):
         battle = make_battle("pikachu", 0.8)
-        self.assertFalse(did_no_damage(battle, {"opp_pikachu": 1.0}, None))
+        self.assertFalse(did_no_damage(battle, {"battle-1|pikachu": (1.0, 1.0)}, None))
 
     def test_status_move_returns_false(self):
         battle = make_battle("pikachu", 0.8)
         move = make_move(MoveCategory.STATUS)
-        self.assertFalse(did_no_damage(battle, {"opp_pikachu": 1.0}, move))
+        self.assertFalse(did_no_damage(battle, {"battle-1|pikachu": (1.0, 1.0)}, move))
 
     def test_no_previous_hp_returns_false(self):
         battle = make_battle("pikachu", 0.8)
@@ -47,17 +48,17 @@ class TestDidNoDamage(unittest.TestCase):
     def test_physical_hp_dropped_returns_false(self):
         battle = make_battle("pikachu", 0.6)
         move = make_move(MoveCategory.PHYSICAL)
-        self.assertFalse(did_no_damage(battle, {"opp_pikachu": 0.8}, move))
+        self.assertFalse(did_no_damage(battle, {"battle-1|pikachu": (1.0, 0.8)}, move))
 
     def test_physical_hp_unchanged_returns_true(self):
         battle = make_battle("pikachu", 0.8)
         move = make_move(MoveCategory.PHYSICAL)
-        self.assertTrue(did_no_damage(battle, {"opp_pikachu": 0.8}, move))
+        self.assertTrue(did_no_damage(battle, {"battle-1|pikachu": (1.0, 0.8)}, move))
 
     def test_physical_hp_increased_returns_true(self):
         battle = make_battle("pikachu", 0.9)
         move = make_move(MoveCategory.PHYSICAL)
-        self.assertTrue(did_no_damage(battle, {"opp_pikachu": 0.8}, move))
+        self.assertTrue(did_no_damage(battle, {"battle-1|pikachu": (1.0, 0.8)}, move))
 
 
 class TestProtectBelief(unittest.TestCase):

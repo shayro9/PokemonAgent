@@ -1,5 +1,7 @@
 import numpy as np
 
+from combat.combat_utils import hp_history_key
+
 DAMAGE_CLIP = 1.0
 STATUS_VALUE = 0.2
 HP_VALUE = 1.0
@@ -16,7 +18,7 @@ def calc_reward(
     """Stateless reward function for a single battle step.
 
     :param battle: poke-env battle object.
-    :param last_hp: Mutable dict keyed by ``battle.battle_tag`` to ``(my_hp, opp_hp)``.
+    :param last_hp: Mutable dict keyed by ``hp_history_key(battle)`` to ``(my_hp, opp_hp)``.
     :param is_agent_battle: ``True`` when this battle belongs to the learning agent.
     :returns: ``(reward, done)`` where ``done`` is ``True`` once the battle has finished.
     """
@@ -26,9 +28,9 @@ def calc_reward(
 
     my_hp = battle.active_pokemon.current_hp_fraction
     opp_hp = battle.opponent_active_pokemon.current_hp_fraction
-    opp_key = f"opp_{battle.opponent_active_pokemon.species}"
+    battle_key = hp_history_key(battle)
 
-    last_my_hp, last_opp_hp = last_hp.get(opp_key, (1.0, 1.0))
+    last_my_hp, last_opp_hp = last_hp.get(battle_key, (1.0, 1.0))
 
     damage_to_opp = (last_opp_hp - opp_hp) * HP_VALUE
     damage_to_me = (last_my_hp - my_hp) * HP_VALUE
