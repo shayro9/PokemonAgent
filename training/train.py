@@ -5,6 +5,7 @@ from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.callbacks import CallbackList
 from wandb.integration.sb3 import WandbCallback
 
+from policy.attention_policy import AttentionPointerPolicy
 from .parse import build_arg_parser
 from config.config import *
 from .logs import *
@@ -86,7 +87,7 @@ def train_model(
     )
 
     model = MaskablePPO(
-        "MlpPolicy",
+        AttentionPointerPolicy,
         env=train_env,
         learning_rate=LR,
         n_steps=N_STEPS,
