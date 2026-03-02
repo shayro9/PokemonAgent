@@ -25,7 +25,7 @@ def _slot_is_available(sequence, slot: int) -> bool:
 def get_valid_action_mask(
         battle,
         *,
-        allow_switches: bool = True,
+        allow_switches: bool = False,
         allow_moves: bool = True,
         allow_mega: bool = False,
         allow_zmove: bool = False,
