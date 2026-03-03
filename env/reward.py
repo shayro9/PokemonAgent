@@ -2,12 +2,13 @@ import numpy as np
 
 from combat.combat_utils import tracker_key
 from env.battle_tracker import BattleTracker
+from poke_env.battle import Status
 
 DAMAGE_CLIP = 1.0
-STATUS_VALUE = 0.2
+_STATUS_WEIGHTS = {Status.SLP: 0.8, Status.PAR: 0.4, Status.BRN: 0.4, Status.TOX: 0.3, Status.PSN: 0.2, Status.FRZ: 0.8}
 HP_VALUE = 1.0
-WIN_BONUS = 5.0
-LOSS_PENALTY = -5.0
+WIN_BONUS = 15.0
+LOSS_PENALTY = -10.0
 
 
 def calc_reward(
@@ -40,8 +41,11 @@ def calc_reward(
     newly_opp_status = (opp_hp > 0) and (opp_status is not None) and (tracker.last_opp_status is None)
     newly_me_status = (my_status is not None) and (tracker.last_my_status is None)
 
-    reward = (damage_to_opp + STATUS_VALUE * newly_opp_status
-              - damage_to_me - STATUS_VALUE * newly_me_status)
+    newly_opp_status_value = _STATUS_WEIGHTS.get(opp_status, 0.2)
+    newly_me_status_value = _STATUS_WEIGHTS.get(my_status, 0.2)
+
+    reward = (damage_to_opp + newly_opp_status_value * newly_opp_status
+              - damage_to_me - newly_me_status_value * newly_me_status)
 
     if battle.finished:
         reward += WIN_BONUS if battle.won else (LOSS_PENALTY if battle.lost else 0.0)

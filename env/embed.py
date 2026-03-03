@@ -15,7 +15,7 @@ MOVE_STATUSES = tuple(Status)
 TRACKED_EFFECTS = [Effect.CONFUSION, Effect.MUST_RECHARGE, Effect.ENCORE]
 
 MAX_MOVES = 4
-MOVE_EMBED_LEN = 35
+MOVE_EMBED_LEN = 37
 
 
 @lru_cache(maxsize=None)
@@ -93,8 +93,8 @@ def embed_move(move: Move, opp_types, my_types, gen: int) -> np.ndarray:
         vec.append(1.0 if move.category == cat else 0.0)
 
     # Protect moves
-    # vec.append(move.is_protect_move)
-    # vec.append(move.breaks_protect)
+    vec.append(move.is_protect_move)
+    vec.append(move.breaks_protect)
 
     # Type multiplier
     type1, type2 = (list(opp_types) + [None])[:2]

@@ -15,11 +15,11 @@ from env.env_builder import build_env
 from .evaluation import evaluate_model, print_eval_summary, build_fixed_eval_pool
 
 LR = 3e-4
-LR_DECAY = 1
-N_STEPS = 2048
-BATCH_SIZE = 256
-GAMMA = 0.95
-ENT_COEF = 0.02
+LR_DECAY = 0.9
+N_STEPS = 4096
+BATCH_SIZE = 512
+GAMMA = 0.99
+ENT_COEF = 0.04
 LOG_FREQ = 500
 
 
@@ -88,10 +88,18 @@ def train_model(
         use_action_masking=use_action_masking,
     )
 
+    policy_kwargs = dict(
+        context_hidden=256,
+        move_hidden=128,
+        trunk_hidden=256,
+        n_attention_heads=4,
+    )
+
     model = MaskablePPO(
         AttentionPointerPolicy,
         env=train_env,
-        learning_rate=lambda progress: LR * (progress if LR_DECAY else 1.0),
+        policy_kwargs=policy_kwargs,
+        learning_rate=lambda progress: LR * (0.1 + LR_DECAY * progress),
         n_steps=N_STEPS,
         batch_size=BATCH_SIZE,
         gamma=GAMMA,
@@ -163,9 +171,9 @@ def main():
 
     fixed_eval_pool = build_fixed_eval_pool(
         opponent_names=opp.eval_names,
-        opponent_generator=opp.eval_gen or opp.eval_battle_team_generator,
+        opponent_generator=opp.eval_gen,
         eval_episodes=args.eval_episodes,
-    )
+    ) if (opp.eval_names or opp.eval_gen) else None
 
     eval_kwargs = {
         "battle_format": battle_format,

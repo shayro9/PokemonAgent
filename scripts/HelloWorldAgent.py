@@ -16,7 +16,7 @@ async def main():
 
     player = DebugRLPlayer(
         battle_format="gen9customgame",
-        team=BELLIBOLT_TEAM,
+        team=STEELIX_TEAM,
         env=env,
     )
 
