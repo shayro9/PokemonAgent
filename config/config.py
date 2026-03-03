@@ -74,7 +74,8 @@ class OpponentsResolved:
     eval_gen: Optional[Iterable]
     train_agent_gen: Optional[Iterable]
     eval_agent_gen: Optional[Iterable]
-    battle_team_generator: Optional[Iterable] = None
+    train_battle_team_generator: Optional[Iterable] = None
+    eval_battle_team_generator: Optional[Iterable] = None
 
 
 def _resolve_train_eval_pools(
@@ -124,10 +125,11 @@ def resolve_opponents(args) -> OpponentsResolved:
             train_names=[],
             eval_names=[],
             train_gen=None,
-            eval_gen=matchup_generator(matchup_pool=eval_pool, seed=args.seed + 1),
+            eval_gen=None,
             train_agent_gen=None,
             eval_agent_gen=None,
-            battle_team_generator=matchup_generator(matchup_pool=train_pool, seed=args.seed),
+            train_battle_team_generator=matchup_generator(matchup_pool=train_pool, seed=args.seed),
+            eval_battle_team_generator=matchup_generator(matchup_pool=eval_pool, seed=args.seed),
         )
 
     if not args.random_generated:

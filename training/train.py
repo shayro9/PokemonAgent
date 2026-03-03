@@ -1,3 +1,4 @@
+import random
 import time
 
 from sb3_contrib import MaskablePPO
@@ -162,7 +163,7 @@ def main():
 
     fixed_eval_pool = build_fixed_eval_pool(
         opponent_names=opp.eval_names,
-        opponent_generator=opp.eval_gen,
+        opponent_generator=opp.eval_gen or opp.eval_battle_team_generator,
         eval_episodes=args.eval_episodes,
     )
 
@@ -170,11 +171,12 @@ def main():
         "battle_format": battle_format,
         "train_team": train_team,
         "opponent_names": [],
-        "opponent_generator": None,
+        "opponent_generator": opp.eval_gen,
         "fixed_eval_pool": fixed_eval_pool,
         "eval_episodes": args.eval_episodes,
         "max_steps": args.eval_max_steps,
         "agent_team_generator": opp.eval_agent_gen,
+        "battle_team_generator": opp.eval_battle_team_generator,
     }
 
     model = train_model(
@@ -188,7 +190,7 @@ def main():
         eval_every_timesteps=args.eval_every_timesteps,
         eval_kwargs=None if args.skip_eval else eval_kwargs,
         agent_team_generator=opp.train_agent_gen,
-        battle_team_generator=opp.battle_team_generator,
+        battle_team_generator=opp.train_battle_team_generator,
         seed=args.seed,
     )
 

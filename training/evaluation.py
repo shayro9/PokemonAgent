@@ -100,10 +100,12 @@ def evaluate_model(
         eval_episodes: int,
         max_steps: int,
         agent_team_generator=None,
+        battle_team_generator=None,
         fixed_eval_pool: list[str] | None = None,
 ) -> list[EvalResult]:
     """Evaluate a trained model against a selected opponent pool.
 
+    :param battle_team_generator: full battle generator
     :param model: Trained model to evaluate.
     :param timestep: Training timestep associated with this evaluation.
     :param train_team: Agent team used for evaluation.
@@ -126,7 +128,10 @@ def evaluate_model(
     if fixed_eval_pool is not None:
         opponent_pool = fixed_eval_pool
     elif not opponent_names:
-        opponent_pool = _generate_eval_pool(eval_episodes, opponent_generator)
+        if battle_team_generator:
+            opponent_pool = []
+        else:
+            opponent_pool = _generate_eval_pool(eval_episodes, opponent_generator)
     else:
         if eval_episodes > 0:
             sampled_names = random.sample(opponent_names, k=min(eval_episodes, len(opponent_names)))
@@ -146,6 +151,7 @@ def evaluate_model(
         opponent_pool=opponent_pool,
         agent_team_generator=agent_team_generator,
         use_action_masking=use_action_masking,
+        battle_team_generator=battle_team_generator,
     )
 
     wins = 0
