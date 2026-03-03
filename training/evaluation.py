@@ -26,12 +26,12 @@ class EvalResult:
     def win_rate(self) -> float:
         if self.episodes == 0:
             return 0.0
-        return (self.wins + self.draws/2) / self.episodes
+        return (self.wins + self.draws / 2) / self.episodes
 
 
 def _play_episode(eval_env: SingleAgentWrapper, model: MaskablePPO, max_steps: int) -> tuple[float, bool]:
     """Run one evaluation episode.
-    
+
     :param eval_env: Evaluation environment wrapper.
     :param model: Trained policy model.
     :param max_steps: Maximum number of steps before truncation.
@@ -55,9 +55,32 @@ def _play_episode(eval_env: SingleAgentWrapper, model: MaskablePPO, max_steps: i
     return total_reward, truncated
 
 
+def build_fixed_eval_pool(
+        opponent_names: list[str],
+        opponent_generator,
+        eval_episodes: int,
+) -> list[str]:
+    """Build a fixed evaluation pool once, to be reused across all evaluations.
+
+    Resolves teams from named opponents or a generator and locks them in so
+    every evaluation checkpoint sees the exact same set of opponents.
+
+    :param opponent_names: Optional predefined opponent names to sample from.
+    :param opponent_generator: Optional generator for opponent teams.
+    :param eval_episodes: Number of episodes (determines pool size).
+    :returns: A fixed list of packed opponent team strings."""
+    if opponent_names:
+        sampled_names = random.sample(opponent_names, k=min(eval_episodes, len(opponent_names)))
+        return [TEAM_BY_NAME[name] for name in sampled_names]
+    elif opponent_generator is not None:
+        return _generate_eval_pool(eval_episodes, opponent_generator)
+    else:
+        raise ValueError("Must provide either opponent_names or opponent_generator to build eval pool.")
+
+
 def _generate_eval_pool(pool_size: int, opponent_generator) -> list[str]:
     """Build an evaluation opponent pool from a generator.
-    
+
     :param pool_size: Number of teams to sample.
     :param opponent_generator: Generator yielding packed opponent teams.
     :returns: A list of packed opponent team strings."""
@@ -77,9 +100,10 @@ def evaluate_model(
         eval_episodes: int,
         max_steps: int,
         agent_team_generator=None,
+        fixed_eval_pool: list[str] | None = None,
 ) -> list[EvalResult]:
     """Evaluate a trained model against a selected opponent pool.
-    
+
     :param model: Trained model to evaluate.
     :param timestep: Training timestep associated with this evaluation.
     :param train_team: Agent team used for evaluation.
@@ -89,6 +113,9 @@ def evaluate_model(
     :param eval_episodes: Number of episodes to evaluate.
     :param max_steps: Maximum steps per episode.
     :param agent_team_generator: Optional generator for agent team rotation.
+    :param fixed_eval_pool: Pre-built pool of opponent teams to reuse across
+        evaluations. When provided, ``opponent_names`` and
+        ``opponent_generator`` are ignored for pool construction.
     :returns: A list containing one ``EvalResult`` summary."""
     results: list[EvalResult] = []
 
@@ -96,7 +123,9 @@ def evaluate_model(
     algo = "maskable_ppo"
     use_action_masking = (algo == "maskable_ppo")
 
-    if not opponent_names:
+    if fixed_eval_pool is not None:
+        opponent_pool = fixed_eval_pool
+    elif not opponent_names:
         opponent_pool = _generate_eval_pool(eval_episodes, opponent_generator)
     else:
         if eval_episodes > 0:
@@ -142,7 +171,7 @@ def evaluate_model(
 
 def print_eval_summary(results: list[EvalResult]) -> None:
     """Print per-timestep and aggregate evaluation statistics.
-    
+
     :param results: Evaluation summaries to print.
     :returns: ``None``."""
     print("\nEvaluation results (deterministic policy):")

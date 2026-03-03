@@ -11,7 +11,7 @@ from config.config import *
 from .logs import *
 
 from env.env_builder import build_env
-from .evaluation import evaluate_model, print_eval_summary
+from .evaluation import evaluate_model, print_eval_summary, build_fixed_eval_pool
 
 LR = 3e-4
 N_STEPS = 2048
@@ -36,7 +36,7 @@ def train_model(
         seed: int = 42,
 ) -> MaskablePPO:
     """Train a MaskablePPO agent and optionally run periodic evaluation.
-    
+
     :param model_path: Output path for the saved model.
     :param battle_format: Showdown format used for battles.
     :param train_team: Packed team string used by the agent.
@@ -150,7 +150,7 @@ def train_model(
 
 def main():
     """Parse arguments, run training, and print evaluation summaries.
-    
+
     :returns: ``None``."""
     args = build_arg_parser().parse_args()
 
@@ -159,11 +159,18 @@ def main():
 
     opp = resolve_opponents(args)
 
+    fixed_eval_pool = build_fixed_eval_pool(
+        opponent_names=opp.eval_names,
+        opponent_generator=opp.eval_gen,
+        eval_episodes=args.eval_episodes,
+    )
+
     eval_kwargs = {
         "battle_format": battle_format,
         "train_team": train_team,
-        "opponent_names": opp.eval_names,
-        "opponent_generator": opp.eval_gen,
+        "opponent_names": [],
+        "opponent_generator": None,
+        "fixed_eval_pool": fixed_eval_pool,
         "eval_episodes": args.eval_episodes,
         "max_steps": args.eval_max_steps,
         "agent_team_generator": opp.eval_agent_gen,
