@@ -27,7 +27,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--eval-episodes",
         type=int,
-        default=100,
+        default=0,
         help="How many episodes to evaluate against (one battle per opponent).",
     )
     parser.add_argument("--eval-max-steps", type=int, default=500)

@@ -7,3 +7,4 @@ sb3-contrib>=2.0.0
 wandb>=0.25.0
 sb3_contrib>=2.7.1
 stable_baselines3>=2.7.1
+torch

@@ -45,7 +45,7 @@ Usage
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple, Type, Union
+from typing import List, Optional, Tuple
 import numpy as np
 import torch
 import torch.nn as nn
@@ -53,25 +53,14 @@ from gymnasium import spaces
 from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
 from stable_baselines3.common.type_aliases import PyTorchObs, Schedule
 
-# ── must match env/embed.py ────────────────────────────────────────────────
-MAX_MOVES = 4
-MOVE_EMBED_LEN = 36
+from env.embed import MAX_MOVES, MOVE_EMBED_LEN
+from env.battle_state import CONTEXT_BEFORE_MY_MOVES, CONTEXT_AFTER_OPP_MOVES
 
-# ── must match battle_state.py layout ─────────────────────────────────────
-# Dims BEFORE my_moves in to_array():
-#   my_hp(1) + my_stats(6) + my_boosts(7) + my_status(7) + my_effects(3)
-#   + opp_hp(1) + opp_base_stats(6) + opp_boosts(7) + opp_status(7) + opp_effects(3)
-#   + opp_preparing(1)  = 49
-CONTEXT_BEFORE_MY_MOVES = 49
-MY_MOVES_LEN = MAX_MOVES * MOVE_EMBED_LEN          # 144
+MY_MOVES_LEN = MAX_MOVES * MOVE_EMBED_LEN          # 148
 OPP_MOVES_START = CONTEXT_BEFORE_MY_MOVES + MY_MOVES_LEN
-OPP_MOVES_LEN = MAX_MOVES * MOVE_EMBED_LEN          # 144
-# Dims AFTER opp_moves:
-#   type_multipliers(4) + weight_bucket(6) + opp_protect_belief(1) = 11
-CONTEXT_AFTER_OPP_MOVES = 11
+OPP_MOVES_LEN = MAX_MOVES * MOVE_EMBED_LEN          # 148
 
 # Total context (everything except my_moves):
-#   49 + 144 (opp_moves) + 11 = 204
 CONTEXT_DIM = CONTEXT_BEFORE_MY_MOVES + OPP_MOVES_LEN + CONTEXT_AFTER_OPP_MOVES
 
 # Action space layout (matches your existing wrapper):

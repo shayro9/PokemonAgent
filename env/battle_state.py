@@ -14,7 +14,9 @@ from env.embed import (
 )
 
 # Update this constant whenever embed_battle changes.
-OBS_SIZE = 348
+OBS_SIZE = 361
+CONTEXT_BEFORE_MY_MOVES = 54
+CONTEXT_AFTER_OPP_MOVES = 11
 
 
 @dataclass
@@ -23,18 +25,22 @@ class BattleState:
     Structured representation of a single battle observation.
     Call .to_array() to get the flat np.ndarray passed to the model.
     """
-    my_hp: float
+    my_hp: float                   # (1)
     my_stats: np.ndarray           # (6),  base stats normalised
     my_boosts: np.ndarray          # (7)  in-battle boosts normalised
     my_status: np.ndarray          # (7)  one-hot Status
     my_effects: np.ndarray         # (3)  one-hot Tracked effects
+    my_stab: float                 # (1)
 
-    opp_hp: float
+    opp_hp: float                  # (1)
     opp_base_stats: np.ndarray     # (6,)
     opp_boosts: np.ndarray         # (7,)
     opp_status: np.ndarray         # (7,)
     opp_effects: np.ndarray        # (3)  one-hot Tracked effects
     opp_preparing: float           # 0 or 1
+    opp_stab: float                # (1)
+    opp_is_terastallized: float    # 0 or 1
+    opp_tera_multiplier: np.ndarray# (2)
 
     my_moves: np.ndarray           # (MAX_MOVES * MOVE_EMBED_LEN,)
     opp_moves: np.ndarray          # (MAX_MOVES * MOVE_EMBED_LEN,)
@@ -50,12 +56,14 @@ class BattleState:
             self.my_boosts,
             self.my_status,
             self.my_effects,
+            [self.my_stab],
             [self.opp_hp],
             self.opp_base_stats,
             self.opp_boosts,
             self.opp_status,
             self.opp_effects,
-            [self.opp_preparing],
+            [self.opp_preparing, self.opp_stab, self.opp_is_terastallized],
+            self.opp_tera_multiplier,
             self.my_moves,
             self.opp_moves,
             self.type_multipliers,
@@ -81,13 +89,13 @@ class BattleState:
         # --- moves ---
         my_moves = np.zeros(MAX_MOVES * MOVE_EMBED_LEN, dtype=np.float32)
         for i, move in enumerate(battle.available_moves[:MAX_MOVES]):
-            emb = embed_move(move, opp_types, battle.gen)
+            emb = embed_move(move, opp_types, my_types, battle.gen)
             my_moves[i * MOVE_EMBED_LEN: (i + 1) * MOVE_EMBED_LEN] = emb
 
         opp_moves = np.zeros(MAX_MOVES * MOVE_EMBED_LEN, dtype=np.float32)
         opp_moves_list = list((opp.moves or {}).values())[:MAX_MOVES]
         for i, move in enumerate(opp_moves_list):
-            emb = embed_move(move, my_types, battle.gen)
+            emb = embed_move(move, my_types, opp_types, battle.gen)
             opp_moves[i * MOVE_EMBED_LEN: (i + 1) * MOVE_EMBED_LEN] = emb
 
         # --- weight bucket ---
@@ -102,6 +110,7 @@ class BattleState:
             my_boosts=np.array(list(my.boosts.values())) / 6.0,
             my_status=embed_status(my.status),
             my_effects=embed_effects(my.effects),
+            my_stab=my.stab_multiplier / 2.0,
 
             opp_hp=opp.current_hp_fraction,
             opp_base_stats=np.array(list(opp.base_stats.values())) / 255.0,
@@ -109,6 +118,9 @@ class BattleState:
             opp_status=embed_status(opp.status),
             opp_effects=embed_effects(opp.effects),
             opp_preparing=float(opp.preparing),
+            opp_stab=opp.stab_multiplier / 2.0,
+            opp_is_terastallized=float(opp.is_terastallized),
+            opp_tera_multiplier=calc_types_vector(my_types, [opp.tera_type], battle.gen, opp_tera_mode=True),
 
             my_moves=my_moves,
             opp_moves=opp_moves,
@@ -127,12 +139,16 @@ class BattleState:
             ("my_boosts", 7),
             ("my_status", len(MOVE_STATUSES)),
             ("my_effects", len(TRACKED_EFFECTS)),
+            # ("my_stab", 1),
             ("opp_hp", 1),
             ("opp_base_stats", 6),
             ("opp_boosts", 7),
             ("opp_status", len(MOVE_STATUSES)),
             ("opp_effects", len(TRACKED_EFFECTS)),
             ("opp_preparing", 1),
+            ("opp_stab", 1),
+            ("opp_is_terastallized", 1),
+            ("opp_tera_multiplier", 1),
         ]
         move_block = [
             ("scalars", 5),
@@ -140,6 +156,7 @@ class BattleState:
             ("is_protect", 1),
             ("breaks_protect", 1),
             ("multiplier", 1),
+            ("is_tera", 1),
             ("status", len(MOVE_STATUSES)),
             ("boosts_target", 7),
             ("boosts_self", 7),

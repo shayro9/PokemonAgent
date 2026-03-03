@@ -15,7 +15,7 @@ MOVE_STATUSES = tuple(Status)
 TRACKED_EFFECTS = [Effect.CONFUSION, Effect.MUST_RECHARGE, Effect.ENCORE]
 
 MAX_MOVES = 4
-MOVE_EMBED_LEN = 36
+MOVE_EMBED_LEN = 37
 
 
 @lru_cache(maxsize=None)
@@ -71,11 +71,12 @@ def _safe_int(move, key, default=0):
     return default
 
 
-def embed_move(move: Move, opp_types, gen: int) -> np.ndarray:
+def embed_move(move: Move, opp_types, my_types, gen: int) -> np.ndarray:
     """Encode a move into a fixed-length numeric feature vector.
     
     :param move: Move instance to embed.
     :param opp_types: Defender typing iterable.
+    :param my_types: Attacker typing iterable.
     :param gen: Battle generation number.
     :returns: A NumPy vector with ``MOVE_EMBED_LEN`` float features."""
     vec: List[float] = list()
@@ -99,6 +100,7 @@ def embed_move(move: Move, opp_types, gen: int) -> np.ndarray:
     type1, type2 = (list(opp_types) + [None])[:2]
     mult = move.type.damage_multiplier(type1, type2, type_chart=_type_chart_for_gen(gen))
     vec.append(-1.0 if mult == 0.0 else float(np.log2(mult) / 2.0))
+    vec.append(1.0 if move.type in my_types else 0.0)
 
     # Status inflicted
     for s in MOVE_STATUSES:
@@ -146,24 +148,32 @@ def embed_effects(effects) -> np.ndarray:
     return np.array([int(e in effects) for e in TRACKED_EFFECTS])
 
 
-def calc_types_vector(my_types: list[PokemonType], opp_types: list[PokemonType], gen: int) -> np.ndarray:
+def calc_types_vector(
+    my_types: list[PokemonType],
+    opp_types: list[PokemonType],
+    gen: int,
+    opp_tera_mode: bool = False,
+) -> np.ndarray:
     """Encode pairwise attacker-vs-defender type interactions.
-    
+
     :param my_types: Attacker type list.
     :param opp_types: Defender type list.
     :param gen: Battle generation number.
-    :returns: A NumPy vector containing matchup multipliers in log2 space."""
+    :param opp_tera_mode: if on return only tera vs my types
+    :returns: Shape (4,) base matchup vector, or shape (2,) tera matchup vector.
+    """
     my_types = (list(my_types) + [None])[:2]
-    opp_types = (list(opp_types) + [None])[:2]
     type_chart = _type_chart_for_gen(gen)
 
-    vec = []
-    for my_t in my_types:
-        for opp_t in opp_types:
-            if my_t is None or opp_t is None:
-                vec.append(0.0)
-            else:
-                mult = my_t.damage_multiplier(opp_t, type_chart=type_chart)
-                vec.append(-1.0 if mult == 0.0 else float(np.log2(mult)))
+    def _mult(my_t, opp_t) -> float:
+        if my_t is None or opp_t is None:
+            return 0.0
+        mult = my_t.damage_multiplier(opp_t, type_chart=type_chart)
+        return -1.0 if mult == 0.0 else float(np.log2(mult))
 
+    if opp_tera_mode:
+        return np.array([_mult(t, opp_types[0]) for t in my_types], dtype=np.float32)
+
+    opp_types = (list(opp_types) + [None])[:2]
+    vec = [_mult(my_t, opp_t) for my_t in my_types for opp_t in opp_types]
     return np.array(vec, dtype=np.float32)
