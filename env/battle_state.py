@@ -14,9 +14,9 @@ from env.embed import (
 )
 
 # Update this constant whenever embed_battle changes.
-OBS_SIZE = 361
+OBS_SIZE = 194
 CONTEXT_BEFORE_MY_MOVES = 54
-CONTEXT_AFTER_OPP_MOVES = 11
+CONTEXT_AFTER_OPP_MOVES = 0
 
 
 @dataclass
@@ -43,11 +43,11 @@ class BattleState:
     opp_tera_multiplier: np.ndarray# (2)
 
     my_moves: np.ndarray           # (MAX_MOVES * MOVE_EMBED_LEN,)
-    opp_moves: np.ndarray          # (MAX_MOVES * MOVE_EMBED_LEN,)
+    # opp_moves: np.ndarray          # (MAX_MOVES * MOVE_EMBED_LEN,)
 
-    type_multipliers: np.ndarray   # (4,)
-    weight_bucket: np.ndarray      # (6,)  one-hot
-    opp_protect_belief: float      # (1)
+    # type_multipliers: np.ndarray   # (4,)
+    # weight_bucket: np.ndarray      # (6,)  one-hot
+    # opp_protect_belief: float      # (1)
 
     def to_array(self) -> np.ndarray:
         state = np.concatenate([
@@ -65,10 +65,10 @@ class BattleState:
             [self.opp_preparing, self.opp_stab, self.opp_is_terastallized],
             self.opp_tera_multiplier,
             self.my_moves,
-            self.opp_moves,
-            self.type_multipliers,
-            self.weight_bucket,
-            [self.opp_protect_belief],
+            # self.opp_moves,
+            # self.type_multipliers,
+            # self.weight_bucket,
+            # [self.opp_protect_belief],
         ]).astype(np.float32)
 
         assert len(state) == OBS_SIZE, (
@@ -123,11 +123,11 @@ class BattleState:
             opp_tera_multiplier=calc_types_vector(my_types, [opp.tera_type], battle.gen, opp_tera_mode=True),
 
             my_moves=my_moves,
-            opp_moves=opp_moves,
+            # opp_moves=opp_moves,
 
-            type_multipliers=calc_types_vector(my_types, opp_types, battle.gen),
-            weight_bucket=weight_bucket,
-            opp_protect_belief=opp_protect_belief,
+            # type_multipliers=calc_types_vector(my_types, opp_types, battle.gen),
+            # weight_bucket=weight_bucket,
+            # opp_protect_belief=opp_protect_belief,
         )
 
     def describe(self) -> str:
@@ -139,7 +139,7 @@ class BattleState:
             ("my_boosts", 7),
             ("my_status", len(MOVE_STATUSES)),
             ("my_effects", len(TRACKED_EFFECTS)),
-            # ("my_stab", 1),
+            ("my_stab", 1),
             ("opp_hp", 1),
             ("opp_base_stats", 6),
             ("opp_boosts", 7),
@@ -153,8 +153,8 @@ class BattleState:
         move_block = [
             ("scalars", 5),
             ("category", len(list(__import__('poke_env.battle.move_category', fromlist=['MoveCategory']).MoveCategory))),
-            ("is_protect", 1),
-            ("breaks_protect", 1),
+            # ("is_protect", 1),
+            # ("breaks_protect", 1),
             ("multiplier", 1),
             ("is_tera", 1),
             ("status", len(MOVE_STATUSES)),
@@ -168,7 +168,7 @@ class BattleState:
 
         for i in range(1, MAX_MOVES + 1):
             layout.extend([(f"opp_move{i}.{name}", size) for name, size in move_block])
-        layout += [("type_multipliers", 4), ("weight_bucket", 6), ("opp_protect_belief", 1)]
+        # layout += [("type_multipliers", 4), ("weight_bucket", 6), ("opp_protect_belief", 1)]
 
         lines = ["[BattleState] OBSERVATION BREAKDOWN"]
         idx = 0
