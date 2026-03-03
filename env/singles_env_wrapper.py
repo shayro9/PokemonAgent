@@ -8,6 +8,7 @@ from combat.combat_utils import detect_opponent_move, did_no_damage, snapshot_op
 from combat.protect import estimate_protect_attempt_prior, build_protect_belief
 from env.battle_tracker import BattleTracker
 from env.reward import calc_reward
+from debug.logs import log_fallback
 
 
 def print_state(battle, *, prefix="[PokemonRLWrapper]") -> str:
@@ -65,7 +66,8 @@ class PokemonRLWrapper(SinglesEnv):
             return super().action_to_order(action, battle, fake, strict)
 
         canonical_action = action
-
+        if self._latest_battle != battle:
+            print("S")
         mask = get_valid_action_mask(
             battle=battle,
             allow_switches=False,
@@ -89,7 +91,11 @@ class PokemonRLWrapper(SinglesEnv):
 
         self._update_last_move(battle, canonical_action)
 
-        return super().action_to_order(canonical_action, battle, fake, strict)
+        try:
+            return super().action_to_order(canonical_action, battle, fake, strict)
+        except ValueError:
+            log_fallback(battle, canonical_action)
+            return super().action_to_order(canonical_action, battle, fake, strict=False)
 
     def action_masks(self) -> np.ndarray:
         if self._latest_battle is None:

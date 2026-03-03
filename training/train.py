@@ -9,7 +9,7 @@ from wandb.integration.sb3 import WandbCallback
 from policy.attention_policy import AttentionPointerPolicy
 from .parse import build_arg_parser
 from config.config import *
-from .logs import *
+from training.battle_metrics_log import *
 
 from env.env_builder import build_env
 from .evaluation import evaluate_model, print_eval_summary, build_fixed_eval_pool
