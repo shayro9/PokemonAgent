@@ -1,8 +1,8 @@
-from typing import Iterable
+from typing import Iterable, Optional
 from dataclasses import dataclass
 
 from teams.single_teams import ALL_SOLO_TEAMS
-from teams.team_generators import *
+from teams.team_generators import single_simple_team_generator, load_pokemon_pool, split_pokemon_pool, matchup_generator
 
 
 TEAM_BY_NAME = {name: team for name, team in ALL_SOLO_TEAMS}
@@ -74,6 +74,7 @@ class OpponentsResolved:
     eval_gen: Optional[Iterable]
     train_agent_gen: Optional[Iterable]
     eval_agent_gen: Optional[Iterable]
+    battle_team_generator: Optional[Iterable] = None
 
 
 def _resolve_train_eval_pools(
@@ -102,6 +103,32 @@ def resolve_opponents(args) -> OpponentsResolved:
     eval_gen = None
     train_agent_gen = None
     eval_agent_gen = None
+
+    if getattr(args, 'matchup_data_path', None):
+        matchup_pool = load_pokemon_pool(args.matchup_data_path)
+
+        if args.split_generated_pool:
+            train_pool, eval_pool = split_pokemon_pool(
+                pokemon_pool=matchup_pool,
+                train_fraction=args.train_split,
+                seed=args.split_seed,
+            )
+            print(
+                f"Matchup pool split: train={len(train_pool)}, eval={len(eval_pool)} "
+                f"(seed={args.split_seed}, train_split={args.train_split})"
+            )
+        else:
+            train_pool = eval_pool = matchup_pool
+
+        return OpponentsResolved(
+            train_names=[],
+            eval_names=[],
+            train_gen=None,
+            eval_gen=matchup_generator(matchup_pool=eval_pool, seed=args.seed + 1),
+            train_agent_gen=None,
+            eval_agent_gen=None,
+            battle_team_generator=matchup_generator(matchup_pool=train_pool, seed=args.seed),
+        )
 
     if not args.random_generated:
         # ---- NAME-BASED TRAIN opponents ----

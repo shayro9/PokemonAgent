@@ -14,6 +14,7 @@ from env.env_builder import build_env
 from .evaluation import evaluate_model, print_eval_summary, build_fixed_eval_pool
 
 LR = 3e-4
+LR_DECAY = 1
 N_STEPS = 2048
 BATCH_SIZE = 256
 GAMMA = 0.95
@@ -89,7 +90,7 @@ def train_model(
     model = MaskablePPO(
         AttentionPointerPolicy,
         env=train_env,
-        learning_rate=LR,
+        learning_rate=lambda progress: LR * (progress if LR_DECAY else 1.0),
         n_steps=N_STEPS,
         batch_size=BATCH_SIZE,
         gamma=GAMMA,
@@ -187,6 +188,7 @@ def main():
         eval_every_timesteps=args.eval_every_timesteps,
         eval_kwargs=None if args.skip_eval else eval_kwargs,
         agent_team_generator=opp.train_agent_gen,
+        battle_team_generator=opp.battle_team_generator,
         seed=args.seed,
     )
 

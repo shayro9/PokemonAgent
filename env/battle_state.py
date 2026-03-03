@@ -106,14 +106,14 @@ class BattleState:
 
         return cls(
             my_hp=my.current_hp_fraction,
-            my_stats=np.minimum(np.array(list(my.stats.values())) / 255.0, 1.0),
+            my_stats=np.minimum(np.array(list(my.stats.values())) / 512.0, 1.0),
             my_boosts=np.array(list(my.boosts.values())) / 6.0,
             my_status=embed_status(my.status),
             my_effects=embed_effects(my.effects),
             my_stab=my.stab_multiplier / 2.0,
 
             opp_hp=opp.current_hp_fraction,
-            opp_base_stats=np.array(list(opp.base_stats.values())) / 255.0,
+            opp_base_stats=np.array(list(opp.base_stats.values())) / 256.0,
             opp_boosts=np.array(list(opp.boosts.values())) / 6.0,
             opp_status=embed_status(opp.status),
             opp_effects=embed_effects(opp.effects),

@@ -37,10 +37,8 @@ def calc_reward(
     my_status = battle.active_pokemon.status
     opp_status = battle.opponent_active_pokemon.status
 
-    newly_opp_status = (opp_hp > 0) and (opp_status is not None) \
-                         and (tracker.last_opp_status is None or tracker.last_opp_status != opp_status)
-    newly_me_status = (my_status is not None) \
-                        and (tracker.last_my_status is None or tracker.last_my_status != my_status)
+    newly_opp_status = (opp_hp > 0) and (opp_status is not None) and (tracker.last_opp_status is None)
+    newly_me_status = (my_status is not None) and (tracker.last_my_status is None)
 
     reward = (damage_to_opp + STATUS_VALUE * newly_opp_status
               - damage_to_me - STATUS_VALUE * newly_me_status)

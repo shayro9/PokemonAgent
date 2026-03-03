@@ -58,6 +58,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
              "data/gen9randombattle_db.json.",
     )
     parser.add_argument(
+        "--matchup-data-path",
+        type=str,
+        default=None,
+        help="Path to a pre-paired matchup database JSON.",
+    )
+    parser.add_argument(
         "--split-generated-pool",
         action="store_true",
         default=False,

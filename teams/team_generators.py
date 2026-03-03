@@ -16,6 +16,23 @@ def load_pokemon_pool(data_path: str) -> list[dict]:
 
     return pokemon_pool
 
+def _mon_kwargs(mon: dict) -> dict:
+    """Extract generate_team kwargs from a pool/matchup entry."""
+    return dict(
+        nickname=mon.get('name'),
+        species=mon.get('species'),
+        item=mon.get('item'),
+        ability=mon.get('ability'),
+        moves=mon.get('moves'),
+        nature=mon.get('nature'),
+        evs=format_stats_dict(mon.get('evs')),
+        ivs=format_stats_dict(mon.get('ivs')),
+        gender=mon.get('gender'),
+        level=mon.get('level'),
+        shiny=mon.get('shiny'),
+        teratype=mon.get('teraType'),
+    )
+
 
 def split_pokemon_pool(
         pokemon_pool: list[dict],
@@ -66,21 +83,35 @@ def single_simple_team_generator(
 
     while True:
         sampled_mon = rng.choice(pokemon_pool)
+        yield generate_team(**_mon_kwargs(sampled_mon))
 
-        yield generate_team(
-            nickname=sampled_mon.get('name'),
-            species=sampled_mon.get('species'),
-            item=sampled_mon.get('item'),
-            ability=sampled_mon.get('ability'),
-            moves=sampled_mon.get('moves'),
-            nature=sampled_mon.get('nature'),
-            evs=format_stats_dict(sampled_mon.get('evs')),
-            ivs=format_stats_dict(sampled_mon.get('ivs')),
-            gender=sampled_mon.get('gender'),
-            level=sampled_mon.get('level'),
-            shiny=sampled_mon.get('shiny'),
-            teratype=sampled_mon.get('teraType')
-        )
+
+def matchup_generator(
+        data_path: str = None,
+        matchup_pool: list[dict] | None = None,
+        seed: int | None = None,
+        shuffle_each_epoch: bool = True,
+):
+    if matchup_pool is None:
+        if data_path is None:
+            raise ValueError("Either data_path or matchup_pool must be provided.")
+        with open(data_path) as f:
+            matchup_pool = json.load(f)['pool']
+
+    if not matchup_pool:
+        raise ValueError("Matchup pool is empty.")
+
+    print(f"[matchup_generator] Using {len(matchup_pool)} matchups")
+    rng = random.Random(seed)
+
+    while True:
+        if shuffle_each_epoch:
+            rng.shuffle(matchup_pool)
+        for matchup in matchup_pool:
+            yield (
+                generate_team(**_mon_kwargs(matchup['agent'])),
+                generate_team(**_mon_kwargs(matchup['opponent'])),
+            )
 
 
 def format_stats_dict(stats: Optional[dict]) -> str:
