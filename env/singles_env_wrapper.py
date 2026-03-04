@@ -96,7 +96,7 @@ class PokemonRLWrapper(SinglesEnv):
         try:
             return super().action_to_order(canonical_action, battle, fake, strict)
         except ValueError:
-            log_fallback(battle, canonical_action)
+            log_fallback(battle)
             return super().action_to_order(canonical_action, battle, fake, strict=False)
 
     def action_masks(self) -> np.ndarray:
