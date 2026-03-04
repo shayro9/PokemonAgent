@@ -29,14 +29,14 @@ Damage inference math
 ---------------------
 Simplified Gen-9 formula (ignoring floor ops, treated as noise):
 
-    D = level_factor * BP * A / D_stat / 50 * modifier + 2
+    D = ((level_factor * BP * A / D_stat / 50) + 2) * modifier
 
 where  level_factor = (2 * level / 5 + 2).
 
 Rearranging to isolate the unknown stat:
 
-    A_est   = (D_raw - 2) * 50 * known_def / (level_factor * BP * modifier)
-    Def_est = (level_factor * BP * known_atk * modifier) / ((D_raw - 2) * 50)
+    A_est   = (D_raw / modifier - 2) * 50 * known_def / (level_factor * BP)
+    Def_est = (level_factor * BP * known_atk) / ((D_raw / modifier - 2) * 50)
 
 ``D_raw`` = ``damage_fraction * max_hp``.
 
@@ -162,7 +162,7 @@ class StatBelief:
 
         Solves for the attacker stat using the simplified damage formula::
 
-            A_est = (D_raw - 2) * 50 * my_defense / (level_factor * BP * modifier)
+            A_est = (D_raw / modifier - 2) * 50 * my_defense / (level_factor * BP)
 
         where  ``D_raw = damage_fraction * my_max_hp``.
 
@@ -178,11 +178,11 @@ class StatBelief:
         :returns: Updated ``StatBelief``.
         """
         d_raw = damage_fraction * my_max_hp
-        denom = level_factor * base_power * modifier
-        if denom <= 0 or d_raw <= 2:
+        denom = level_factor * base_power
+        if denom <= 0 or modifier <= 0 or (d_raw / modifier) <= 2:
             return self  # degenerate observation — no update
 
-        a_est = (d_raw - 2) * 50.0 * my_defense / denom
+        a_est = (d_raw / modifier - 2) * 50.0 * my_defense / denom
         if a_est <= 0:
             return self
 
@@ -208,7 +208,7 @@ class StatBelief:
         Uses the current HP-mean belief to convert the fraction into raw HP::
 
             D_raw   = damage_fraction * opp_hp_mean_est
-            Def_est = level_factor * BP * my_attack * modifier / ((D_raw - 2) * 50)
+            Def_est = level_factor * BP * my_attack / ((D_raw / modifier - 2) * 50)
 
         :param damage_fraction: Fraction of *opponent's* max HP lost this turn.
         :param my_attack: Our relevant attack stat (Atk or SpA, raw).
@@ -227,8 +227,10 @@ class StatBelief:
         if d_raw <= 2:
             return self  # almost no damage — too noisy to infer defense from
 
-        numer = level_factor * base_power * my_attack * modifier
-        def_est = numer / ((d_raw - 2) * 50.0)
+        numer = level_factor * base_power * my_attack
+        if modifier <= 0 or (d_raw / modifier) <= 2:
+            return self
+        def_est = numer / ((d_raw / modifier - 2) * 50.0)
         if def_est <= 0:
             return self
 

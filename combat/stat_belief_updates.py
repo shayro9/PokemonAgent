@@ -21,6 +21,7 @@ from __future__ import annotations
 from poke_env.battle import MoveCategory
 
 from combat.stats_belief import StatBelief, build_stat_belief, level_factor
+from combat.combat_utils import calc_modifier
 
 
 # ---------------------------------------------------------------------------
@@ -93,9 +94,13 @@ def _update_from_damage_dealt(
         return belief
 
     me = battle.active_pokemon
+    opp = battle.opponent_active_pokemon
+
     is_special = (my_move.category == MoveCategory.SPECIAL)
     atk_key = "spa" if is_special else "atk"
     my_atk = float(me.stats[atk_key])
+
+    modifier, extra_noise_frac = calc_modifier(my_move, me, opp, battle, True)
 
     return belief.update_from_damage_dealt(
         damage_fraction=opp_hp_delta,
@@ -103,8 +108,8 @@ def _update_from_damage_dealt(
         base_power=bp,
         move_is_special=is_special,
         level_factor=lf,
-        modifier=1.0,
-        extra_noise_frac=0.10,
+        modifier=modifier,
+        extra_noise_frac=extra_noise_frac,
     )
 
 
@@ -140,10 +145,14 @@ def _update_from_damage_received(
         return belief
 
     me = battle.active_pokemon
+    opp = battle.opponent_active_pokemon
+
     is_special = (opp_last_move.category == MoveCategory.SPECIAL)
     def_key = "spd" if is_special else "def"
     my_def    = float(me.stats[def_key])
     my_max_hp = float(me.stats["hp"])
+
+    modifier, extra_noise_frac = calc_modifier(opp_last_move, opp, me, battle, False)
 
     return belief.update_from_damage_received(
         damage_fraction=my_hp_delta,
@@ -152,8 +161,8 @@ def _update_from_damage_received(
         base_power=bp,
         move_is_special=is_special,
         level_factor=lf,
-        modifier=1.0,
-        extra_noise_frac=0.05,  # BP is known exactly — low extra noise
+        modifier=modifier,
+        extra_noise_frac=extra_noise_frac,  # BP is known exactly — low extra noise
     )
 
 

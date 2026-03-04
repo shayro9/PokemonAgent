@@ -1,13 +1,14 @@
 import numpy as np
-from functools import lru_cache
+
 from typing import List
 
-from poke_env.data import GenData
-from poke_env.battle import Move, effect
+from poke_env.battle import Move
 from poke_env.battle.pokemon_type import PokemonType
 from poke_env.battle.move_category import MoveCategory
 from poke_env.battle.status import Status
 from poke_env.battle.effect import Effect
+
+from combat.combat_utils import type_chart_for_gen
 
 BOOST_KEYS = ("atk", "def", "spa", "spd", "spe", "accuracy", "evasion")
 MOVE_CATEGORIES = tuple(MoveCategory)
@@ -15,16 +16,7 @@ MOVE_STATUSES = tuple(Status)
 TRACKED_EFFECTS = [Effect.CONFUSION, Effect.MUST_RECHARGE, Effect.ENCORE]
 
 MAX_MOVES = 4
-MOVE_EMBED_LEN = 37
-
-
-@lru_cache(maxsize=None)
-def _type_chart_for_gen(gen: int):
-    """Return cached type chart data for a generation.
-    
-    :param gen: Pokémon generation number.
-    :returns: The generation-specific type chart mapping."""
-    return GenData.from_gen(gen).type_chart
+MOVE_EMBED_LEN = 38
 
 
 def _iter_scaled_boosts(boosts: dict | None):
@@ -87,6 +79,7 @@ def embed_move(move: Move, opp_types, my_types, gen: int) -> np.ndarray:
     vec.append(_scale_01(move.max_pp or 0, 40.0))
     vec.append(_scale_m11(_safe_int(move, "priority", 0), 7.0))
     vec.append(_scale_01(move.heal or 0, 1))
+    vec.append(_scale_01(move.crit_ratio or 0, 6))
 
     # Category one-hot
     for cat in MOVE_CATEGORIES:
@@ -98,7 +91,7 @@ def embed_move(move: Move, opp_types, my_types, gen: int) -> np.ndarray:
 
     # Type multiplier
     type1, type2 = (list(opp_types) + [None])[:2]
-    mult = move.type.damage_multiplier(type1, type2, type_chart=_type_chart_for_gen(gen))
+    mult = move.type.damage_multiplier(type1, type2, type_chart=type_chart_for_gen(gen))
     vec.append(-1.0 if mult == 0.0 else float(np.log2(mult) / 2.0))
     vec.append(1.0 if move.type in my_types else 0.0)
 
@@ -163,7 +156,7 @@ def calc_types_vector(
     :returns: Shape (4,) base matchup vector, or shape (2,) tera matchup vector.
     """
     my_types = (list(my_types) + [None])[:2]
-    type_chart = _type_chart_for_gen(gen)
+    type_chart = type_chart_for_gen(gen)
 
     def _mult(my_t, opp_t) -> float:
         if my_t is None or opp_t is None:

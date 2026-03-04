@@ -14,7 +14,7 @@ from env.embed import (
 )
 
 # Update this constant whenever embed_battle changes.
-OBS_SIZE = 357
+OBS_SIZE = 365
 CONTEXT_BEFORE_MY_MOVES = 60
 CONTEXT_AFTER_OPP_MOVES = 1
 

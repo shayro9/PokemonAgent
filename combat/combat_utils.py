@@ -1,9 +1,19 @@
 from dataclasses import dataclass
+from functools import lru_cache
 
-from poke_env.battle import MoveCategory, Move
+from poke_env.battle import MoveCategory, Move, Weather, PokemonType, SideCondition, Status, Pokemon, Battle
+from poke_env.data import GenData
 
 from env.battle_tracker import BattleTracker
-from env.embed import MAX_MOVES
+
+
+@lru_cache(maxsize=None)
+def type_chart_for_gen(gen: int):
+    """Return cached type chart data for a generation.
+
+    :param gen: Pokémon generation number.
+    :returns: The generation-specific type chart mapping."""
+    return GenData.from_gen(gen).type_chart
 
 
 def tracker_key(battle) -> str:
@@ -58,3 +68,72 @@ def snapshot_opponent_pp(battle) -> dict:
         move.id: move.current_pp
         for move in (battle.opponent_active_pokemon.moves or {}).values()
     }
+
+def calc_modifier(
+    move: Move,
+    attacker: Pokemon,
+    defender: Pokemon,
+    battle: Battle,
+    attacker_is_us: bool,
+) -> tuple[float, float]:
+    """Compute the combined damage modifier and residual noise for a move.
+
+    :param move: The move being used.
+    :param attacker: poke-env Pokemon using the move.
+    :param defender: poke-env Pokemon receiving the move.
+    :param battle: poke-env battle object.
+    :param attacker_is_us: ``True`` when our Pokemon is the attacker.
+    :returns: ``(modifier, extra_noise_frac)`` tuple.
+    """
+    mod = 1.0
+
+    # --- STAB ---
+    if move.type in attacker.types:
+        mod *= attacker.stab_multiplier
+
+    # --- Type effectiveness ---
+    defending_types = [t for t in defender.types if t is not None]
+    if defending_types:
+        mod *= move.type.damage_multiplier(*defending_types, type_chart=type_chart_for_gen(battle.gen))
+
+    # --- Weather ---
+    weather = next(iter(battle.weather), None)
+    if weather is not None:
+        if weather == Weather.SUNNYDAY:
+            if move.type == PokemonType.FIRE:
+                mod *= 1.5
+            elif move.type == PokemonType.WATER:
+                mod *= 0.5
+        elif weather == Weather.RAINDANCE:
+            if move.type == PokemonType.WATER:
+                mod *= 1.5
+            elif move.type == PokemonType.FIRE:
+                mod *= 0.5
+
+    # --- Burn (halves attacker's physical damage) ---
+    if (
+        move.category == MoveCategory.PHYSICAL
+        and getattr(attacker, "status", None) == Status.BRN
+    ):
+        mod *= 0.5
+
+    # --- Screens (check the defending side's active conditions) ---
+    side_conditions = (
+        battle.opponent_side_conditions if attacker_is_us else battle.side_conditions
+    )
+    if move.category == MoveCategory.PHYSICAL and SideCondition.REFLECT in side_conditions:
+        mod *= 0.5
+    elif move.category == MoveCategory.SPECIAL and SideCondition.LIGHT_SCREEN in side_conditions:
+        mod *= 0.5
+
+    # --- Crit (unknown if it occurred — adjust in expectation) ---
+    # Move.crit_ratio is a stage integer; map to approximate Gen-6+ probabilities.
+    _CRIT_PROB = {0: 1 / 24, 1: 1 / 8, 2: 1 / 2}
+    crit_ratio = getattr(move, "crit_ratio", 0)
+    p_crit = 1.0 if crit_ratio >= 3 else _CRIT_PROB.get(crit_ratio, 1 / 24)
+    # Expected damage is inflated by 0.5 * p_crit; noise grows with the variance
+    # of the binary crit outcome (which can swing damage by ~50%).
+    mod *= (1.0 + 0.5 * p_crit)
+    extra_noise = 0.05 + p_crit * 0.5
+
+    return mod, extra_noise
