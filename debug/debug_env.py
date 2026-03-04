@@ -20,10 +20,10 @@ def debug_run(n_steps=20):
         action = np.int64(6)
         obs, reward, terminated, truncated, _ = env.step(action)
 
-        # print(f"\n[step {step}]")
-        # print(f"  reward={reward:.4f}")
-        # print(f"  opp_protect_belief={obs[-1]:.3f}")
-        # print(f"  done={terminated or truncated}")
+        print(f"\n[step {step}]")
+        print(f"  reward={reward:.4f}")
+        print(f"  opp_protect_belief={obs[-1]:.3f}")
+        print(f"  done={terminated or truncated}")
 
         if terminated or truncated:
             obs, _ = env.reset()

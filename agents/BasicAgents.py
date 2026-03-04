@@ -27,12 +27,7 @@ class DebugRLPlayer(RandomPlayer):
         # battle.opponent_active_pokemon.stats = battle.opponent_active_pokemon.base_stats
         # print(calculate_damage(battle.active_pokemon.identifier('p1'), battle.opponent_active_pokemon.identifier('p2'), battle.available_moves[0], battle))
 
-        types = battle.opponent_active_pokemon.types
-        my_types = battle.active_pokemon.types
-        gen = battle.gen
-        for move in battle.available_moves:
-            print("type - {}"
-                  .format(move.type))
-            print(embed_move(move, types, my_types, gen))
+        opp = battle.opponent_active_pokemon
+        print("moves - {} \n stats - {} \n base - {} \n level - {} \n stab - {}".format(opp.moves, opp.stats, opp.base_stats, opp.level, opp.stab_multiplier))
 
         return self.choose_random_move(battle)

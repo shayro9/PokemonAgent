@@ -14,8 +14,8 @@ from env.embed import (
 )
 
 # Update this constant whenever embed_battle changes.
-OBS_SIZE = 351
-CONTEXT_BEFORE_MY_MOVES = 54
+OBS_SIZE = 357
+CONTEXT_BEFORE_MY_MOVES = 60
 CONTEXT_AFTER_OPP_MOVES = 1
 
 
@@ -33,7 +33,7 @@ class BattleState:
     my_stab: float                 # (1)
 
     opp_hp: float                  # (1)
-    opp_base_stats: np.ndarray     # (6,)
+    opp_stat_belief: np.ndarray    # (12,)  [mean/STAT_NORM ×6, std/STAT_NORM ×6]
     opp_boosts: np.ndarray         # (7,)
     opp_status: np.ndarray         # (7,)
     opp_effects: np.ndarray        # (3)  one-hot Tracked effects
@@ -58,7 +58,7 @@ class BattleState:
             self.my_effects,
             [self.my_stab],
             [self.opp_hp],
-            self.opp_base_stats,
+            self.opp_stat_belief,
             self.opp_boosts,
             self.opp_status,
             self.opp_effects,
@@ -78,7 +78,7 @@ class BattleState:
         return state
 
     @classmethod
-    def from_battle(cls, battle, opp_protect_belief: float = 1.0) -> "BattleState":
+    def from_battle(cls, battle, opp_protect_belief: float = 1.0, opp_stat_belief: np.ndarray | None = None) -> "BattleState":
         """Build a BattleState from a poke-env battle object."""
         my = battle.active_pokemon
         opp = battle.opponent_active_pokemon
@@ -113,7 +113,7 @@ class BattleState:
             my_stab=my.stab_multiplier / 2.0,
 
             opp_hp=opp.current_hp_fraction,
-            opp_base_stats=np.array(list(opp.base_stats.values())) / 256.0,
+            opp_stat_belief=opp_stat_belief if opp_stat_belief is not None else np.zeros(12, dtype=np.float32),
             opp_boosts=np.array(list(opp.boosts.values())) / 6.0,
             opp_status=embed_status(opp.status),
             opp_effects=embed_effects(opp.effects),
@@ -141,7 +141,7 @@ class BattleState:
             ("my_effects", len(TRACKED_EFFECTS)),
             ("my_stab", 1),
             ("opp_hp", 1),
-            ("opp_base_stats", 6),
+            ("opp_stats_belief", 12),
             ("opp_boosts", 7),
             ("opp_status", len(MOVE_STATUSES)),
             ("opp_effects", len(TRACKED_EFFECTS)),

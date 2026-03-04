@@ -1,6 +1,8 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Optional
+
+from combat.stats_belief import StatBelief
 
 
 @dataclass
@@ -26,6 +28,8 @@ class BattleTracker:
     # Protect belief (was: last_protect_chance, protect_belief)
     last_protect_chance: float = 1.0
     protect_belief: float = 1.0
+
+    stat_belief: Optional[StatBelief] = None
 
     @property
     def last_hp(self) -> tuple[float, float]:
