@@ -4,7 +4,11 @@ from poke_env.environment import SinglesEnv
 
 from env.action_masking import get_valid_action_mask, ACTION_DEFAULT
 from env.battle_state import BattleState, OBS_SIZE
-from combat.combat_utils import detect_opponent_move, did_no_damage, snapshot_opponent_pp, tracker_key
+from combat.combat_utils import snapshot_opponent_pp, tracker_key
+from combat.event_parser import (
+    detect_opponent_move_from_events,
+    did_no_damage_from_events,
+)
 from combat.protect_belief import estimate_protect_attempt_prior, build_protect_belief
 from combat.stats_belief import build_stat_belief
 from combat.stat_belief_updates import update_stat_belief
@@ -177,19 +181,20 @@ class PokemonRLWrapper(SinglesEnv):
             self._trackers[tag] = BattleTracker()
         return self._trackers[tag]
 
-
     def _update_battle_state(self, battle) -> None:
         """Update per-turn bookkeeping. Call once per step before embed_battle."""
         tracker = self._get_tracker(battle)
-        me = battle.active_pokemon
         opp = battle.opponent_active_pokemon
 
-        # ── protect belief (unchanged) ───────────────────────────────────
-        opp_last_move = detect_opponent_move(battle, tracker.last_opp_pp)
-        no_damage = did_no_damage(battle, tracker, tracker.my_last_move)
+        # ── detect opponent move and no-damage via events ────────────────
+        opp_last_move = detect_opponent_move_from_events(battle)
+        no_damage = did_no_damage_from_events(battle, tracker.my_last_move)
+
+        # ── protect belief ───────────────────────────────────────────────
         protected = opp_last_move.is_protect_move if opp_last_move else (None if no_damage else False)
         prior = estimate_protect_attempt_prior(battle)
 
+        # Keep pp snapshot for any callers that may still need it
         tracker.last_opp_pp = snapshot_opponent_pp(battle)
 
         if tracker.my_last_move is not None:
@@ -200,8 +205,6 @@ class PokemonRLWrapper(SinglesEnv):
             tracker.protect_belief = prior
 
         # ── stat belief ───────────────────────────────────────────────────
-
-        # Initialize on the very first call for this battle
         if tracker.stat_belief is None:
             tracker.stat_belief = build_stat_belief(opp, battle.gen)
             return

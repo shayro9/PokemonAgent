@@ -4,11 +4,6 @@ combat/stat_belief_updates.py
 Poke-env-aware wrappers that translate raw battle state into
 ``StatBelief`` updates.
 
-This module is intentionally the *only* place that imports both
-poke-env types and ``StatBelief``.  ``stat_belief.py`` stays pure
-(no poke-env dependency) and ``singles_env_wrapper.py`` stays thin
-(no stat-inference logic).
-
 Public API
 ----------
 ``update_stat_belief(belief, battle, tracker, opp_last_move)``
@@ -22,6 +17,7 @@ from poke_env.battle import MoveCategory
 
 from combat.stats_belief import StatBelief, build_stat_belief, level_factor
 from combat.combat_utils import calc_modifier
+from combat.event_parser import we_moved_first_from_events
 
 
 # ---------------------------------------------------------------------------
@@ -36,16 +32,12 @@ def update_stat_belief(
 ) -> StatBelief:
     """Apply all available turn evidence to the stat belief.
 
-    Initialises the belief from the prior if this is the first turn.
-    Otherwise runs up to three independent Bayesian updates — one per
-    evidence source — and returns the final posterior.
-
     :param belief: Current ``StatBelief``, or ``None`` on the first turn.
     :param battle: poke-env battle object.
     :param tracker: ``BattleTracker`` holding last-turn HP snapshots and
         the move we played.
     :param opp_last_move: The opponent's last move as detected by
-        ``detect_opponent_move``, or ``None`` if unknown.
+        ``detect_opponent_move_from_events``, or ``None`` if unknown.
     :returns: Updated ``StatBelief``.
     """
     opp = battle.opponent_active_pokemon
@@ -74,8 +66,7 @@ def _update_from_damage_dealt(
 ) -> StatBelief:
     """Update opp Def or SpD from damage we dealt last turn.
 
-    Uses the move we played (``tracker.my_last_move``) for exact BP
-    and category, so no guessing is required.
+    Uses ``opp.max_hp`` directly from the battle object — no HP belief needed.
 
     :param belief: Current belief.
     :param battle: poke-env battle object.
@@ -98,6 +89,10 @@ def _update_from_damage_dealt(
     me = battle.active_pokemon
     opp = battle.opponent_active_pokemon
 
+    opp_max_hp = float(opp.max_hp or 0)
+    if opp_max_hp <= 0:
+        return belief
+
     is_special = (my_move.category == MoveCategory.SPECIAL)
     atk_key = "spa" if is_special else "atk"
     my_atk = float(me.stats[atk_key])
@@ -106,6 +101,7 @@ def _update_from_damage_dealt(
 
     return belief.update_from_damage_dealt(
         damage_fraction=opp_hp_delta,
+        opp_max_hp=opp_max_hp,
         my_attack=my_atk,
         base_power=bp,
         move_is_special=is_special,
@@ -124,14 +120,10 @@ def _update_from_damage_received(
 ) -> StatBelief:
     """Update opp Atk or SpA from damage we received last turn.
 
-    Uses the opponent's detected move for exact BP and category when
-    available.  Skips the update entirely when the move is unknown
-    (rather than guessing) to avoid injecting noisy evidence.
-
     :param belief: Current belief.
     :param battle: poke-env battle object.
     :param tracker: Tracker holding ``last_my_hp``.
-    :param opp_last_move: Opponent's last move, or ``None`` if not detected.
+    :param opp_last_move: Opponent's last move from event parser, or ``None``.
     :param lf: Pre-computed level factor for the opponent.
     :returns: Updated belief, or the original if no valid evidence.
     """
@@ -164,7 +156,7 @@ def _update_from_damage_received(
         move_is_special=is_special,
         level_factor=lf,
         modifier=modifier,
-        extra_noise_frac=extra_noise_frac,  # BP is known exactly — low extra noise
+        extra_noise_frac=extra_noise_frac,
     )
 
 
@@ -172,21 +164,16 @@ def _update_from_speed_order(
     belief: StatBelief,
     battle,
 ) -> StatBelief:
-    """Update opp Spe from turn-order evidence.
-
-    Uses poke-env's ``preparing`` and ``must_recharge`` flags as a
-    reliable signal that the opponent could not have moved first.
-    Returns the belief unchanged when order is ambiguous.
+    """Update opp Spe from turn-order evidence parsed directly from events.
 
     :param belief: Current belief.
     :param battle: poke-env battle object.
     :returns: Updated belief, or the original if order is ambiguous.
     """
-    opp = battle.opponent_active_pokemon
-    me  = battle.active_pokemon
-    our_spe = float(me.stats["spe"])
+    our_spe = float(battle.active_pokemon.stats["spe"])
+    we_moved_first = we_moved_first_from_events(battle)
 
-    if getattr(opp, "preparing", False) or getattr(opp, "must_recharge", False):
-        return belief.update_from_speed_order(our_spe=our_spe, we_moved_first=True)
+    if we_moved_first is None:
+        return belief
 
-    return belief
+    return belief.update_from_speed_order(our_spe=our_spe, we_moved_first=we_moved_first)

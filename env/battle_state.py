@@ -15,7 +15,8 @@ from env.embed import (
 )
 
 # Update this constant whenever embed_battle changes.
-OBS_SIZE = 375
+# opp_stat_belief shrank from 12 to 10 (HP removed from belief).
+OBS_SIZE = 373
 CONTEXT_BEFORE_MY_MOVES = 61
 CONTEXT_AFTER_OPP_MOVES = 1
 
@@ -37,7 +38,7 @@ class BattleState:
     my_stab: float                 # (1)
 
     opp_hp: float                  # (1)
-    opp_stat_belief: np.ndarray    # (12,)  [mean/STAT_NORM ×6, std/STAT_NORM ×6]
+    opp_stat_belief: np.ndarray    # (10,)  [mean/STAT_NORM ×5, std/STAT_NORM ×5]  (no HP)
     opp_boosts: np.ndarray         # (7,)
     opp_status: np.ndarray         # (7,)
     opp_effects: np.ndarray        # (3)  one-hot Tracked effects
@@ -49,8 +50,6 @@ class BattleState:
     my_moves: np.ndarray           # (MAX_MOVES * MOVE_EMBED_LEN,)
     opp_moves: np.ndarray          # (MAX_MOVES * MOVE_EMBED_LEN,)
 
-    # type_multipliers: np.ndarray   # (4,)
-    # weight_bucket: np.ndarray      # (6,)  one-hot
     opp_protect_belief: float      # (1)
 
     def to_array(self) -> np.ndarray:
@@ -72,8 +71,6 @@ class BattleState:
             self.opp_tera_multiplier,
             self.my_moves,
             self.opp_moves,
-            # self.type_multipliers,
-            # self.weight_bucket,
             [self.opp_protect_belief],
         ]).astype(np.float32)
 
@@ -104,12 +101,6 @@ class BattleState:
             emb = embed_move(move, my_types, opp_types, battle.gen)
             opp_moves[i * MOVE_EMBED_LEN: (i + 1) * MOVE_EMBED_LEN] = emb
 
-        # --- weight bucket ---
-        bucket = int(my.weight // opp.weight) if opp.weight else 0
-        bucket = max(0, min(bucket, 5))
-        weight_bucket = np.zeros(6, dtype=np.float32)
-        weight_bucket[bucket] = 1.0
-
         return cls(
             turn=battle.turn / 30.0,
             weather=embed_weather(battle.weather),
@@ -121,7 +112,7 @@ class BattleState:
             my_stab=my.stab_multiplier / 2.0,
 
             opp_hp=opp.current_hp_fraction,
-            opp_stat_belief=opp_stat_belief if opp_stat_belief is not None else np.zeros(12, dtype=np.float32),
+            opp_stat_belief=opp_stat_belief if opp_stat_belief is not None else np.zeros(10, dtype=np.float32),
             opp_boosts=np.array(list(opp.boosts.values())) / 6.0,
             opp_status=embed_status(opp.status),
             opp_effects=embed_effects(opp.effects),
@@ -132,9 +123,6 @@ class BattleState:
 
             my_moves=my_moves,
             opp_moves=opp_moves,
-
-            # type_multipliers=calc_types_vector(my_types, opp_types, battle.gen),
-            # weight_bucket=weight_bucket,
             opp_protect_belief=opp_protect_belief,
         )
 
@@ -149,7 +137,7 @@ class BattleState:
             ("my_effects", len(TRACKED_EFFECTS)),
             ("my_stab", 1),
             ("opp_hp", 1),
-            ("opp_stats_belief", 12),
+            ("opp_stats_belief", 10),
             ("opp_boosts", 7),
             ("opp_status", len(MOVE_STATUSES)),
             ("opp_effects", len(TRACKED_EFFECTS)),
@@ -176,7 +164,6 @@ class BattleState:
 
         for i in range(1, MAX_MOVES + 1):
             layout.extend([(f"opp_move{i}.{name}", size) for name, size in move_block])
-        # layout += [("type_multipliers", 4), ("weight_bucket", 6), ("opp_protect_belief", 1)]
 
         lines = ["[BattleState] OBSERVATION BREAKDOWN"]
         idx = 0
