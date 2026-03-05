@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from poke_env.battle import MoveCategory
 
-from combat.stats_belief import StatBelief, DEF_IDX, SPD_IDX, level_factor
+from combat.stats_belief import StatBelief, DEF_IDX, SPD_IDX, level_factor, HP_IDX
 from combat.combat_utils import calc_modifier, boost_multiplier
 
 
@@ -54,7 +54,7 @@ def estimate_move_damage_fraction(
     me  = battle.active_pokemon
     opp = battle.opponent_active_pokemon
 
-    opp_max_hp = float(opp.max_hp or 0)
+    opp_max_hp = stat_belief.mean[HP_IDX]
     if opp_max_hp <= 0:
         return 0.0
 
@@ -76,6 +76,8 @@ def estimate_move_damage_fraction(
     modifier, _ = calc_modifier(move, me, opp, battle, attacker_is_us=True)
 
     d_raw = (lf * bp * my_atk_eff / opp_def_eff / 50.0 + 2.0) * modifier
+    print(f"damage_raw for move {move.id}: (({lf} * {bp} * ({my_atk_eff} / {opp_def_eff}))/50 + 2.0) * {modifier}")
     damage_fraction = d_raw / opp_max_hp
-
+    print(opp_max_hp)
+    print("move id - {} Damage fraction: {}".format(move.id, damage_fraction))
     return float(min(1.0, max(0.0, damage_fraction)))
