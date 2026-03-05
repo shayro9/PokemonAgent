@@ -234,7 +234,8 @@ class StatBelief:
         if def_est <= 0:
             return self
 
-        noise_frac = DAMAGE_OBS_NOISE_FRAC + extra_noise_frac
+        hp_noise_frac = np.sqrt(max(self.var[HP_IDX], MIN_VAR)) / opp_hp_est
+        noise_frac = DAMAGE_OBS_NOISE_FRAC + hp_noise_frac + extra_noise_frac
         obs_var = (noise_frac * def_est) ** 2
 
         stat_idx = SPD_IDX if move_is_special else DEF_IDX

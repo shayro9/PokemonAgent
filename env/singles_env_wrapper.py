@@ -68,8 +68,6 @@ class PokemonRLWrapper(SinglesEnv):
             return super().action_to_order(action, battle, fake, strict)
 
         canonical_action = action
-        if self._latest_battle != battle:
-            print("S")
         mask = get_valid_action_mask(
             battle=battle,
             allow_switches=False,

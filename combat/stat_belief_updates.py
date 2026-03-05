@@ -49,13 +49,15 @@ def update_stat_belief(
     :returns: Updated ``StatBelief``.
     """
     opp = battle.opponent_active_pokemon
+    me = battle.active_pokemon
 
     if belief is None:
         return build_stat_belief(opp, battle.gen)
 
-    lf = level_factor(opp.level)
-    belief = _update_from_damage_dealt(belief, battle, tracker, lf)
-    belief = _update_from_damage_received(belief, battle, tracker, opp_last_move, lf)
+    opp_lf = level_factor(opp.level)
+    my_lf = level_factor(me.level)
+    belief = _update_from_damage_dealt(belief, battle, tracker, my_lf)
+    belief = _update_from_damage_received(belief, battle, tracker, opp_last_move, opp_lf)
     belief = _update_from_speed_order(belief, battle)
     return belief
 
