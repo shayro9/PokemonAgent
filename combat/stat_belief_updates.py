@@ -91,11 +91,6 @@ def _update_from_damage_dealt(
 
     me  = battle.active_pokemon
     opp = battle.opponent_active_pokemon
-
-    opp_max_hp = float(opp.max_hp or 0)
-    if opp_max_hp <= 0:
-        return belief
-
     is_special = (my_move.category == MoveCategory.SPECIAL)
     atk_key = "spa" if is_special else "atk"
     def_key = "spd" if is_special else "def"
@@ -112,7 +107,6 @@ def _update_from_damage_dealt(
 
     return belief.update_from_damage_dealt(
         damage_fraction=opp_hp_delta,
-        opp_max_hp=opp_max_hp,
         my_attack=my_atk_eff,           # boosted effective attack
         opp_def_boost=opp_def_boost,    # passed through so belief can un-boost
         base_power=bp,

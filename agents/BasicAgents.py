@@ -17,8 +17,8 @@ class DebugRLPlayer(RandomPlayer):
         self.env = env
 
     def choose_move(self, battle: Battle):
-        # print_state(battle, prefix="[DebugRLPlayer]")
-        # print("=" * 50)
+        print_state(battle, prefix="[DebugRLPlayer]")
+        print("=" * 50)
         # mask = self.env.action_masks()
         # print(mask)
         # print("=" * 50)
@@ -26,11 +26,11 @@ class DebugRLPlayer(RandomPlayer):
         # print(battle.active_pokemon.identifier('p2'))
         # battle.opponent_active_pokemon.stats = battle.opponent_active_pokemon.base_stats
         # print(calculate_damage(battle.active_pokemon.identifier('p1'), battle.opponent_active_pokemon.identifier('p2'), battle.available_moves[0], battle))
-        print(battle.opponent_active_pokemon.max_hp)
-        print(battle.opponent_active_pokemon.current_hp)
-
-        for t, o in battle.observations.items():
-            print(t, o.events)
-        print("=" * 50)
+        # print(battle.opponent_active_pokemon.max_hp)
+        # print(battle.opponent_active_pokemon.current_hp)
+        #
+        # for t, o in battle.observations.items():
+        #     print(t, o.events)
+        # print("=" * 50)
 
         return self.choose_random_move(battle)

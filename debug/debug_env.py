@@ -3,11 +3,12 @@ import numpy as np
 from env.env_builder import build_env
 from env.battle_state import BattleState
 from teams.single_teams import STEELIX_TEAM, VIKAVOLT_TEAM
+from env.embed import MOVE_EMBED_LEN
 
 
-def debug_run(n_steps=20):
+def debug_run(n_steps=5):
     env = build_env(
-        agent_team=VIKAVOLT_TEAM,
+        agent_team=STEELIX_TEAM,
         battle_format="gen9nationaldex",
         opponent_names=["regigigas"],
         opponent_generator=None,
@@ -20,7 +21,6 @@ def debug_run(n_steps=20):
         action = np.int64(6)
         obs, reward, terminated, truncated, _ = env.step(action)
 
-        print(f"\n[step {step}]")
 
         if terminated or truncated:
             obs, _ = env.reset()

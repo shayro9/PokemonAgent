@@ -182,7 +182,6 @@ class StatBelief:
         self,
         *,
         damage_fraction: float,
-        opp_max_hp: float,
         my_attack: float,
         opp_def_boost: float = 1.0, # opponent's Def/SpD boost multiplier
         base_power: float,
@@ -198,7 +197,6 @@ class StatBelief:
         to recover the unboosted base stat the belief tracks.
 
         :param damage_fraction: Fraction of opponent's max HP lost this turn.
-        :param opp_max_hp: Opponent's actual max HP.
         :param my_attack: Our effective attack stat after boosts.
         :param opp_def_boost: Opponent's defense boost multiplier (from ``boost_multiplier()``).
         :param base_power: Move base power.
@@ -208,10 +206,11 @@ class StatBelief:
         :param extra_noise_frac: Additional fractional noise.
         :returns: Updated ``StatBelief``.
         """
-        if opp_max_hp <= 0:
+        opp_hp_est = self.mean[HP_IDX]
+        if opp_hp_est <= 0:
             return self
 
-        d_raw = damage_fraction * opp_max_hp
+        d_raw = damage_fraction * opp_hp_est
         if d_raw <= 2:
             return self
 
