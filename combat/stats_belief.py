@@ -179,16 +179,16 @@ class StatBelief:
         return self._gaussian_update_single(stat_idx, a_est, obs_var)
 
     def update_from_damage_dealt(
-        self,
-        *,
-        damage_fraction: float,
-        my_attack: float,
-        opp_def_boost: float = 1.0, # opponent's Def/SpD boost multiplier
-        base_power: float,
-        move_is_special: bool,
-        level_factor: float,
-        modifier: float = 1.0,
-        extra_noise_frac: float = 0.0,
+            self,
+            *,
+            damage_fraction: float,
+            my_attack: float,
+            opp_def_boost: float = 1.0,
+            base_power: float,
+            move_is_special: bool,
+            level_factor: float,
+            modifier: float = 1.0,
+            extra_noise_frac: float = 0.0,
     ) -> StatBelief:
         """Update belief on opp Def (physical) or SpD (special) from damage dealt.
 
@@ -218,21 +218,37 @@ class StatBelief:
         if modifier <= 0 or (d_raw / modifier) <= 2:
             return self
 
-        # Effective defense inferred from damage formula
+        def_idx = SPD_IDX if move_is_special else DEF_IDX
+
+        # --- Update Def / SpD ---
         def_eff = numer / ((d_raw / modifier - 2) * 50.0)
         if def_eff <= 0:
             return self
 
-        # Convert effective → base by removing the opponent's boost
         def_est = def_eff / opp_def_boost
         if def_est <= 0:
             return self
 
         noise_frac = DAMAGE_OBS_NOISE_FRAC + extra_noise_frac
         obs_var = (noise_frac * def_est) ** 2
+        belief = self._gaussian_update_single(def_idx, def_est, obs_var)
 
-        stat_idx = SPD_IDX if move_is_special else DEF_IDX
-        return self._gaussian_update_single(stat_idx, def_est, obs_var)
+        # --- Infer HP using the updated def mean ---
+        # Now that def is tighter, recompute d_raw with the posterior def mean.
+        opp_def_mean_eff = float(belief.mean[def_idx]) * opp_def_boost
+        if opp_def_mean_eff <= 0:
+            return belief
+
+        d_raw_est = (level_factor * base_power * my_attack / opp_def_mean_eff / 50.0 + 2.0) * modifier
+        if d_raw_est <= 0 or damage_fraction <= 0:
+            return belief
+
+        hp_est = d_raw_est / damage_fraction
+        def_std_frac = float(belief.var[def_idx] ** 0.5) / max(float(belief.mean[def_idx]), 1.0)
+        hp_obs_var = ((DAMAGE_OBS_NOISE_FRAC + extra_noise_frac + def_std_frac) * hp_est) ** 2
+        belief = belief._gaussian_update_single(HP_IDX, hp_est, hp_obs_var)
+
+        return belief
 
     def update_from_speed_order(
         self,
