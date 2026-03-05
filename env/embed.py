@@ -17,14 +17,10 @@ TRACKED_EFFECTS = [Effect.CONFUSION, Effect.MUST_RECHARGE, Effect.ENCORE]
 WEATHERS = tuple(Weather)
 
 MAX_MOVES = 4
-MOVE_EMBED_LEN = 38
+MOVE_EMBED_LEN = 39
 
 
 def _iter_scaled_boosts(boosts: dict | None):
-    """Yield normalized stat-boost values in canonical key order.
-    
-    :param boosts: Optional mapping of boost names to stage values.
-    :returns: An iterator of scaled float boost values."""
     if not boosts:
         for _ in BOOST_KEYS:
             yield 0.0
@@ -34,44 +30,38 @@ def _iter_scaled_boosts(boosts: dict | None):
 
 
 def _scale_01(x: float, max_x: float = 1) -> float:
-    """Scale a value into the inclusive ``[0, 1]`` range.
-    
-    :param x: Input value.
-    :param max_x: Maximum absolute value used for normalization.
-    :returns: The normalized and clamped value."""
     return min(1.0, max(0.0, x / max_x)) if max_x > 0 else 0.0
 
 
 def _scale_m11(x: float, max_abs: float) -> float:
-    """Scale a value into the inclusive ``[-1, 1]`` range.
-    
-    :param x: Input value.
-    :param max_abs: Maximum absolute value used for normalization.
-    :returns: The normalized and clamped value."""
     return max(-1.0, min(1.0, x / max_abs)) if max_abs > 0 else 0.0
 
 
 def _safe_int(move, key, default=0):
-    """Safely read an integer field from a move entry dictionary.
-    
-    :param move: Move object containing optional ``entry`` metadata.
-    :param key: Field name to read from ``entry``.
-    :param default: Value returned when the field is unavailable.
-    :returns: The extracted integer value."""
     entry = getattr(move, "entry", None)
     if isinstance(entry, dict):
         return int(entry.get(key, 0) or 0)
     return default
 
 
-def embed_move(move: Move, opp_types, my_types, gen: int) -> np.ndarray:
+def embed_move(
+    move: Move,
+    opp_types,
+    my_types,
+    gen: int,
+    damage_fraction: float = 0.0,
+) -> np.ndarray:
     """Encode a move into a fixed-length numeric feature vector.
-    
+
     :param move: Move instance to embed.
     :param opp_types: Defender typing iterable.
     :param my_types: Attacker typing iterable.
     :param gen: Battle generation number.
-    :returns: A NumPy vector with ``MOVE_EMBED_LEN`` float features."""
+    :param damage_fraction: Pre-computed expected damage as a fraction of
+        the opponent's max HP in ``[0, 1]``.  Pass ``0.0`` (default) when
+        the estimate is unavailable (e.g. for opponent moves).
+    :returns: A NumPy vector with ``MOVE_EMBED_LEN`` float features.
+    """
     vec: List[float] = list()
 
     # Scalars
@@ -121,32 +111,23 @@ def embed_move(move: Move, opp_types, my_types, gen: int) -> np.ndarray:
     vec.append(_scale_01(min_hits, 5.0))
     vec.append(_scale_01(max_hits, 5.0))
 
+    # Expected damage fraction — pre-computed by caller from StatBelief
+    vec.append(_scale_01(damage_fraction, 1.0))
+
     result = np.array(vec, dtype=np.float32)
     assert len(result) == MOVE_EMBED_LEN, f"embed_move: expected {MOVE_EMBED_LEN}, got {len(result)}"
     return result
 
 
 def embed_status(status) -> np.ndarray:
-    """One-hot encode a battle status value.
-    
-    :param status: Status value to encode.
-    :returns: A NumPy one-hot vector over known status values."""
     return np.array([1.0 if status == s else 0.0 for s in MOVE_STATUSES], dtype=np.float32)
 
 
 def embed_effects(effects) -> np.ndarray:
-    """One-hot encode a battle effect vector
-
-    :param effects: List of battle effects to encode
-    :returns: A NumPy one-hot vector over tracked effect values."""
     return np.array([int(e in effects) for e in TRACKED_EFFECTS])
 
-def embed_weather(weather) -> np.ndarray:
-    """One-hot encode a battle weather vector
 
-    :param weather: Weather to encode
-    :returns: A NumPy one-hot vector over tracked weather values.
-    """
+def embed_weather(weather) -> np.ndarray:
     return np.array([1.0 if weather == w else 0.0 for w in WEATHERS], dtype=np.float32)
 
 
@@ -156,14 +137,6 @@ def calc_types_vector(
     gen: int,
     opp_tera_mode: bool = False,
 ) -> np.ndarray:
-    """Encode pairwise attacker-vs-defender type interactions.
-
-    :param my_types: Attacker type list.
-    :param opp_types: Defender type list.
-    :param gen: Battle generation number.
-    :param opp_tera_mode: if on return only tera vs my types
-    :returns: Shape (4,) base matchup vector, or shape (2,) tera matchup vector.
-    """
     my_types = (list(my_types) + [None])[:2]
     type_chart = type_chart_for_gen(gen)
 

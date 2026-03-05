@@ -13,11 +13,12 @@ from env.embed import (
     MOVE_EMBED_LEN,
     MOVE_STATUSES, TRACKED_EFFECTS,
 )
+from combat.damage_estimate import estimate_move_damage_fraction
+from combat.stats_belief import StatBelief
 
 # Update this constant whenever embed_battle changes.
-# opp_stat_belief shrank from 12 to 10 (HP removed from belief).
-OBS_SIZE = 373
-CONTEXT_BEFORE_MY_MOVES = 68
+OBS_SIZE = 381
+CONTEXT_BEFORE_MY_MOVES = 61
 CONTEXT_AFTER_OPP_MOVES = 1
 
 
@@ -31,17 +32,17 @@ class BattleState:
     weather: np.ndarray            # (9)
 
     my_hp: float                   # (1)
-    my_stats: np.ndarray           # (6),  base stats normalised
-    my_boosts: np.ndarray          # (7)  in-battle boosts normalised
-    my_status: np.ndarray          # (7)  one-hot Status
-    my_effects: np.ndarray         # (3)  one-hot Tracked effects
+    my_stats: np.ndarray           # (6)
+    my_boosts: np.ndarray          # (7)
+    my_status: np.ndarray          # (7)
+    my_effects: np.ndarray         # (3)
     my_stab: float                 # (1)
 
     opp_hp: float                  # (1)
-    opp_stat_belief: np.ndarray    # (10,)  [mean/STAT_NORM ×5, std/STAT_NORM ×5]  (no HP)
-    opp_boosts: np.ndarray         # (7,)
-    opp_status: np.ndarray         # (7,)
-    opp_effects: np.ndarray        # (3)  one-hot Tracked effects
+    opp_stat_belief: np.ndarray    # (10)  [mean/STAT_NORM ×5, std/STAT_NORM ×5]
+    opp_boosts: np.ndarray         # (7)
+    opp_status: np.ndarray         # (7)
+    opp_effects: np.ndarray        # (3)
     opp_preparing: float           # 0 or 1
     opp_stab: float                # (1)
     opp_is_terastallized: float    # 0 or 1
@@ -81,18 +82,37 @@ class BattleState:
         return state
 
     @classmethod
-    def from_battle(cls, battle, opp_protect_belief: float = 1.0, opp_stat_belief: np.ndarray | None = None) -> "BattleState":
-        """Build a BattleState from a poke-env battle object."""
-        my = battle.active_pokemon
+    def from_battle(
+        cls,
+        battle,
+        opp_protect_belief: float = 1.0,
+        opp_stat_belief: np.ndarray | None = None,
+        stat_belief_obj: StatBelief | None = None,
+    ) -> "BattleState":
+        """Build a BattleState from a poke-env battle object.
+
+        :param battle: poke-env battle object.
+        :param opp_protect_belief: Current protect belief scalar.
+        :param opp_stat_belief: Pre-serialized 10-dim belief array for the
+            observation vector. Pass the result of ``tracker.stat_belief.to_array()``.
+        :param stat_belief_obj: The raw ``StatBelief`` object used to compute
+            per-move damage estimates.  When ``None``, damage estimates are 0.0.
+        """
+        my  = battle.active_pokemon
         opp = battle.opponent_active_pokemon
 
-        my_types = my.types
+        my_types  = my.types
         opp_types = opp.types
 
         # --- moves ---
         my_moves = np.zeros(MAX_MOVES * MOVE_EMBED_LEN, dtype=np.float32)
         for i, move in enumerate(battle.available_moves[:MAX_MOVES]):
-            emb = embed_move(move, opp_types, my_types, battle.gen)
+            dmg = (
+                estimate_move_damage_fraction(move, battle, stat_belief_obj)
+                if stat_belief_obj is not None
+                else 0.0
+            )
+            emb = embed_move(move, opp_types, my_types, battle.gen, damage_fraction=dmg)
             my_moves[i * MOVE_EMBED_LEN: (i + 1) * MOVE_EMBED_LEN] = emb
 
         opp_moves = np.zeros(MAX_MOVES * MOVE_EMBED_LEN, dtype=np.float32)
@@ -130,6 +150,8 @@ class BattleState:
         """Human-readable breakdown matching to_array() layout. Useful for debugging."""
         arr = self.to_array()
         layout = [
+            ("turn", 1),
+            ("weather", 9),
             ("my_hp", 1),
             ("my_stats", 6),
             ("my_boosts", 7),
@@ -144,36 +166,43 @@ class BattleState:
             ("opp_preparing", 1),
             ("opp_stab", 1),
             ("opp_is_terastallized", 1),
-            ("opp_tera_multiplier", 1),
+            ("opp_tera_multiplier", 2),
         ]
         move_block = [
-            ("scalars", 5),
-            ("category", len(list(__import__('poke_env.battle.move_category', fromlist=['MoveCategory']).MoveCategory))),
+            ("bp", 1),
+            ("accuracy", 1),
+            ("pp", 1),
+            ("priority", 1),
+            ("heal", 1),
+            ("crit_ratio", 1),
+            ("category", len(MOVE_CATEGORIES := tuple(__import__(
+                'poke_env.battle.move_category', fromlist=['MoveCategory']).MoveCategory))),
             ("is_protect", 1),
             ("breaks_protect", 1),
-            ("multiplier", 1),
-            ("is_tera", 1),
+            ("type_mult", 1),
+            ("is_stab", 1),
             ("status", len(MOVE_STATUSES)),
             ("boosts_target", 7),
             ("boosts_self", 7),
             ("recoil_drain", 2),
             ("multi_hit", 2),
+            ("damage_fraction", 1),
         ]
         for i in range(1, MAX_MOVES + 1):
             layout.extend([(f"move{i}.{name}", size) for name, size in move_block])
-
         for i in range(1, MAX_MOVES + 1):
             layout.extend([(f"opp_move{i}.{name}", size) for name, size in move_block])
+        layout.append(("opp_protect_belief", 1))
 
         lines = ["[BattleState] OBSERVATION BREAKDOWN"]
         idx = 0
         for name, size in layout:
             chunk = arr[idx: idx + size]
             if size == 1:
-                lines.append(f"  {name:35}: {chunk[0]: .3f}")
+                lines.append(f"  {name:40}: {chunk[0]: .3f}")
             else:
                 fmt = ", ".join(f"{x: .3f}" for x in chunk)
-                lines.append(f"  {name:35}: [{fmt}]")
+                lines.append(f"  {name:40}: [{fmt}]")
             idx += size
 
         lines.append(f"\n  TOTAL DIMENSIONS: {len(arr)}")

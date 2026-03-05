@@ -5,7 +5,7 @@ def log_fallback(battle) -> None:
     path = f"data/fallback_logs/{battle.battle_tag.replace('|', '_')}_turn{battle.turn}.log"
 
     with open(path, "w") as f:
-        for msg in battle.observations:
-            f.write(str(msg) + "\n")
+        for turn, msg in battle.observations:
+            f.write("turn: " + str(turn) + " \n" + msg + "\n")
 
     print(f"[FALLBACK LOG] {path}")

@@ -132,6 +132,7 @@ class StatBelief:
         *,
         damage_fraction: float,
         my_max_hp: float,
+        my_defense: float,
         opp_atk_boost: float = 1.0, # opponent's Atk/SpA boost multiplier
         base_power: float,
         move_is_special: bool,
@@ -182,6 +183,7 @@ class StatBelief:
         *,
         damage_fraction: float,
         opp_max_hp: float,
+        my_attack: float,
         opp_def_boost: float = 1.0, # opponent's Def/SpD boost multiplier
         base_power: float,
         move_is_special: bool,

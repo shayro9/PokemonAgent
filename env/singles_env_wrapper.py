@@ -121,6 +121,7 @@ class PokemonRLWrapper(SinglesEnv):
             battle,
             opp_protect_belief=tracker.protect_belief,
             opp_stat_belief=stat_vec,
+            stat_belief_obj=tracker.stat_belief,
         ).to_array()
 
     # ------------------------------------------------------------------
