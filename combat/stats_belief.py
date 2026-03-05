@@ -53,7 +53,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, replace
-from typing import Callable, Protocol
+from typing import Protocol
 
 import numpy as np
 
@@ -65,34 +65,30 @@ STAT_NORM: float = 512.0
 STAT_KEYS = ("atk", "def", "spa", "spd", "spe")
 N_STATS = len(STAT_KEYS)          # 5
 
-# Indices into the stat vector
 ATK_IDX, DEF_IDX, SPA_IDX, SPD_IDX, SPE_IDX = range(N_STATS)
 
 # Assumed IV / EV defaults for the prior mean (standard competitive assumptions)
 PRIOR_IV: int = 31
 PRIOR_EV: int = 84
-
 # Prior standard deviation expressed as a fraction of the mean stat value.
 PRIOR_STD_FRAC: float = 0.20
-
 # Observation noise for the damage-based Gaussian likelihood.
 DAMAGE_OBS_NOISE_FRAC: float = 0.12
 
 # Multipliers used for the speed-order soft observation.
 SPEED_RATIO_FIRST: float = 0.80
 SPEED_RATIO_SECOND: float = 1.20
-SPEED_OBS_VAR_FRAC: float = 0.25  # as a fraction of our_spe
+SPEED_OBS_VAR_FRAC: float = 0.25
 
 # Minimum variance floor to prevent posterior collapse
 MIN_VAR: float = (5.0 / STAT_NORM) ** 2
 
 
 # ---------------------------------------------------------------------------
-# Protocol / type alias for prior functions
+# Protocol
 # ---------------------------------------------------------------------------
 
 class StatPriorFn(Protocol):
-    """Callable that builds an initial ``StatBelief`` for an opponent Pokémon."""
     def __call__(self, opp, gen: int) -> "StatBelief": ...
 
 
@@ -116,10 +112,6 @@ class StatBelief:
     mean: np.ndarray   # (5,)  raw stat units
     var:  np.ndarray   # (5,)  raw stat units²
 
-    # ------------------------------------------------------------------
-    # Output
-    # ------------------------------------------------------------------
-
     def to_array(self) -> np.ndarray:
         """Return a 10-dim normalized array ``[mean/STAT_NORM ×5, std/STAT_NORM ×5]``.
 
@@ -140,20 +132,42 @@ class StatBelief:
         *,
         damage_fraction: float,
         my_max_hp: float,
-        my_defense: float,
+        opp_atk_boost: float = 1.0, # opponent's Atk/SpA boost multiplier
         base_power: float,
         move_is_special: bool,
         level_factor: float,
         modifier: float = 1.0,
         extra_noise_frac: float = 0.0,
     ) -> StatBelief:
-        """Update belief on opp Atk (physical) or SpA (special) from damage we received."""
+        """Update belief on opp Atk (physical) or SpA (special) from damage received.
+
+        ``my_defense`` should already be the *effective* (boosted) value.
+        The inferred effective opponent attack is divided by ``opp_atk_boost``
+        to recover the unboosted base stat the belief tracks.
+
+        :param damage_fraction: Fraction of our max HP lost this turn.
+        :param my_max_hp: Our max HP stat (raw).
+        :param my_defense: Our effective defense stat after boosts.
+        :param opp_atk_boost: Opponent's attack boost multiplier (from ``boost_multiplier()``).
+        :param base_power: Move base power.
+        :param move_is_special: ``True`` for SpA/SpD inference.
+        :param level_factor: ``2 * opp_level / 5 + 2``.
+        :param modifier: STAB, type, weather, screens, crit product.
+        :param extra_noise_frac: Additional fractional noise.
+        :returns: Updated ``StatBelief``.
+        """
         d_raw = damage_fraction * my_max_hp
         denom = level_factor * base_power
         if denom <= 0 or modifier <= 0 or (d_raw / modifier) <= 2:
             return self
 
-        a_est = (d_raw / modifier - 2) * 50.0 * my_defense / denom
+        # Effective attack inferred from damage formula
+        a_eff = (d_raw / modifier - 2) * 50.0 * my_defense / denom
+        if a_eff <= 0:
+            return self
+
+        # Convert effective → base by removing the opponent's boost
+        a_est = a_eff / opp_atk_boost
         if a_est <= 0:
             return self
 
@@ -168,26 +182,28 @@ class StatBelief:
         *,
         damage_fraction: float,
         opp_max_hp: float,
-        my_attack: float,
+        opp_def_boost: float = 1.0, # opponent's Def/SpD boost multiplier
         base_power: float,
         move_is_special: bool,
         level_factor: float,
         modifier: float = 1.0,
         extra_noise_frac: float = 0.0,
     ) -> StatBelief:
-        """Update belief on opp Def (physical) or SpD (special) from damage we dealt.
+        """Update belief on opp Def (physical) or SpD (special) from damage dealt.
 
-        Uses ``opp_max_hp`` read directly from the battle object rather than
-        estimating it from the belief.
+        ``my_attack`` should already be the *effective* (boosted) value.
+        The inferred effective opponent defense is divided by ``opp_def_boost``
+        to recover the unboosted base stat the belief tracks.
 
         :param damage_fraction: Fraction of opponent's max HP lost this turn.
-        :param opp_max_hp: Opponent's actual max HP (from ``battle.opponent_active_pokemon.max_hp``).
-        :param my_attack: Our relevant attack stat (Atk or SpA, raw).
+        :param opp_max_hp: Opponent's actual max HP.
+        :param my_attack: Our effective attack stat after boosts.
+        :param opp_def_boost: Opponent's defense boost multiplier (from ``boost_multiplier()``).
         :param base_power: Move base power.
-        :param move_is_special: ``True`` for SpA/SpD, ``False`` for Atk/Def.
+        :param move_is_special: ``True`` for SpA/SpD inference.
         :param level_factor: ``2 * our_level / 5 + 2``.
-        :param modifier: Product of STAB, type multiplier, etc.
-        :param extra_noise_frac: Additional fractional noise for uncertain mods.
+        :param modifier: STAB, type, weather, screens, crit product.
+        :param extra_noise_frac: Additional fractional noise.
         :returns: Updated ``StatBelief``.
         """
         if opp_max_hp <= 0:
@@ -200,7 +216,14 @@ class StatBelief:
         numer = level_factor * base_power * my_attack
         if modifier <= 0 or (d_raw / modifier) <= 2:
             return self
-        def_est = numer / ((d_raw / modifier - 2) * 50.0)
+
+        # Effective defense inferred from damage formula
+        def_eff = numer / ((d_raw / modifier - 2) * 50.0)
+        if def_eff <= 0:
+            return self
+
+        # Convert effective → base by removing the opponent's boost
+        def_est = def_eff / opp_def_boost
         if def_est <= 0:
             return self
 
@@ -216,7 +239,22 @@ class StatBelief:
         our_spe: float,
         we_moved_first: bool,
     ) -> StatBelief:
-        """Update belief on opp Spe from the observed move-order this turn."""
+        """Update belief on opp Spe from observed move order.
+
+        ``our_spe`` should be the *effective* (boosted) value so the inferred
+        opponent speed estimate is also in effective units.  Since opponent
+        speed boosts are tracked in ``opp.boosts``, the caller in
+        ``stat_belief_updates.py`` should un-boost before passing here if
+        the belief is meant to track base speed.
+
+        In practice, speed boosts are rare and short-lived, so we accept a
+        small inaccuracy here rather than adding noisy boost-reversal logic
+        for an observation that already has high variance.
+
+        :param our_spe: Our effective Speed stat after boosts.
+        :param we_moved_first: ``True`` if we acted before the opponent.
+        :returns: Updated ``StatBelief``.
+        """
         ratio = SPEED_RATIO_FIRST if we_moved_first else SPEED_RATIO_SECOND
         spe_obs = our_spe * ratio
         obs_var = (our_spe * SPEED_OBS_VAR_FRAC) ** 2
@@ -227,7 +265,6 @@ class StatBelief:
     # ------------------------------------------------------------------
 
     def describe(self) -> str:
-        """Return a human-readable table of mean ± std for each stat."""
         lines = ["[StatBelief]"]
         for i, key in enumerate(STAT_KEYS):
             std = math.sqrt(max(self.var[i], MIN_VAR))
@@ -238,16 +275,10 @@ class StatBelief:
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _gaussian_update_single(
-        self,
-        idx: int,
-        obs_mean: float,
-        obs_var: float,
-    ) -> "StatBelief":
         """Conjugate Gaussian-Gaussian update for one stat dimension."""
-        prior_var = float(self.var[idx])
-        prior_var = max(prior_var, MIN_VAR)
-        obs_var   = max(obs_var,   MIN_VAR)
+    def _gaussian_update_single(self, idx: int, obs_mean: float, obs_var: float) -> "StatBelief":
+        prior_var = max(float(self.var[idx]), MIN_VAR)
+        obs_var   = max(obs_var, MIN_VAR)
 
         precision_post = 1.0 / prior_var + 1.0 / obs_var
         post_var  = 1.0 / precision_post
@@ -298,34 +329,13 @@ def flat_uninformative_prior(_opp, _gen: int) -> StatBelief:
 # Public factory
 # ---------------------------------------------------------------------------
 
-def build_stat_belief(
-    opp,
-    gen: int,
-    prior_fn: StatPriorFn = base_stat_level_prior,
-) -> StatBelief:
-    """Build the initial stat belief for an opponent Pokémon.
-
-    :param opp: poke-env Pokémon object.
-    :param gen: Battle generation number.
-    :param prior_fn: Callable matching ``StatPriorFn``.
-    :returns: Initial ``StatBelief`` from the chosen prior.
-    """
+def build_stat_belief(opp, gen: int, prior_fn: StatPriorFn = base_stat_level_prior) -> StatBelief:
     return prior_fn(opp, gen)
 
 
 def level_factor(level: int) -> float:
-    """Return the level scaling term used in the damage formula.
-
-    :param level: Pokémon level.
-    :returns: ``2 * level / 5 + 2`` as a float.
-    """
     return 2.0 * level / 5.0 + 2.0
 
 
-# ---------------------------------------------------------------------------
-# Stat formula helpers (private)
-# ---------------------------------------------------------------------------
-
 def _stat_formula(base: int, level: int) -> float:
-    """Standard non-HP stat formula with assumed defaults (IV=31, EV=84, nature=1.0)."""
     return math.floor((2 * base + PRIOR_IV + math.floor(PRIOR_EV / 4)) * level / 100 + 5)

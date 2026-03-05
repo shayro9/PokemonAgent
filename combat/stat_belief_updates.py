@@ -16,7 +16,7 @@ from __future__ import annotations
 from poke_env.battle import MoveCategory
 
 from combat.stats_belief import StatBelief, build_stat_belief, level_factor
-from combat.combat_utils import calc_modifier
+from combat.combat_utils import calc_modifier, boost_multiplier
 from combat.event_parser import we_moved_first_from_events
 
 
@@ -41,13 +41,13 @@ def update_stat_belief(
     :returns: Updated ``StatBelief``.
     """
     opp = battle.opponent_active_pokemon
-    me = battle.active_pokemon
+    me  = battle.active_pokemon
 
     if belief is None:
         return build_stat_belief(opp, battle.gen)
 
     opp_lf = level_factor(opp.level)
-    my_lf = level_factor(me.level)
+    my_lf  = level_factor(me.level)
     belief = _update_from_damage_dealt(belief, battle, tracker, my_lf)
     belief = _update_from_damage_received(belief, battle, tracker, opp_last_move, opp_lf)
     belief = _update_from_speed_order(belief, battle)
@@ -55,7 +55,7 @@ def update_stat_belief(
 
 
 # ---------------------------------------------------------------------------
-# Private helpers — one per evidence source
+# Private helpers
 # ---------------------------------------------------------------------------
 
 def _update_from_damage_dealt(
@@ -66,7 +66,10 @@ def _update_from_damage_dealt(
 ) -> StatBelief:
     """Update opp Def or SpD from damage we dealt last turn.
 
-    Uses ``opp.max_hp`` directly from the battle object — no HP belief needed.
+    Boost adjustments applied here:
+    - Our effective Atk/SpA  = base stat × our boost multiplier
+    - Inferred opp effective Def/SpD is divided by opp's boost multiplier
+      to recover the unboosted base stat the belief tracks.
 
     :param belief: Current belief.
     :param battle: poke-env battle object.
@@ -86,7 +89,7 @@ def _update_from_damage_dealt(
     if opp_hp_delta <= 0.01:
         return belief
 
-    me = battle.active_pokemon
+    me  = battle.active_pokemon
     opp = battle.opponent_active_pokemon
 
     opp_max_hp = float(opp.max_hp or 0)
@@ -95,14 +98,23 @@ def _update_from_damage_dealt(
 
     is_special = (my_move.category == MoveCategory.SPECIAL)
     atk_key = "spa" if is_special else "atk"
-    my_atk = float(me.stats[atk_key])
+    def_key = "spd" if is_special else "def"
+
+    # Our effective attack includes our boost
+    my_atk_base    = float(me.stats[atk_key])
+    my_atk_boost   = boost_multiplier(me.boosts.get(atk_key, 0))
+    my_atk_eff     = my_atk_base * my_atk_boost
+
+    # Opp's boost — used to convert effective def back to base
+    opp_def_boost  = boost_multiplier(opp.boosts.get(def_key, 0))
 
     modifier, extra_noise_frac = calc_modifier(my_move, me, opp, battle, True)
 
     return belief.update_from_damage_dealt(
         damage_fraction=opp_hp_delta,
         opp_max_hp=opp_max_hp,
-        my_attack=my_atk,
+        my_attack=my_atk_eff,           # boosted effective attack
+        opp_def_boost=opp_def_boost,    # passed through so belief can un-boost
         base_power=bp,
         move_is_special=is_special,
         level_factor=lf,
@@ -119,6 +131,11 @@ def _update_from_damage_received(
     lf: float,
 ) -> StatBelief:
     """Update opp Atk or SpA from damage we received last turn.
+
+    Boost adjustments applied here:
+    - Our effective Def/SpD  = base stat × our boost multiplier
+    - Inferred opp effective Atk/SpA is divided by opp's boost multiplier
+      to recover the unboosted base stat the belief tracks.
 
     :param belief: Current belief.
     :param battle: poke-env battle object.
@@ -138,20 +155,30 @@ def _update_from_damage_received(
     if bp <= 0:
         return belief
 
-    me = battle.active_pokemon
+    me  = battle.active_pokemon
     opp = battle.opponent_active_pokemon
 
     is_special = (opp_last_move.category == MoveCategory.SPECIAL)
     def_key = "spd" if is_special else "def"
-    my_def    = float(me.stats[def_key])
-    my_max_hp = float(me.stats["hp"])
+    atk_key = "spa" if is_special else "atk"
+
+    # Our effective defense includes our boost
+    my_def_base   = float(me.stats[def_key])
+    my_def_boost  = boost_multiplier(me.boosts.get(def_key, 0))
+    my_def_eff    = my_def_base * my_def_boost
+
+    my_max_hp     = float(me.stats["hp"])
+
+    # Opp's boost — used to convert effective atk back to base
+    opp_atk_boost = boost_multiplier(opp.boosts.get(atk_key, 0))
 
     modifier, extra_noise_frac = calc_modifier(opp_last_move, opp, me, battle, False)
 
     return belief.update_from_damage_received(
         damage_fraction=my_hp_delta,
         my_max_hp=my_max_hp,
-        my_defense=my_def,
+        my_defense=my_def_eff,          # boosted effective defense
+        opp_atk_boost=opp_atk_boost,    # passed through so belief can un-boost
         base_power=bp,
         move_is_special=is_special,
         level_factor=lf,
@@ -164,16 +191,17 @@ def _update_from_speed_order(
     belief: StatBelief,
     battle,
 ) -> StatBelief:
-    """Update opp Spe from turn-order evidence parsed directly from events.
+    """Update opp Spe from turn-order evidence parsed directly from events."""
+    # Speed boosts affect turn order — apply our boost to the observation too
+    our_spe_base  = float(battle.active_pokemon.stats["spe"])
+    our_spe_boost = boost_multiplier(battle.active_pokemon.boosts.get("spe", 0))
+    our_spe_eff   = our_spe_base * our_spe_boost
 
-    :param belief: Current belief.
-    :param battle: poke-env battle object.
-    :returns: Updated belief, or the original if order is ambiguous.
-    """
-    our_spe = float(battle.active_pokemon.stats["spe"])
     we_moved_first = we_moved_first_from_events(battle)
-
     if we_moved_first is None:
         return belief
 
-    return belief.update_from_speed_order(our_spe=our_spe, we_moved_first=we_moved_first)
+    return belief.update_from_speed_order(
+        our_spe=our_spe_eff,
+        we_moved_first=we_moved_first,
+    )
