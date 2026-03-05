@@ -2,7 +2,7 @@ import numpy as np
 
 from typing import List
 
-from poke_env.battle import Move
+from poke_env.battle import Move, Weather
 from poke_env.battle.pokemon_type import PokemonType
 from poke_env.battle.move_category import MoveCategory
 from poke_env.battle.status import Status
@@ -14,6 +14,7 @@ BOOST_KEYS = ("atk", "def", "spa", "spd", "spe", "accuracy", "evasion")
 MOVE_CATEGORIES = tuple(MoveCategory)
 MOVE_STATUSES = tuple(Status)
 TRACKED_EFFECTS = [Effect.CONFUSION, Effect.MUST_RECHARGE, Effect.ENCORE]
+WEATHERS = tuple(Weather)
 
 MAX_MOVES = 4
 MOVE_EMBED_LEN = 38
@@ -139,6 +140,14 @@ def embed_effects(effects) -> np.ndarray:
     :param effects: List of battle effects to encode
     :returns: A NumPy one-hot vector over tracked effect values."""
     return np.array([int(e in effects) for e in TRACKED_EFFECTS])
+
+def embed_weather(weather) -> np.ndarray:
+    """One-hot encode a battle weather vector
+
+    :param weather: Weather to encode
+    :returns: A NumPy one-hot vector over tracked weather values.
+    """
+    return np.array([1.0 if weather == w else 0.0 for w in WEATHERS], dtype=np.float32)
 
 
 def calc_types_vector(

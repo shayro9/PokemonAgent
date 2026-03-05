@@ -7,6 +7,7 @@ from env.embed import (
     embed_move,
     embed_status,
     embed_effects,
+    embed_weather,
     calc_types_vector,
     MAX_MOVES,
     MOVE_EMBED_LEN,
@@ -14,8 +15,8 @@ from env.embed import (
 )
 
 # Update this constant whenever embed_battle changes.
-OBS_SIZE = 365
-CONTEXT_BEFORE_MY_MOVES = 60
+OBS_SIZE = 375
+CONTEXT_BEFORE_MY_MOVES = 61
 CONTEXT_AFTER_OPP_MOVES = 1
 
 
@@ -25,6 +26,9 @@ class BattleState:
     Structured representation of a single battle observation.
     Call .to_array() to get the flat np.ndarray passed to the model.
     """
+    turn: float                    # (1)
+    weather: np.ndarray            # (9)
+
     my_hp: float                   # (1)
     my_stats: np.ndarray           # (6),  base stats normalised
     my_boosts: np.ndarray          # (7)  in-battle boosts normalised
@@ -51,6 +55,8 @@ class BattleState:
 
     def to_array(self) -> np.ndarray:
         state = np.concatenate([
+            [self.turn],
+            self.weather,
             [self.my_hp],
             self.my_stats,
             self.my_boosts,
@@ -105,6 +111,8 @@ class BattleState:
         weight_bucket[bucket] = 1.0
 
         return cls(
+            turn=battle.turn / 30.0,
+            weather=embed_weather(battle.weather),
             my_hp=my.current_hp_fraction,
             my_stats=np.minimum(np.array(list(my.stats.values())) / 512.0, 1.0),
             my_boosts=np.array(list(my.boosts.values())) / 6.0,
