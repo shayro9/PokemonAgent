@@ -1,9 +1,8 @@
 """
 combat/stat_belief.py
 =====================
-Gaussian belief system over an opponent's five in-battle stats
-(atk, def, spa, spd, spe).  HP is excluded because it can be read
-directly from ``battle.opponent_active_pokemon.max_hp``.
+Gaussian belief system over an opponent's six in-battle stats
+(hp, atk, def, spa, spd, spe).
 
 Design highlights
 ------------
@@ -13,17 +12,18 @@ Design highlights
 * **Independent Bayesian updates** — each stat dimension is updated with a
   standard conjugate Gaussian-Gaussian posterior, keeping the model tractable
   while still propagating uncertainty correctly.
-* **Model-ready output** — ``to_array()`` returns a normalised 10-dim array
-  ``[mean/STAT_NORM ×5, std/STAT_NORM ×5]``
+* **Model-ready output** — ``to_array()`` returns a normalised 12-dim array
+  ``[mean/STAT_NORM ×6, std/STAT_NORM ×6]``
 
 Stat order
 -----------------
     INDEX   STAT
-      0     atk
-      1     def
-      2     spa
-      3     spd
-      4     spe
+      0     hp
+      1     atk
+      2     def
+      3     spa
+      4     spd
+      5     spe
 
 Damage inference math
 ---------------------
@@ -62,10 +62,10 @@ import numpy as np
 # ---------------------------------------------------------------------------
 
 STAT_NORM: float = 512.0
-STAT_KEYS = ("atk", "def", "spa", "spd", "spe")
-N_STATS = len(STAT_KEYS)          # 5
+STAT_KEYS = ("hp", "atk", "def", "spa", "spd", "spe")
+N_STATS = len(STAT_KEYS)          # 6
 
-ATK_IDX, DEF_IDX, SPA_IDX, SPD_IDX, SPE_IDX = range(N_STATS)
+HP_IDX, ATK_IDX, DEF_IDX, SPA_IDX, SPD_IDX, SPE_IDX = range(N_STATS)
 
 # Assumed IV / EV defaults for the prior mean (standard competitive assumptions)
 PRIOR_IV: int = 31
@@ -99,23 +99,23 @@ class StatPriorFn(Protocol):
 @dataclass(frozen=True)
 class StatBelief:
     """
-    Gaussian belief over an opponent's five actual in-battle stats.
+    Gaussian belief over an opponent's six actual in-battle stats.
 
     Attributes
     ----------
-    mean : np.ndarray, shape (5,)
+    mean : np.ndarray, shape (6,)
         Current posterior mean for each stat.
-    var : np.ndarray, shape (5,)
+    var : np.ndarray, shape (6,)
         Current posterior variance for each stat (must be > 0).
     """
 
-    mean: np.ndarray   # (5,)  raw stat units
-    var:  np.ndarray   # (5,)  raw stat units²
+    mean: np.ndarray   # (6,)  raw stat units
+    var:  np.ndarray   # (6,)  raw stat units²
 
     def to_array(self) -> np.ndarray:
-        """Return a 10-dim normalized array ``[mean/STAT_NORM ×5, std/STAT_NORM ×5]``.
+        """Return a 12-dim normalized array ``[mean/STAT_NORM ×6, std/STAT_NORM ×6]``.
 
-        :returns: Float32 array of shape (10,).
+        :returns: Float32 array of shape (12,).
         """
         std = np.sqrt(np.maximum(self.var, MIN_VAR))
         return np.concatenate([
@@ -309,6 +309,7 @@ def base_stat_level_prior(opp, gen: int) -> StatBelief:
     base  = opp.base_stats
 
     mean = np.array([
+        _hp_formula(base["hp"], level),
         _stat_formula(base["atk"], level),
         _stat_formula(base["def"], level),
         _stat_formula(base["spa"], level),
@@ -341,3 +342,7 @@ def level_factor(level: int) -> float:
 
 def _stat_formula(base: int, level: int) -> float:
     return math.floor((2 * base + PRIOR_IV + math.floor(PRIOR_EV / 4)) * level / 100 + 5)
+
+
+def _hp_formula(base: int, level: int) -> float:
+    return math.floor((2 * base + PRIOR_IV + math.floor(PRIOR_EV / 4)) * level / 100 + level + 10)

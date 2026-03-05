@@ -17,8 +17,8 @@ from combat.damage_estimate import estimate_move_damage_fraction
 from combat.stats_belief import StatBelief
 
 # Update this constant whenever embed_battle changes.
-OBS_SIZE = 381
-CONTEXT_BEFORE_MY_MOVES = 61
+OBS_SIZE = 383
+CONTEXT_BEFORE_MY_MOVES = 63
 CONTEXT_AFTER_OPP_MOVES = 1
 
 
@@ -39,7 +39,7 @@ class BattleState:
     my_stab: float                 # (1)
 
     opp_hp: float                  # (1)
-    opp_stat_belief: np.ndarray    # (10)  [mean/STAT_NORM ×5, std/STAT_NORM ×5]
+    opp_stat_belief: np.ndarray    # (12)  [mean/STAT_NORM ×6, std/STAT_NORM ×6]
     opp_boosts: np.ndarray         # (7)
     opp_status: np.ndarray         # (7)
     opp_effects: np.ndarray        # (3)
@@ -93,7 +93,7 @@ class BattleState:
 
         :param battle: poke-env battle object.
         :param opp_protect_belief: Current protect belief scalar.
-        :param opp_stat_belief: Pre-serialized 10-dim belief array for the
+        :param opp_stat_belief: Pre-serialized 12-dim belief array for the
             observation vector. Pass the result of ``tracker.stat_belief.to_array()``.
         :param stat_belief_obj: The raw ``StatBelief`` object used to compute
             per-move damage estimates.  When ``None``, damage estimates are 0.0.
@@ -132,7 +132,7 @@ class BattleState:
             my_stab=my.stab_multiplier / 2.0,
 
             opp_hp=opp.current_hp_fraction,
-            opp_stat_belief=opp_stat_belief if opp_stat_belief is not None else np.zeros(10, dtype=np.float32),
+            opp_stat_belief=opp_stat_belief if opp_stat_belief is not None else np.zeros(12, dtype=np.float32),
             opp_boosts=np.array(list(opp.boosts.values())) / 6.0,
             opp_status=embed_status(opp.status),
             opp_effects=embed_effects(opp.effects),
@@ -159,7 +159,7 @@ class BattleState:
             ("my_effects", len(TRACKED_EFFECTS)),
             ("my_stab", 1),
             ("opp_hp", 1),
-            ("opp_stats_belief", 10),
+            ("opp_stats_belief", 12),
             ("opp_boosts", 7),
             ("opp_status", len(MOVE_STATUSES)),
             ("opp_effects", len(TRACKED_EFFECTS)),
