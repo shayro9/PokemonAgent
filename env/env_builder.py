@@ -62,7 +62,7 @@ def build_env(
 
     unique_id = int(time.time() * 1000) % 100000
 
-    opponent_policy = MaxBasePowerPlayer(
+    opponent_policy = RandomPlayer(
         battle_format=battle_format,
         server_configuration=LocalhostServerConfiguration,
     )

@@ -17,7 +17,7 @@ from env.embed import (
 # Update this constant whenever embed_battle changes.
 # opp_stat_belief shrank from 12 to 10 (HP removed from belief).
 OBS_SIZE = 373
-CONTEXT_BEFORE_MY_MOVES = 61
+CONTEXT_BEFORE_MY_MOVES = 68
 CONTEXT_AFTER_OPP_MOVES = 1
 
 

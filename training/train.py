@@ -17,9 +17,9 @@ from .evaluation import evaluate_model, print_eval_summary, build_fixed_eval_poo
 LR = 3e-4
 LR_DECAY = 0.9
 N_STEPS = 4096
-BATCH_SIZE = 512
+BATCH_SIZE = 256
 GAMMA = 0.99
-ENT_COEF = 0.04
+ENT_COEF = 0.03
 LOG_FREQ = 500
 
 
