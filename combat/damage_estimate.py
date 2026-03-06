@@ -76,8 +76,5 @@ def estimate_move_damage_fraction(
     modifier, _ = calc_modifier(move, me, opp, battle, attacker_is_us=True)
 
     d_raw = (lf * bp * my_atk_eff / opp_def_eff / 50.0 + 2.0) * modifier
-    print(f"damage_raw for move {move.id}: (({lf} * {bp} * ({my_atk_eff} / {opp_def_eff}))/50 + 2.0) * {modifier}")
     damage_fraction = d_raw / opp_max_hp
-    print(opp_max_hp)
-    print("move id - {} Damage fraction: {}".format(move.id, damage_fraction))
     return float(min(1.0, max(0.0, damage_fraction)))

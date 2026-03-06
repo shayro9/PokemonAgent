@@ -18,7 +18,7 @@ from combat.stats_belief import StatBelief
 
 # Update this constant whenever embed_battle changes.
 OBS_SIZE = 383
-CONTEXT_BEFORE_MY_MOVES = 63
+CONTEXT_BEFORE_MY_MOVES = 70
 CONTEXT_AFTER_OPP_MOVES = 1
 
 

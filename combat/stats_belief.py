@@ -81,7 +81,7 @@ SPEED_RATIO_SECOND: float = 1.20
 SPEED_OBS_VAR_FRAC: float = 0.25
 
 # Minimum variance floor to prevent posterior collapse
-MIN_VAR: float = (5.0 / STAT_NORM) ** 2
+MIN_VAR: float = 5.0 ** 2
 
 
 # ---------------------------------------------------------------------------
@@ -121,24 +121,24 @@ class StatBelief:
         return np.concatenate([
             self.mean / STAT_NORM,
             std       / STAT_NORM,
-        ]).astype(np.float32)
+            ]).astype(np.float32)
 
     # ------------------------------------------------------------------
     # Evidence updates
     # ------------------------------------------------------------------
 
     def update_from_damage_received(
-        self,
-        *,
-        damage_fraction: float,
-        my_max_hp: float,
-        my_defense: float,
-        opp_atk_boost: float = 1.0, # opponent's Atk/SpA boost multiplier
-        base_power: float,
-        move_is_special: bool,
-        level_factor: float,
-        modifier: float = 1.0,
-        extra_noise_frac: float = 0.0,
+            self,
+            *,
+            damage_fraction: float,
+            my_max_hp: float,
+            my_defense: float,
+            opp_atk_boost: float = 1.0, # opponent's Atk/SpA boost multiplier
+            base_power: float,
+            move_is_special: bool,
+            level_factor: float,
+            modifier: float = 1.0,
+            extra_noise_frac: float = 0.0,
     ) -> StatBelief:
         """Update belief on opp Atk (physical) or SpA (special) from damage received.
 
@@ -179,16 +179,16 @@ class StatBelief:
         return self._gaussian_update_single(stat_idx, a_est, obs_var)
 
     def update_from_damage_dealt(
-        self,
-        *,
-        damage_fraction: float,
-        my_attack: float,
-        opp_def_boost: float = 1.0, # opponent's Def/SpD boost multiplier
-        base_power: float,
-        move_is_special: bool,
-        level_factor: float,
-        modifier: float = 1.0,
-        extra_noise_frac: float = 0.0,
+            self,
+            *,
+            damage_fraction: float,
+            my_attack: float,
+            opp_def_boost: float = 1.0, # opponent's Def/SpD boost multiplier
+            base_power: float,
+            move_is_special: bool,
+            level_factor: float,
+            modifier: float = 1.0,
+            extra_noise_frac: float = 0.0,
     ) -> StatBelief:
         """Update belief on opp Def (physical) or SpD (special) from damage dealt.
 
@@ -235,10 +235,10 @@ class StatBelief:
         return self._gaussian_update_single(stat_idx, def_est, obs_var)
 
     def update_from_speed_order(
-        self,
-        *,
-        our_spe: float,
-        we_moved_first: bool,
+            self,
+            *,
+            our_spe: float,
+            we_moved_first: bool,
     ) -> StatBelief:
         """Update belief on opp Spe from observed move order.
 
@@ -272,12 +272,12 @@ class StatBelief:
             lines.append(f"  {key:4s}  mean={self.mean[i]:6.1f}  std={std:5.1f}")
         return "\n".join(lines)
 
-    # ------------------------------------------------------------------
-    # Private helpers
-    # ------------------------------------------------------------------
+        # ------------------------------------------------------------------
+        # Private helpers
+        # ------------------------------------------------------------------
 
-        """Conjugate Gaussian-Gaussian update for one stat dimension."""
     def _gaussian_update_single(self, idx: int, obs_mean: float, obs_var: float) -> "StatBelief":
+        """Conjugate Gaussian-Gaussian update for one stat dimension."""
         prior_var = max(float(self.var[idx]), MIN_VAR)
         obs_var   = max(obs_var, MIN_VAR)
 

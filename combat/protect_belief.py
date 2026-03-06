@@ -100,11 +100,11 @@ def estimate_protect_attempt_prior(battle) -> float:
     """
     # Prior on reset
     if not battle:
-        return 1.0
+        return 0.25
 
     moves = list((battle.opponent_active_pokemon.moves or {}).values())
     if not moves:
-        return 1.0
+        return 0.25
 
     protect_moves = len([move for move in moves if move.is_protect_move])
 
