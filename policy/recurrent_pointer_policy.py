@@ -191,12 +191,6 @@ class LSTMFirstExtractor(nn.Module):
         attended, attn_scores = self.attn(
             lstm_out, move_h, key_padding_mask=is_padding
         )
-
-        # Rows where every move slot is padding (all-zero obs from SB3 sequence
-        # padding) produce all-inf attention scores → NaN after softmax.
-        # Replace those NaN attended vectors with zeros so the trunk can still
-        # produce finite outputs; the corresponding logits will also be zeroed
-        # and these rows are masked out by SB3's valid_mask during loss computation.
         attended = torch.nan_to_num(attended, nan=0.0)
 
         # Cache for the actor head (pointer logits).
@@ -322,56 +316,34 @@ class RecurrentPointerPolicy(RecurrentActorCriticPolicy):
 
     def _run_lstm(
         self,
-        ctx_h: torch.Tensor,           # (B, context_hidden) or (T*B, context_hidden)
-        lstm_states,                   # RNNStates or raw (h, c) tuple
-        episode_starts: torch.Tensor,  # (B,) or (T*B,) float; 1.0 = episode boundary
+        ctx_h: torch.Tensor,
+        lstm_states,
+        episode_starts: torch.Tensor,
     ) -> Tuple[torch.Tensor, RNNStates]:
-        """
-        Pass encoded context through the shared LSTM.
-
-        Handles two calling conventions from SB3:
-          - Inference  (collect_rollouts / predict_values):
-              ctx_h is (B, hidden), episode_starts is (B,)
-          - Training   (evaluate_actions):
-              ctx_h is (T*B, hidden), episode_starts is (T*B,)
-              Must loop over T so episode boundaries zero the hidden state
-              mid-sequence — a single broadcast mask is not sufficient here.
-
-        SB3 also passes a raw (h, c) tuple in some internal paths (e.g.
-        predict_values called from collect_rollouts) instead of RNNStates.
-        """
-        # Unwrap whichever state format SB3 decided to pass.
         if isinstance(lstm_states, RNNStates):
             h, c = lstm_states.pi
         else:
-            h, c = lstm_states          # raw (h, c) tuple
+            h, c = lstm_states
 
         n_envs = h.shape[1]
 
         if ctx_h.shape[0] == n_envs:
-            # ── Single-step inference path ────────────────────────────────────
-            ep_mask = (1.0 - episode_starts).view(1, -1, 1)   # (1, B, 1)
+            ep_mask = (1.0 - episode_starts).view(1, -1, 1)
             h = ep_mask * h
             c = ep_mask * c
             lstm_out, (h_n, c_n) = self.lstm_actor(ctx_h.unsqueeze(0), (h, c))
-            lstm_out = lstm_out.squeeze(0)                     # (B, lstm_hidden)
+            lstm_out = lstm_out.squeeze(0)
         else:
-            # ── Training sequence path ────────────────────────────────────────
-            # ctx_h          : (T*B, context_hidden) → (T, B, context_hidden)
-            # episode_starts : (T*B,)                → (T, B)
             seq_len = ctx_h.shape[0] // n_envs
             ctx_seq = ctx_h.reshape(seq_len, n_envs, -1)
             ep_seq  = episode_starts.reshape(seq_len, n_envs)
-
             lstm_outs = []
             for t in range(seq_len):
-                ep_mask = (1.0 - ep_seq[t]).view(1, -1, 1)    # (1, B, 1)
+                ep_mask = (1.0 - ep_seq[t]).view(1, -1, 1)
                 h = ep_mask * h
                 c = ep_mask * c
                 out, (h, c) = self.lstm_actor(ctx_seq[t].unsqueeze(0), (h, c))
-                lstm_outs.append(out.squeeze(0))               # (B, lstm_hidden)
-
-            # Reassemble to (T*B, lstm_hidden) to match the flattened obs layout.
+                lstm_outs.append(out.squeeze(0))
             lstm_out = torch.stack(lstm_outs, dim=0).reshape(seq_len * n_envs, -1)
             h_n, c_n = h, c
 
@@ -430,10 +402,6 @@ class RecurrentPointerPolicy(RecurrentActorCriticPolicy):
             MaskableCategorical,
             MaskableCategoricalDistribution,
         )
-        # Padded sequence rows (all-zero obs) can still produce NaN/inf logits
-        # even after the attention fix, e.g. from the pointer dot-product over
-        # zeroed move_hidden.  Replace them with 0.0 — these rows are excluded
-        # by SB3's valid_mask during loss computation so the values don't matter.
         logits = torch.nan_to_num(logits, nan=0.0, posinf=0.0, neginf=0.0)
         dist = MaskableCategoricalDistribution(int(self.action_space.n))   # type: ignore
         dist.distribution = MaskableCategorical(logits=logits)             # type: ignore
@@ -486,11 +454,15 @@ class RecurrentPointerPolicy(RecurrentActorCriticPolicy):
         episode_starts: torch.Tensor,
         action_masks=None,
     ):
-        action_masks, features, move_hidden, _ = self._extract_features(
+        action_masks, features, move_hidden, new_states = self._extract_features(
             obs, lstm_states, episode_starts
         )
         logits = self._build_logits(features, move_hidden)
-        return self._make_distribution(logits, action_masks)
+        dist = self._make_distribution(logits, action_masks)
+        # SB3's predict() does: distribution, lstm_states = get_distribution(...)
+        # then immediately: states = (states[0].cpu().numpy(), states[1].cpu().numpy())
+        # so it expects a plain (h, c) tensor tuple, not an RNNStates wrapper.
+        return dist, new_states.pi
 
     def predict_values(
         self,
