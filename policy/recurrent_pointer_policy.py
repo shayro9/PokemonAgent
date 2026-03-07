@@ -342,7 +342,7 @@ class RecurrentPointerPolicy(RecurrentActorCriticPolicy):
         obs: torch.Tensor,
         lstm_states: RNNStates,
         episode_starts: torch.Tensor,
-    ) -> Tuple[torch.Tensor, torch.Tensor, RNNStates]:
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, RNNStates]:
         """
         Full two-stage extraction with LSTM in the middle.
 
@@ -354,7 +354,8 @@ class RecurrentPointerPolicy(RecurrentActorCriticPolicy):
         """
         if not isinstance(obs, torch.Tensor):
             obs = torch.as_tensor(obs, device=self.device)
-        obs = obs.float()
+        mask = obs[:,-TOTAL_ACTIONS:]
+        obs = obs[:, :-TOTAL_ACTIONS].float()
 
         # Stage 1: context → ctx_h
         ctx_h = self.mlp_extractor.encode_context(obs)           # (B, context_hidden)
@@ -365,7 +366,7 @@ class RecurrentPointerPolicy(RecurrentActorCriticPolicy):
         # Stage 2: (lstm_out, moves) → features; also caches move_hidden
         features = self.mlp_extractor.attend_and_trunk(lstm_out, obs)
 
-        return features, self.mlp_extractor.move_hidden, new_states
+        return mask, features, self.mlp_extractor.move_hidden, new_states
 
     def _build_logits(
         self,
@@ -404,7 +405,7 @@ class RecurrentPointerPolicy(RecurrentActorCriticPolicy):
         deterministic: bool = False,
         action_masks=None,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, RNNStates]:
-        features, move_hidden, new_states = self._extract_features(
+        action_masks, features, move_hidden, new_states = self._extract_features(
             obs, lstm_states, episode_starts
         )
         logits   = self._build_logits(features, move_hidden)
@@ -422,7 +423,7 @@ class RecurrentPointerPolicy(RecurrentActorCriticPolicy):
         episode_starts: torch.Tensor,
         action_masks=None,
     ) -> Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]:
-        features, move_hidden, _ = self._extract_features(
+        action_masks, features, move_hidden, _ = self._extract_features(
             obs, lstm_states, episode_starts
         )
         logits   = self._build_logits(features, move_hidden)
@@ -439,7 +440,7 @@ class RecurrentPointerPolicy(RecurrentActorCriticPolicy):
         episode_starts: torch.Tensor,
         action_masks=None,
     ):
-        features, move_hidden, _ = self._extract_features(
+        action_masks, features, move_hidden, _ = self._extract_features(
             obs, lstm_states, episode_starts
         )
         logits = self._build_logits(features, move_hidden)
@@ -451,7 +452,7 @@ class RecurrentPointerPolicy(RecurrentActorCriticPolicy):
         lstm_states: RNNStates,
         episode_starts: torch.Tensor,
     ) -> torch.Tensor:
-        features, _, _ = self._extract_features(obs, lstm_states, episode_starts)
+        _, features, _, _ = self._extract_features(obs, lstm_states, episode_starts)
         return self.value_head(features)
 
     # SB3 calls extract_features in a few internal paths; guard it explicitly.

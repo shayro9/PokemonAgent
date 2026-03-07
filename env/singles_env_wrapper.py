@@ -54,7 +54,7 @@ class PokemonRLWrapper(SinglesEnv):
         self._action_space = gym.spaces.Discrete(26)
         self.action_spaces = {agent: self._action_space for agent in self.possible_agents}
         self.observation_spaces = {
-            agent: gym.spaces.Box(low=-1.0, high=1.0, shape=(OBS_SIZE,), dtype=np.float32)
+            agent: gym.spaces.Box(low=-1.0, high=1.0, shape=(OBS_SIZE + 26,), dtype=np.float32)
             for agent in self.possible_agents
         }
 
@@ -117,12 +117,14 @@ class PokemonRLWrapper(SinglesEnv):
 
         tracker = self._get_tracker(battle)
         stat_vec = tracker.stat_belief.to_array() if tracker.stat_belief is not None else None
-        return BattleState.from_battle(
+        obs = BattleState.from_battle(
             battle,
             opp_protect_belief=tracker.protect_belief,
             opp_stat_belief=stat_vec,
             stat_belief_obj=tracker.stat_belief,
         ).to_array()
+        mask = get_valid_action_mask(battle).astype(np.float32)
+        return np.concatenate([obs, mask])
 
     # ------------------------------------------------------------------
     # Reward

@@ -56,9 +56,9 @@ from stable_baselines3.common.type_aliases import PyTorchObs, Schedule
 from env.embed import MAX_MOVES, MOVE_EMBED_LEN
 from env.battle_state import CONTEXT_BEFORE_MY_MOVES, CONTEXT_AFTER_OPP_MOVES
 
-MY_MOVES_LEN = MAX_MOVES * MOVE_EMBED_LEN          # 152
+MY_MOVES_LEN = MAX_MOVES * MOVE_EMBED_LEN          # 156
 OPP_MOVES_START = CONTEXT_BEFORE_MY_MOVES + MY_MOVES_LEN
-OPP_MOVES_LEN = MAX_MOVES * MOVE_EMBED_LEN          # 152
+OPP_MOVES_LEN = MAX_MOVES * MOVE_EMBED_LEN          # 156
 
 # Total context (everything except my_moves):
 CONTEXT_DIM = CONTEXT_BEFORE_MY_MOVES + OPP_MOVES_LEN + CONTEXT_AFTER_OPP_MOVES
