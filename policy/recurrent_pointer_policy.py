@@ -273,6 +273,24 @@ class RecurrentPointerPolicy(RecurrentActorCriticPolicy):
 
         super().__init__(observation_space, action_space, lr_schedule, **kwargs)
 
+        # ── Fix LSTM input size (must be done AFTER super().__init__ returns) ──
+        # RecurrentActorCriticPolicy.__init__ recreates self.lstm_actor *after*
+        # _build() finishes, resetting it to input_size=features_dim (raw obs,
+        # e.g. 383).  We overwrite it here, at the very end of our __init__,
+        # so nothing can stomp it again.
+        context_hidden = self._extractor_kwargs["context_hidden"]
+        self.lstm_actor = nn.LSTM(
+            input_size=context_hidden,
+            hidden_size=lstm_hidden_size,
+            num_layers=n_lstm_layers,
+            batch_first=False,
+        )
+
+        # Rebuild the optimizer so lstm_actor's new parameters are included.
+        self.optimizer = self.optimizer_class(
+            self.parameters(), lr=lr_schedule(1), **self.optimizer_kwargs
+        )
+
     # ── build ─────────────────────────────────────────────────────────────────
 
     def _build_mlp_extractor(self) -> None:
