@@ -1,9 +1,10 @@
 import random
 from dataclasses import dataclass
 
+import numpy as np
 from poke_env.environment import SingleAgentWrapper
 
-from sb3_contrib import MaskablePPO
+from sb3_contrib import RecurrentPPO
 from sb3_contrib.common.maskable.utils import get_action_masks
 
 from config.config import TEAM_BY_NAME
@@ -29,22 +30,25 @@ class EvalResult:
         return (self.wins + self.draws / 2) / self.episodes
 
 
-def _play_episode(eval_env: SingleAgentWrapper, model: MaskablePPO, max_steps: int) -> tuple[float, bool]:
-    """Run one evaluation episode.
-
-    :param eval_env: Evaluation environment wrapper.
-    :param model: Trained policy model.
-    :param max_steps: Maximum number of steps before truncation.
-    :returns: A tuple of ``(total_reward, truncated)``."""
+def _play_episode(eval_env: SingleAgentWrapper, model: RecurrentPPO, max_steps: int) -> tuple[float, bool]:
     obs, _ = eval_env.reset()
     terminated = False
     truncated = False
     total_reward = 0.0
 
+    lstm_states = None
+    episode_start = np.array([True])
+
     for _ in range(max_steps):
-        action, _ = model.predict(obs, deterministic=True, action_masks=get_action_masks(eval_env))
+        action, lstm_states = model.predict(
+            obs,
+            state=lstm_states,
+            episode_start=episode_start,
+            deterministic=True,
+        )
         obs, reward, terminated, truncated, _ = eval_env.step(action)
         total_reward += float(reward)
+        episode_start = np.array([False])
 
         if terminated or truncated:
             break
@@ -91,7 +95,7 @@ def _generate_eval_pool(pool_size: int, opponent_generator) -> list[str]:
 
 
 def evaluate_model(
-        model: MaskablePPO,
+        model: RecurrentPPO,
         timestep: int,
         train_team: str,
         battle_format: str,

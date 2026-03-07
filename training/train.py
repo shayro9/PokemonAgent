@@ -1,12 +1,12 @@
 import random
 import time
 
-from sb3_contrib import MaskablePPO
+from sb3_contrib import RecurrentPPO
 from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.callbacks import CallbackList
 from wandb.integration.sb3 import WandbCallback
 
-from policy.attention_policy import AttentionPointerPolicy
+from policy.recurrent_pointer_policy import RecurrentPointerPolicy
 from .parse import build_arg_parser
 from config.config import *
 from training.battle_metrics_log import *
@@ -36,7 +36,7 @@ def train_model(
         agent_team_generator=None,
         battle_team_generator=None,
         seed: int = 42,
-) -> MaskablePPO:
+) -> RecurrentPPO:
     """Train a MaskablePPO agent and optionally run periodic evaluation.
 
     :param model_path: Output path for the saved model.
@@ -95,8 +95,8 @@ def train_model(
         n_attention_heads=4,
     )
 
-    model = MaskablePPO(
-        AttentionPointerPolicy,
+    model = RecurrentPPO(
+        RecurrentPointerPolicy,
         env=train_env,
         policy_kwargs=policy_kwargs,
         learning_rate=lambda progress: LR * (0.1 + LR_DECAY * progress),
