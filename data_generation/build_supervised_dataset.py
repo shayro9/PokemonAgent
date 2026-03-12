@@ -52,6 +52,12 @@ python build_supervised_dataset.py \\
     --out-path    data/supervised/dataset.jsonl \\
     --player      p1          # p1 | p2 | both (default: p1)
 
+# Build dataset WITH action splitting (AFTER building observations):
+python build_supervised_dataset.py \\
+    --replay-jsonl data/replays/raw_battles.jsonl \\
+    --out-path    data/supervised/dataset.jsonl \\
+    --split-actions
+
 # Inspect stats only:
 python build_supervised_dataset.py --replay-jsonl data/replays/raw_battles.jsonl --stats-only
 
@@ -64,6 +70,9 @@ NOTES
 * Replays with unparseable logs are skipped with a warning counter.
 * gen9customgame replays (your training format) also work if the server
   saved an inputlog.
+* The --split-actions flag creates separate files for move and switch
+  actions AFTER observations are built, ensuring each split contains
+  complete (obs, action) pairs.
 """
 
 from __future__ import annotations
@@ -484,6 +493,7 @@ def build_dataset(
     out_path: Path,
     player: str = "p1",
     stats_only: bool = False,
+    split_actions: bool = False,
 ) -> None:
     """Convert all replays in a JSONL file to (obs, action) samples.
 
@@ -492,6 +502,8 @@ def build_dataset(
     :param out_path: Output JSONL path (one sample per line).
     :param player: ``'p1'``, ``'p2'``, or ``'both'``.
     :param stats_only: If ``True``, count and print stats without writing.
+    :param split_actions: If ``True``, write separate files for move/switch actions
+        AFTER building observations.
     """
     if not replay_jsonl.exists():
         sys.exit(f"[ERROR] Replay file not found: {replay_jsonl}")
@@ -504,7 +516,16 @@ def build_dataset(
     total_samples = 0
     action_counts = {"move": 0, "switch": 0}
 
+    # Prepare output file handles
     out_fh = None if stats_only else out_path.open("w", encoding="utf-8")
+    move_fh = None
+    switch_fh = None
+
+    if split_actions and not stats_only:
+        move_path = out_path.parent / f"{out_path.stem}_move{out_path.suffix}"
+        switch_path = out_path.parent / f"{out_path.stem}_switch{out_path.suffix}"
+        move_fh = move_path.open("w", encoding="utf-8")
+        switch_fh = switch_path.open("w", encoding="utf-8")
 
     try:
         with replay_jsonl.open(encoding="utf-8") as fh:
@@ -548,11 +569,23 @@ def build_dataset(
                     skipped_error += 1
                     continue
 
+                # Write samples to appropriate files AFTER obs is built
                 for sample in samples:
                     action_counts[sample["action_type"]] += 1
                     total_samples += 1
+
+                    sample_json = json.dumps(sample) + "\n"
+
+                    # Write to main output file
                     if out_fh is not None:
-                        out_fh.write(json.dumps(sample) + "\n")
+                        out_fh.write(sample_json)
+
+                    # Write to split files based on action type
+                    if split_actions:
+                        if sample["action_type"] == "move" and move_fh is not None:
+                            move_fh.write(sample_json)
+                        elif sample["action_type"] == "switch" and switch_fh is not None:
+                            switch_fh.write(sample_json)
 
                 if total_replays % 100 == 0:
                     print(
@@ -564,6 +597,10 @@ def build_dataset(
     finally:
         if out_fh is not None:
             out_fh.close()
+        if move_fh is not None:
+            move_fh.close()
+        if switch_fh is not None:
+            switch_fh.close()
 
     print(f"\n{'─'*55}")
     print(f"Replays read    : {total_replays}")
@@ -574,6 +611,9 @@ def build_dataset(
     print(f"  Switch samples: {action_counts['switch']}")
     if not stats_only:
         print(f"Output          : {out_path}")
+        if split_actions:
+            print(f"  Move file     : {out_path.parent / f'{out_path.stem}_move{out_path.suffix}'}")
+            print(f"  Switch file   : {out_path.parent / f'{out_path.stem}_switch{out_path.suffix}'}")
     print(f"{'─'*55}")
 
 
@@ -610,6 +650,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Only print statistics, do not write output file.",
     )
+    p.add_argument(
+        "--split-actions",
+        action="store_true",
+        help="Write separate files for move and switch actions (AFTER building observations).",
+    )
     return p
 
 
@@ -620,6 +665,7 @@ def main() -> None:
         out_path=args.out_path,
         player=args.player,
         stats_only=args.stats_only,
+        split_actions=args.split_actions,
     )
 
 

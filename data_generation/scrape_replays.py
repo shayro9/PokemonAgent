@@ -6,42 +6,30 @@ them into structured datasets.
 
 USAGE
 -----
-Basic scrape (all raw battles):
+Basic scrape:
     python scrape_replays.py --format gen9randombattle --num-replays 500
 
-Scrape + split by action type:
-    python scrape_replays.py --format gen9randombattle --num-replays 500 --split-actions
-
 Custom output directory:
-    python scrape_replays.py --format gen9randombattle --num-replays 200 --out-dir data/replays --split-actions
+    python scrape_replays.py --format gen9randombattle --num-replays 200 --out-dir data/replays
 
 Resume from a previous run (skip already-fetched IDs):
     python scrape_replays.py --format gen9randombattle --num-replays 1000 --resume
 
 OUTPUT FILES
 ------------
-Without --split-actions:
-    <out-dir>/
-        raw_battles.jsonl          – one JSON object per battle (full log + metadata)
+<out-dir>/
+    raw_battles.jsonl          – one JSON object per battle (full log + metadata)
 
-With --split-actions:
-    <out-dir>/
-        raw_battles.jsonl          – every battle (as above)
-        actions_move.jsonl         – one record per MOVE action taken across all battles
-        actions_switch.jsonl       – one record per SWITCH action taken across all battles
-        actions_all.jsonl          – every action (move + switch combined)
-
-Each action record has the shape:
+Each battle record has the shape:
     {
         "battle_id":   str,      # e.g. "gen9randombattle-123456789"
         "format":      str,
-        "turn":        int,
-        "player":      str,      # "p1" or "p2"
-        "action_type": str,      # "move" or "switch"
-        "action":      str,      # move name or Pokémon being switched in
-        "actor":       str,      # slot label, e.g. "p1a: Garchomp"
-        "target":      str,      # slot label or "" for self-targeting moves
-        "raw_line":    str,      # the verbatim protocol line
+        "uploadtime":  int,
+        "p1":          str,
+        "p2":          str,
+        "winner":      str,
+        "log":         str,      # full battle log
+        "inputlog":    str,      # inputlog (needed for supervised learning)
     }
 
 NOTES
@@ -51,6 +39,8 @@ NOTES
 * Rate limiting: we sleep 0.4 s between replay fetches and 0.2 s between
   search pages to be polite to the server.
 * Replays whose log cannot be parsed are logged as warnings and skipped.
+* For splitting data by action type AFTER building observations, use the
+  --split-actions flag in build_supervised_dataset.py instead.
 """
 
 from __future__ import annotations
@@ -201,86 +191,6 @@ def fetch_inputlog(replay_id: str) -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# Log parsing
-# ---------------------------------------------------------------------------
-
-
-def parse_actions_from_log(log: str, battle_id: str, fmt: str) -> list[dict]:
-    """Parse all move/switch actions from a PS battle log string.
-
-    The PS protocol uses lines of the form:
-        |move|<actor>|<move_name>|<target>
-        |switch|<actor>|<species_detail>|<hp>
-        |drag|<actor>|<species_detail>|<hp>       ← treated as switch
-
-    :param log: Full battle log text (the ``log`` field of the replay JSON).
-    :param battle_id: Used to populate the ``battle_id`` field of each record.
-    :param fmt: Format string, used to populate ``format``.
-    :returns: List of action records (dicts) in turn order.
-    """
-    actions: list[dict] = []
-    current_turn = 0
-
-    for raw_line in log.splitlines():
-        raw_line = raw_line.strip()
-        if not raw_line.startswith("|"):
-            continue
-
-        parts = raw_line.lstrip("|").split("|")
-        if not parts:
-            continue
-
-        tag = parts[0]
-
-        # Track turn number
-        if tag == "turn" and len(parts) >= 2:
-            try:
-                current_turn = int(parts[1])
-            except ValueError:
-                pass
-            continue
-
-        # ── Move ──────────────────────────────────────────────────────
-        if tag == "move" and len(parts) >= 3:
-            actor = parts[1]            # e.g. "p1a: Garchomp"
-            move_name = parts[2]        # e.g. "Earthquake"
-            target = parts[3] if len(parts) > 3 else ""
-            player = actor[:2] if len(actor) >= 2 else "??"
-            actions.append({
-                "battle_id":   battle_id,
-                "format":      fmt,
-                "turn":        current_turn,
-                "player":      player,
-                "action_type": "move",
-                "action":      move_name,
-                "actor":       actor,
-                "target":      target,
-                "raw_line":    raw_line,
-            })
-
-        # ── Switch / Drag (forced switch treated the same) ─────────────
-        elif tag in ("switch", "drag") and len(parts) >= 3:
-            actor = parts[1]            # e.g. "p1a: Garchomp"
-            # parts[2] is like "Garchomp, L80, M" — extract just species
-            species_detail = parts[2]
-            species = species_detail.split(",")[0].strip()
-            player = actor[:2] if len(actor) >= 2 else "??"
-            actions.append({
-                "battle_id":   battle_id,
-                "format":      fmt,
-                "turn":        current_turn,
-                "player":      player,
-                "action_type": "switch",
-                "action":      species,
-                "actor":       actor,
-                "target":      "",
-                "raw_line":    raw_line,
-            })
-
-    return actions
-
-
-# ---------------------------------------------------------------------------
 # Persistence helpers
 # ---------------------------------------------------------------------------
 
@@ -324,7 +234,6 @@ def scrape(
     format_id: str,
     num_replays: int,
     out_dir: Path,
-    split_actions: bool,
     resume: bool,
     fetch_inputlog_flag: bool = True,
 ) -> None:
@@ -333,7 +242,6 @@ def scrape(
     :param format_id: PS battle format, e.g. ``'gen9randombattle'``.
     :param num_replays: Target number of replays to download.
     :param out_dir: Directory to write output files.
-    :param split_actions: If ``True``, write per-action JSONL files split by type.
     :param resume: If ``True``, skip replays already in ``raw_battles.jsonl``.
     :param fetch_inputlog_flag: If ``True`` (default), also fetch the ``.inputlog``
         for each replay and store it in the ``inputlog`` field.  Required by
@@ -347,18 +255,9 @@ def scrape(
         seen_ids = _load_seen_ids(raw_path)
         print(f"[resume] {len(seen_ids)} replays already on disk — skipping these.")
 
-    # Prepare action files
-    if split_actions:
-        move_path   = out_dir / "actions_move.jsonl"
-        switch_path = out_dir / "actions_switch.jsonl"
-        all_path    = out_dir / "actions_all.jsonl"
-    else:
-        move_path = switch_path = all_path = None  # suppress warnings
-
     total_fetched = 0
-    total_actions = {"move": 0, "switch": 0}
 
-    print(f"Scraping format={format_id}  target={num_replays} replays  split_actions={split_actions}")
+    print(f"Scraping format={format_id}  target={num_replays} replays")
     print(f"Output directory: {out_dir.resolve()}\n")
 
     for replay_id, _ in iter_replay_ids(format_id, num_replays + len(seen_ids)):
@@ -398,27 +297,9 @@ def scrape(
         seen_ids.add(replay_id)
         total_fetched += 1
 
-        # ── Parse + store actions ─────────────────────────────────────
-        if split_actions:
-            actions = parse_actions_from_log(log_text, replay_id, format_id)
-            move_actions   = [a for a in actions if a["action_type"] == "move"]
-            switch_actions = [a for a in actions if a["action_type"] == "switch"]
-
-            if move_actions:
-                _append_jsonl(move_path, move_actions)
-                total_actions["move"] += len(move_actions)
-            if switch_actions:
-                _append_jsonl(switch_path, switch_actions)
-                total_actions["switch"] += len(switch_actions)
-            if actions:
-                _append_jsonl(all_path, actions)
-
         # ── Progress ──────────────────────────────────────────────────
         if total_fetched % 50 == 0 or total_fetched == num_replays:
-            msg = f"  [{total_fetched}/{num_replays}] {replay_id}"
-            if split_actions:
-                msg += f"  (moves={total_actions['move']}, switches={total_actions['switch']})"
-            print(msg)
+            print(f"  [{total_fetched}/{num_replays}] {replay_id}")
 
     # ── Summary ───────────────────────────────────────────────────────
     print(f"\n{'─'*55}")
@@ -433,7 +314,7 @@ def scrape(
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Scrape Pokémon Showdown replays and (optionally) split by action type.",
+        description="Scrape Pokémon Showdown replays.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
@@ -452,12 +333,6 @@ def _build_parser() -> argparse.ArgumentParser:
         "--out-dir",
         default="data/replays",
         help="Output directory for JSONL files (default: data/replays).",
-    )
-    parser.add_argument(
-        "--split-actions",
-        action="store_true",
-        default=False,
-        help="Parse each replay and write separate JSONL files for moves and switches.",
     )
     parser.add_argument(
         "--no-inputlog",
@@ -480,7 +355,6 @@ def main() -> None:
         format_id=args.format,
         num_replays=args.num_replays,
         out_dir=Path(args.out_dir),
-        split_actions=args.split_actions,
         resume=args.resume,
         fetch_inputlog_flag=not args.no_inputlog,
     )
