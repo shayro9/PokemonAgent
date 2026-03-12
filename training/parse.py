@@ -54,8 +54,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--opponent-data-path",
         type=str,
         default=None,
-        help="Path to generated dataset used for the opponent team generator. Defaults to "
-             "data/gen9randombattle_db.json.",
+        help="Path to generated dataset used for the opponent team generator. Defaults to data/gen9randombattle_db.json.",
     )
     parser.add_argument(
         "--matchup-data-path",
