@@ -74,37 +74,24 @@ import logging
 import sys
 import re
 from pathlib import Path
-from typing import Iterator
 
 import numpy as np
 
 # ---------------------------------------------------------------------------
 # poke-env imports
 # ---------------------------------------------------------------------------
-try:
-    from poke_env.battle import Battle
-except ImportError:
-    sys.exit("poke-env is required: pip install poke-env")
+from poke_env.battle import Battle
 
 # ---------------------------------------------------------------------------
 # Project imports — must be run from the PokemonAgent root
 # ---------------------------------------------------------------------------
-try:
-    from env.battle_state import BattleState, OBS_SIZE
-    from env.battle_tracker import BattleTracker
-    from combat.stats_belief import build_stat_belief
-    from combat.stat_belief_updates import update_stat_belief
-    from combat.protect_belief import build_protect_belief, estimate_protect_attempt_prior
-    from combat.event_parser import detect_opponent_move_from_events, did_no_damage_from_events
-    from combat.combat_utils import snapshot_opponent_pp
-    HAS_PROJECT = True
-except ImportError:
-    HAS_PROJECT = False
-    print(
-        "[WARN] Project modules not found — observations will be raw zero vectors.\n"
-        "       Run from the PokemonAgent root directory to get full 383-dim obs.",
-        file=sys.stderr,
-    )
+from env.battle_state import BattleState, OBS_SIZE
+from env.battle_tracker import BattleTracker
+from combat.stats_belief import build_stat_belief
+from combat.stat_belief_updates import update_stat_belief
+from combat.protect_belief import build_protect_belief, estimate_protect_attempt_prior
+from combat.event_parser import detect_opponent_move_from_events, did_no_damage_from_events
+from combat.combat_utils import snapshot_opponent_pp
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -162,8 +149,6 @@ class _BattleObserver:
 
     def update_trackers(self) -> None:
         """Update stat/protect beliefs from current battle state."""
-        if not HAS_PROJECT:
-            return
         b = self.battle
         opp = b.opponent_active_pokemon
         if opp is None:
@@ -204,8 +189,6 @@ class _BattleObserver:
 
     def get_obs(self) -> np.ndarray:
         """Build the 383-dim observation vector for the current battle state."""
-        if not HAS_PROJECT:
-            return np.zeros(OBS_SIZE if HAS_PROJECT else 383, dtype=np.float32)
         self.update_trackers()
         stat_vec = (
             self.tracker.stat_belief.to_array()
