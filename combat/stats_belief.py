@@ -56,6 +56,7 @@ from dataclasses import dataclass, replace
 from typing import Protocol
 
 import numpy as np
+from poke_env.battle import Pokemon
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -319,6 +320,23 @@ def base_stat_level_prior(opp, gen: int) -> StatBelief:
     var = np.maximum((PRIOR_STD_FRAC * mean) ** 2, MIN_VAR)
     return StatBelief(mean=mean, var=var)
 
+def base_stat_level_prior_raw(base, level, gen) -> StatBelief:
+    """prior: mean from base stats + level, wide variance.
+    used for when no Pokémon object is available.
+    :returns: Prior ``StatBelief``.
+    """
+    mean = np.array([
+        _hp_formula(base["base_hp"], level),
+        _stat_formula(base["base_atk"], level),
+        _stat_formula(base["base_def"], level),
+        _stat_formula(base["base_spa"], level),
+        _stat_formula(base["base_spd"], level),
+        _stat_formula(base["base_spe"], level),
+    ], dtype=np.float64)
+
+    var = np.maximum((PRIOR_STD_FRAC * mean) ** 2, MIN_VAR)
+    return StatBelief(mean=mean, var=var)
+
 
 def flat_uninformative_prior(_opp, _gen: int) -> StatBelief:
     """Wide-variance prior that ignores species entirely."""
@@ -333,6 +351,9 @@ def flat_uninformative_prior(_opp, _gen: int) -> StatBelief:
 
 def build_stat_belief(opp, gen: int, prior_fn: StatPriorFn = base_stat_level_prior) -> StatBelief:
     return prior_fn(opp, gen)
+
+def build_raw_stat_belief(base, level, gen: int, prior_fn: StatPriorFn = base_stat_level_prior_raw) -> StatBelief:
+    return prior_fn(base, level, gen)
 
 
 def level_factor(level: int) -> float:

@@ -38,9 +38,12 @@ def _scale_m11(x: float, max_abs: float) -> float:
 
 
 def _safe_int(move, key, default=0):
-    entry = getattr(move, "entry", None)
-    if isinstance(entry, dict):
-        return int(entry.get(key, 0) or 0)
+    try:
+        entry = getattr(move, "entry", None)
+        if isinstance(entry, dict):
+            return int(entry.get(key, 0) or 0)
+    except TypeError:
+        pass
     return default
 
 
@@ -69,7 +72,7 @@ def embed_move(
     vec.append(1.0 if move.accuracy is True else _scale_01(move.accuracy or 0))
     vec.append(_scale_01(move.max_pp or 0, 40.0))
     vec.append(_scale_m11(_safe_int(move, "priority", 0), 7.0))
-    vec.append(_scale_01(move.heal or 0, 1))
+    vec.append(_scale_01(_safe_int(move, 'heal', 0), 1))
     vec.append(_scale_01(move.crit_ratio or 0, 6))
 
     # Category one-hot
@@ -138,6 +141,7 @@ def calc_types_vector(
     opp_tera_mode: bool = False,
 ) -> np.ndarray:
     my_types = (list(my_types) + [None])[:2]
+    opp_types = [None] if opp_types is None else opp_types
     type_chart = type_chart_for_gen(gen)
 
     def _mult(my_t, opp_t) -> float:

@@ -42,6 +42,17 @@ import lz4.frame
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 import numpy as np
+from six import moves
+
+from env.embed import (
+    embed_status, embed_weather, embed_effects, calc_types_vector, embed_move,
+    Weather, Status, Effect, PokemonType, Move,
+    MOVE_EMBED_LEN, MAX_MOVES,
+)
+
+from combat.stats_belief import build_raw_stat_belief
+
+GEN = 1
 
 
 def load_metamon_json(filepath: Path) -> Dict[str, Any]:
@@ -55,6 +66,135 @@ def load_metamon_json(filepath: Path) -> Dict[str, Any]:
     """
     with lz4.frame.open(filepath, 'r') as f:
         return json.load(f)
+
+
+def convert_metamon_state_to_vector(state: Dict[str, Any], turn) -> np.ndarray:
+    """Convert a single metamon state dict to your 383-dim observation vector.
+
+    Args:
+        :param state: One element from the 'states' array in metamon JSON
+        :param turn: the index of the state
+
+    Returns:
+        np.ndarray of shape (383,) matching your BattleState.to_array() format
+    """
+    my_poke = state["player_active_pokemon"]
+    opp_poke = state["opponent_active_pokemon"]
+
+    vec = []
+
+    # Turn (1 dim) - not in metamon, use 0
+    vec.append(turn)
+
+    # Weather (9 dims)
+    weather_vec = embed_weather(getattr(Weather, state["weather"], None))
+    vec.extend(weather_vec)
+    # My HP (1 dim)
+    vec.append(my_poke.get("hp_pct", 1.0))
+
+    # My stats (6 dims: HP, Atk, Def, SpA, SpD, Spe)
+    my_stats = np.array([
+        my_poke.get("base_hp", 100),
+        my_poke.get("base_atk", 100),
+        my_poke.get("base_def", 100),
+        my_poke.get("base_spa", 100),
+        my_poke.get("base_spd", 100),
+        my_poke.get("base_spe", 100),
+    ], dtype=np.float32) / 512.0
+    vec.extend(np.minimum(my_stats, 1.0))
+
+    # My boosts (7 dims)
+    my_boosts = np.array([
+        my_poke.get("atk_boost", 0),
+        my_poke.get("def_boost", 0),
+        my_poke.get("spa_boost", 0),
+        my_poke.get("spd_boost", 0),
+        my_poke.get("spe_boost", 0),
+        my_poke.get("accuracy_boost", 0),
+        my_poke.get("evasion_boost", 0),
+    ], dtype=np.float32) / 6.0
+    vec.extend(my_boosts)
+
+    # My status (7 dims)
+    my_status = getattr(Status, my_poke.get("status", "nostatus"), None)
+    status_vec = embed_status(my_status)
+    vec.extend(status_vec)
+
+    # My effects (3 dims)
+    my_effects = getattr(Effect, my_poke.get("effect", "noeffect"), [])
+    effects_vec = embed_effects(my_effects)
+    vec.extend(effects_vec)
+
+    # My STAB (1 dim) - not in metamon, use 1.0
+    vec.append(my_poke.get("stab_multiplier", 1.5) / 2.0)
+
+    # Opp HP (1 dim)
+    vec.append(opp_poke.get("hp_pct", 1.0))
+
+    # Opp stat belief (12 dims: 6 means + 6 stds)
+    # Metamon doesn't have belief, use base stats as mean with 0 std
+    opp_stats_belief = build_raw_stat_belief(opp_poke, opp_poke["lvl"], GEN).to_array()
+    vec.extend(opp_stats_belief)
+
+    # Opp boosts (7 dims)
+    opp_boosts = np.array([
+        opp_poke.get("atk_boost", 0),
+        opp_poke.get("def_boost", 0),
+        opp_poke.get("spa_boost", 0),
+        opp_poke.get("spd_boost", 0),
+        opp_poke.get("spe_boost", 0),
+        opp_poke.get("accuracy_boost", 0),
+        opp_poke.get("evasion_boost", 0),
+    ], dtype=np.float32) / 6.0
+    vec.extend(opp_boosts)
+
+    # Opp status (7 dims)
+    opp_status = getattr(Status, opp_poke.get("status", "nostatus"), None)
+    opp_status_vec = embed_status(opp_status)
+    vec.extend(opp_status_vec)
+
+    # Opp effects (3 dims)
+    opp_effects = getattr(Effect, opp_poke.get("effect", "noeffect"), [])
+    opp_effects_vec = embed_effects(opp_effects)
+    vec.extend(opp_effects_vec)
+
+    # Opp preparing, STAB, is_terastallized (3 dims)
+    vec.append(0.0)  # preparing - not in metamon
+    vec.append(1.5 / 2.0)  # opp_stab
+    vec.append(0.0)  # is_terastallized
+
+    # Opp tera multiplier (2 dims)
+    opp_tera_type = getattr(PokemonType, opp_poke["tera_type"], None)
+    my_raw_types = [getattr(PokemonType, t.upper(), None) for t in my_poke["types"].split()]
+    opp_raw_types = [getattr(PokemonType, t.upper(), None) for t in opp_poke["types"].split()]
+
+    my_types = list(filter(lambda x: x is not None, my_raw_types))
+    opp_types = list(filter(lambda x: x is not None, opp_raw_types))
+    vec.extend(calc_types_vector(my_types, opp_tera_type, GEN, True))
+
+
+    # My moves (MAX_MOVES * MOVE_EMBED_LEN dims)
+    my_moves_vec = np.zeros(MAX_MOVES * MOVE_EMBED_LEN, dtype=np.float32)
+    for i, move_dict in enumerate(my_poke.get("moves", [])[:MAX_MOVES]):
+        move = Move(move_id=move_dict["name"], gen=GEN)
+        move_emb = embed_move(move, opp_types, my_types, GEN)
+        my_moves_vec[i * MOVE_EMBED_LEN:(i + 1) * MOVE_EMBED_LEN] = move_emb
+    vec.extend(my_moves_vec)
+
+    # Opp moves (MAX_MOVES * MOVE_EMBED_LEN dims)
+    opp_moves_vec = np.zeros(MAX_MOVES * MOVE_EMBED_LEN, dtype=np.float32)
+    for i, move_dict in enumerate(opp_poke.get("moves", [])[:MAX_MOVES]):
+        move = Move(move_id=move_dict["name"], gen=GEN)
+        move_emb = embed_move(move, my_types, opp_types, GEN)
+        opp_moves_vec[i * MOVE_EMBED_LEN:(i + 1) * MOVE_EMBED_LEN] = move_emb
+    vec.extend(opp_moves_vec)
+
+    # Opp protect belief (1 dim)
+    vec.append(0.0)
+
+    result = np.array(vec, dtype=np.float32)
+    assert len(result) == 383, f"Expected 383 dims, got {len(result)}"
+    return result
 
 
 def convert_metamon_battle(
@@ -73,24 +213,8 @@ def convert_metamon_battle(
     samples = []
 
     # Extract sequences from metamon format
-    # The structure may vary - try multiple possible keys
-    observations = (
-        battle_data.get("observations") or
-        battle_data.get("obs") or
-        battle_data.get("states") or
-        []
-    )
-
-    actions = (
-        battle_data.get("actions") or
-        battle_data.get("action") or
-        []
-    )
-
-    metadata = battle_data.get("metadata", {}) or battle_data
-
-    # Get winner if available
-    winner = metadata.get("winner", "") or metadata.get("result", "")
+    observations = battle_data.get("states")
+    actions = battle_data.get("actions")
 
     # Skip if no valid data
     if not observations or not actions:
@@ -113,46 +237,23 @@ def convert_metamon_battle(
 
         # Determine action type based on action index
         # This is a heuristic - adjust based on your action space
-        if action < 6:  # Assuming 0-5 are switches
+        if action > 3:  # Assuming 4-8 are switches
             action_type = "switch"
-        elif action < 10:  # 6-9 are moves
+        elif 0 <= action <= 3:  # 0-3 are moves
             action_type = "move"
         else:
-            # Unknown action, skip
+            # skip
             continue
 
-        # Convert observation to list if it's a numpy array
-        if isinstance(obs, np.ndarray):
-            obs_list = obs.tolist()
-        elif isinstance(obs, dict):
-            # If obs is a dict of arrays, flatten or select main obs
-            # Try common keys
-            for key in ["observation", "obs", "state", "vector"]:
-                if key in obs:
-                    obs_value = obs[key]
-                    if isinstance(obs_value, np.ndarray):
-                        obs_list = obs_value.tolist()
-                    else:
-                        obs_list = obs_value
-                    break
-            else:
-                # Fallback: use first value
-                obs_list = list(obs.values())[0] if obs else []
-                if isinstance(obs_list, np.ndarray):
-                    obs_list = obs_list.tolist()
-        elif isinstance(obs, (list, tuple)):
-            obs_list = list(obs)
-        else:
-            obs_list = [obs]
+        state = convert_metamon_state_to_vector(obs, turn_idx)
 
+        state_list = state.tolist()
         samples.append({
-            "obs": obs_list,
+            "obs": state_list,
             "action": action,
             "action_type": action_type,
             "battle_id": battle_id,
-            "turn": turn_idx + 1,
             "player": "p1",
-            "winner": winner,
         })
 
     return samples
@@ -273,8 +374,7 @@ def convert_dataset(
         if switch_fh:
             switch_fh.close()
 
-
-def main():
+def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Convert metamon JSON files to supervised learning format",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -308,6 +408,11 @@ def main():
         help="Don't automatically search subdirectories for JSON files",
     )
 
+    return parser
+
+
+def main():
+    parser = build_arg_parser()
     args = parser.parse_args()
 
     if not args.input_dir.exists():

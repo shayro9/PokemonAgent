@@ -17,8 +17,9 @@ class DebugRLPlayer(RandomPlayer):
         self.env = env
 
     def choose_move(self, battle: Battle):
-        print_state(battle, prefix="[DebugRLPlayer]")
+        # print_state(battle, prefix="[DebugRLPlayer]")
         print("=" * 50)
+        print(battle.weather)
         # mask = self.env.action_masks()
         # print(mask)
         # print("=" * 50)
