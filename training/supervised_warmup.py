@@ -134,7 +134,7 @@ def pretrain_from_human_data(
         data_path: str,
         *,
         episode_key: str   = "battle_id",
-        n_epochs:    int   = 20,
+        n_epochs:    int   = 100,
         batch_size:  int   = 256,
         lr:          float = 3e-4,
         lambda_value: float = 1.0,

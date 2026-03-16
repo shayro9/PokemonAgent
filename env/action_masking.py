@@ -53,6 +53,8 @@ def get_valid_action_mask(
         available_moves = getattr(battle, "available_moves", [])
         all_moves = getattr(battle.active_pokemon, "moves", []).values()
         move_mask = [move in available_moves for move in all_moves]
+        while len(move_mask) < 4:
+            move_mask.append(False)
         if not any(move_mask):
             move_mask = [1, 0, 0, 0]
         for slot, action in enumerate(ACTION_MOVE_RANGE):
