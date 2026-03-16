@@ -23,13 +23,13 @@ STAT_NORM  = 512.0  # divide raw stats by this → [0, 1]
 BOOST_NORM = 6.0    # boost stages range −6..+6 → [−1, +1]
 
 
-class PokemonStats:
+class PokemonState:
     """
     Holds the HP, normalized stats, boost stages, status, effects and types
     for one Pokémon on one side of the field.
 
-        Gen 1    →  PokemonStats(gen1=True,  pokemon=my_pokemon)
-        Gen 2–9+ →  PokemonStats(gen1=False, pokemon=my_pokemon)
+        Gen 1    →  PokemonState(gen1=True,  pokemon=my_pokemon)
+        Gen 2–9+ →  PokemonState(gen1=False, pokemon=my_pokemon)
     """
 
     # ------------------------------------------------------------------
