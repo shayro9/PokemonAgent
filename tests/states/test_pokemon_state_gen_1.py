@@ -8,7 +8,6 @@ from poke_env.battle.status import Status
 
 from env.states.pokemon_state import (
     PokemonState,
-    GEN1_BOOST_KEYS,
     ALL_TYPES,
     ALL_STATUSES,
 )
@@ -22,7 +21,7 @@ from tests.states.test_pokemon_state import PokemonStatsBaseTest, FIXTURES_DIR, 
 class TestPokemonStatsStarmie(PokemonStatsBaseTest, unittest.TestCase):
 
     def setUp(self):
-        self.ps = PokemonState(gen1=True, pokemon=make_mock_from_fixture("gen1_starmie.json"))
+        self.ps = PokemonState(pokemon=make_mock_from_fixture("gen1_starmie.json"))
 
     def test_hp(self):
         self.assertEqual(self.ps.hp, 1.0)
@@ -34,7 +33,7 @@ class TestPokemonStatsStarmie(PokemonStatsBaseTest, unittest.TestCase):
         )
 
     def test_boosts_all_zero(self):
-        np.testing.assert_array_equal(self.ps.boosts, np.zeros(len(GEN1_BOOST_KEYS)))
+        np.testing.assert_array_equal(self.ps.boosts, np.zeros(len(PokemonState.BOOST_KEYS)))
 
     def test_status_par(self):
         self.assertEqual(self.ps.status[ALL_STATUSES.index(Status.PAR)], 1.0)
@@ -56,7 +55,7 @@ class TestPokemonStatsStarmie(PokemonStatsBaseTest, unittest.TestCase):
 class TestPokemonStatsTauros(PokemonStatsBaseTest, unittest.TestCase):
 
     def setUp(self):
-        self.ps = PokemonState(gen1=True, pokemon=make_mock_from_fixture("gen1_tauros.json"))
+        self.ps = PokemonState(pokemon=make_mock_from_fixture("gen1_tauros.json"))
 
     def test_hp(self):
         self.assertEqual(self.ps.hp, 1.0)
@@ -75,13 +74,13 @@ class TestPokemonStatsTauros(PokemonStatsBaseTest, unittest.TestCase):
         self.assertEqual(self.ps.types.sum(), 1.0)
 
     def test_atk_boost(self):
-        self.assertEqual(self.ps.boosts[GEN1_BOOST_KEYS.index("atk")], 2.0)
+        self.assertEqual(self.ps.boosts[PokemonState.BOOST_KEYS.index("atk")], 2.0)
 
     def test_spa_boost(self):
-        self.assertEqual(self.ps.boosts[GEN1_BOOST_KEYS.index("spa")], -2.0)
+        self.assertEqual(self.ps.boosts[PokemonState.BOOST_KEYS.index("spa")], -2.0)
 
     def test_spe_boost(self):
-        self.assertEqual(self.ps.boosts[GEN1_BOOST_KEYS.index("spe")], 1.0)
+        self.assertEqual(self.ps.boosts[PokemonState.BOOST_KEYS.index("spe")], 1.0)
 
     def test_spa_spd_equal_in_fixture(self):
         # In Gen 1 special is one stat — spa and spd boosts must always match
@@ -97,7 +96,7 @@ class TestPokemonStatsTauros(PokemonStatsBaseTest, unittest.TestCase):
 class TestPokemonStatsChansey(PokemonStatsBaseTest, unittest.TestCase):
 
     def setUp(self):
-        self.ps = PokemonState(gen1=True, pokemon=make_mock_from_fixture("gen1_chansey.json"))
+        self.ps = PokemonState(pokemon=make_mock_from_fixture("gen1_chansey.json"))
 
     def test_hp_fraction(self):
         self.assertAlmostEqual(self.ps.hp, 0.5)
@@ -112,13 +111,13 @@ class TestPokemonStatsChansey(PokemonStatsBaseTest, unittest.TestCase):
         self.assertEqual(self.ps.status[ALL_STATUSES.index(Status.BRN)], 1.0)
 
     def test_def_boost(self):
-        self.assertEqual(self.ps.boosts[GEN1_BOOST_KEYS.index("def")], 3.0)
+        self.assertEqual(self.ps.boosts[PokemonState.BOOST_KEYS.index("def")], 3.0)
 
     def test_other_boosts_zero(self):
-        def_idx = GEN1_BOOST_KEYS.index("def")
+        def_idx = PokemonState.BOOST_KEYS.index("def")
         np.testing.assert_array_equal(
             np.delete(self.ps.boosts, def_idx),
-            np.zeros(len(GEN1_BOOST_KEYS) - 1)
+            np.zeros(len(PokemonState.BOOST_KEYS) - 1)
         )
 
     def test_type_normal_only(self):
@@ -133,7 +132,7 @@ class TestPokemonStatsChansey(PokemonStatsBaseTest, unittest.TestCase):
 class TestPokemonStatsAlakazam(PokemonStatsBaseTest, unittest.TestCase):
 
     def setUp(self):
-        self.ps = PokemonState(gen1=True, pokemon=make_mock_from_fixture("gen1_alakazam.json"))
+        self.ps = PokemonState(pokemon=make_mock_from_fixture("gen1_alakazam.json"))
 
     def test_hp_fraction(self):
         self.assertAlmostEqual(self.ps.hp, 0.75)
@@ -148,7 +147,7 @@ class TestPokemonStatsAlakazam(PokemonStatsBaseTest, unittest.TestCase):
         self.assertEqual(self.ps.status[ALL_STATUSES.index(Status.SLP)], 1.0)
 
     def test_spa_boost(self):
-        self.assertEqual(self.ps.boosts[GEN1_BOOST_KEYS.index("spa")], 2.0)
+        self.assertEqual(self.ps.boosts[PokemonState.BOOST_KEYS.index("spa")], 2.0)
 
     def test_spa_spd_equal_in_fixture(self):
         with open(FIXTURES_DIR / "gen1_alakazam.json") as f:
@@ -163,4 +162,3 @@ class TestPokemonStatsAlakazam(PokemonStatsBaseTest, unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

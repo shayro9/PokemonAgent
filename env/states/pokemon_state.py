@@ -27,34 +27,31 @@ class PokemonState:
     """
     Holds the HP, normalized stats, boost stages, status, effects and types
     for one Pokémon on one side of the field.
-
-        Gen 1    →  PokemonState(gen1=True,  pokemon=my_pokemon)
-        Gen 2–9+ →  PokemonState(gen1=False, pokemon=my_pokemon)
     """
+
+    STAT_KEYS  = GEN1_STAT_KEYS
+    BOOST_KEYS = GEN1_BOOST_KEYS
 
     # ------------------------------------------------------------------
     # init
     # ------------------------------------------------------------------
-    def __init__(self, gen1: bool = False, pokemon: Optional[Pokemon] = None):
-        stat_keys = GEN1_STAT_KEYS if gen1 else MODERN_STAT_KEYS
-        boost_keys = GEN1_BOOST_KEYS if gen1 else MODERN_BOOST_KEYS
-
+    def __init__(self, pokemon: Optional[Pokemon] = None):
         if pokemon is not None:
-            self.hp = pokemon.current_hp_fraction
-            self.stats = self._encode_stats(pokemon.stats, stat_keys)
-            self.boosts = self._encode_boosts(pokemon.boosts, boost_keys)
-            self.status = self._encode_status(pokemon.status)
+            self.hp      = pokemon.current_hp_fraction
+            self.stats   = self._encode_stats(pokemon.stats,   self.STAT_KEYS)
+            self.boosts  = self._encode_boosts(pokemon.boosts, self.BOOST_KEYS)
+            self.status  = self._encode_status(pokemon.status)
             self.effects = self._encode_effects(pokemon.effects)
-            self.types = self._encode_types(pokemon.types)
-            self.stab = 1.5 if gen1 else pokemon.stab_multiplier
+            self.types   = self._encode_types(pokemon.types)
+            self.stab    = self._encode_stab(pokemon)
         else:
-            self.hp = 0.0
-            self.stats = np.zeros(len(stat_keys), dtype=np.float32)
-            self.boosts = np.zeros(len(boost_keys), dtype=np.float32)
-            self.status = self._encode_status(None)
+            self.hp      = 0.0
+            self.stats   = np.zeros(len(self.STAT_KEYS),   dtype=np.float32)
+            self.boosts  = np.zeros(len(self.BOOST_KEYS),  dtype=np.float32)
+            self.status  = self._encode_status(None)
             self.effects = self._encode_effects({})
-            self.types = self._encode_types([])
-            self.stab = 1.5
+            self.types   = self._encode_types([])
+            self.stab    = 1.5
 
     # ------------------------------------------------------------------
     # static embedding helpers
@@ -81,6 +78,11 @@ class PokemonState:
     def _encode_boosts(boosts: dict, boost_keys: list[str]) -> np.ndarray:
         """Extract raw boost stages by key."""
         return np.array([boosts.get(k, 0) for k in boost_keys], dtype=np.float32)
+
+    @staticmethod
+    def _encode_stab(self, pokemon: Pokemon) -> float:
+        """Calculate STAB multiplier based on pokemon"""
+        return 1.5
 
     # ------------------------------------------------------------------
     # encoding helpers

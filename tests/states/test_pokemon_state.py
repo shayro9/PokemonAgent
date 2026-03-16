@@ -10,8 +10,6 @@ from poke_env.battle.status import Status
 
 from env.states.pokemon_state import (
     PokemonState,
-    GEN1_STAT_KEYS,
-    GEN1_BOOST_KEYS,
     ALL_TYPES,
     ALL_STATUSES,
     TRACKED_EFFECTS,
@@ -38,7 +36,7 @@ def make_mock_from_fixture(filename: str) -> MagicMock:
 
 def _expected_array_len():
     hp = stab = 1
-    return hp + len(GEN1_STAT_KEYS) + len(GEN1_BOOST_KEYS) + len(ALL_STATUSES) + len(TRACKED_EFFECTS) + len(ALL_TYPES) + stab
+    return hp + len(PokemonState.STAT_KEYS) + len(PokemonState.BOOST_KEYS) + len(ALL_STATUSES) + len(TRACKED_EFFECTS) + len(ALL_TYPES) + stab
 
 
 # ---------------------------------------------------------------------------
@@ -54,7 +52,7 @@ class PokemonStatsBaseTest:
     ps: PokemonState
 
     def test_stats_shape(self):
-        self.assertEqual(self.ps.stats.shape, (len(GEN1_STAT_KEYS),))
+        self.assertEqual(self.ps.stats.shape, (len(PokemonState.STAT_KEYS),))
 
     def test_stats_dtype(self):
         self.assertEqual(self.ps.stats.dtype, np.float32)
@@ -64,7 +62,7 @@ class PokemonStatsBaseTest:
         self.assertTrue(np.all(enc >= 0.0) and np.all(enc <= 1.0))
 
     def test_boosts_shape(self):
-        self.assertEqual(self.ps.boosts.shape, (len(GEN1_BOOST_KEYS),))
+        self.assertEqual(self.ps.boosts.shape, (len(PokemonState.BOOST_KEYS),))
 
     def test_boosts_dtype(self):
         self.assertEqual(self.ps.boosts.dtype, np.float32)
@@ -115,16 +113,16 @@ class TestPokemonStatsEmpty(PokemonStatsBaseTest, unittest.TestCase):
     """PokemonStats with no pokemon — all zeros."""
 
     def setUp(self):
-        self.ps = PokemonState(gen1=True)
+        self.ps = PokemonState()
 
     def test_hp_is_zero(self):
         self.assertEqual(self.ps.hp, 0.0)
 
     def test_stats_all_zero(self):
-        np.testing.assert_array_equal(self.ps.stats, np.zeros(len(GEN1_STAT_KEYS)))
+        np.testing.assert_array_equal(self.ps.stats, np.zeros(len(PokemonState.STAT_KEYS)))
 
     def test_boosts_all_zero(self):
-        np.testing.assert_array_equal(self.ps.boosts, np.zeros(len(GEN1_BOOST_KEYS)))
+        np.testing.assert_array_equal(self.ps.boosts, np.zeros(len(PokemonState.BOOST_KEYS)))
 
     def test_status_all_zero(self):
         np.testing.assert_array_equal(self.ps.status, np.zeros(len(ALL_STATUSES)))
