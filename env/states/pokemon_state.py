@@ -80,7 +80,7 @@ class PokemonState:
         return np.array([boosts.get(k, 0) for k in boost_keys], dtype=np.float32)
 
     @staticmethod
-    def _encode_stab(self, pokemon: Pokemon) -> float:
+    def _encode_stab(pokemon: Pokemon) -> float:
         """Calculate STAB multiplier based on pokemon"""
         return 1.5
 
