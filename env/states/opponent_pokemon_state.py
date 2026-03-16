@@ -90,8 +90,8 @@ class OpponentPokemonState(PokemonState):
             if stat_belief is not None
             else np.zeros(_STAT_BELIEF_DIM, dtype=np.float32)
         )
-        self.stats: np.ndarray      = _belief[:_STAT_BELIEF_DIM / 2]
-        self.stats_std: np.ndarray  = _belief[_STAT_BELIEF_DIM / 2:]
+        self.stats: np.ndarray      = _belief[:_STAT_BELIEF_DIM // 2]
+        self.stats_std: np.ndarray  = _belief[_STAT_BELIEF_DIM // 2:]
 
         # ── Opponent-specific flags ──────────────────────────────────────
         self.preparing: float = (
@@ -121,7 +121,7 @@ class OpponentPokemonState(PokemonState):
             self.status,                # (7)
             self.effects,               # (3)
             [self.preparing],           # (1)
-            [self.stab / 2.0],          # (1)
+            [self.stab],          # (1)
             [self.protect_belief],      # (1)
         ]).astype(np.float32)
 
