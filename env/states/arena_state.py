@@ -80,6 +80,23 @@ class ArenaState:
         turn = 1
         return turn + len(self.my_screens) + len(self.opp_screens)
 
+    def describe(self) -> str:
+        """Human-readable breakdown of the arena state. Useful for debugging."""
+        screen_names = [sc.name for sc in self.TRACKED_SCREENS]
+        my_active    = [screen_names[i] for i, v in enumerate(self.my_screens)  if v == 1.0]
+        opp_active   = [screen_names[i] for i, v in enumerate(self.opp_screens) if v == 1.0]
+
+        lines = [
+            f"Turn          : {self.turn} (encoded: {self.turn_encoded():.3f})",
+            f"My  screens   : {my_active  if my_active  else 'none'}",
+            f"Opp screens   : {opp_active if opp_active else 'none'}",
+            f"Array length  : {self.array_len()}",
+        ]
+        return "\n".join(lines)
+
+    def __repr__(self) -> str:
+        return self.describe()
+
 
 
 
