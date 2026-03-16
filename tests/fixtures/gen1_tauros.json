@@ -1,0 +1,29 @@
+{
+  "_comment": "Gen 1 OU Tauros fixture. Physical attacker, Normal type, no status, +2 atk +2 spa/spd (special) +1 spe boosts.",
+  "_note_boosts": "In Gen 1 Special is one stat (spc), so spa and spd boosts are always equal. poke-env tracks both as separate keys but they should always match.",
+  "species": "tauros",
+  "gen": 1,
+  "level": 100,
+  "types": ["NORMAL"],
+  "stats": {
+    "hp": 303,
+    "atk": 298,
+    "def": 228,
+    "spc": 158,
+    "spe": 318
+  },
+  "boosts": {
+    "accuracy": 0,
+    "atk": 2,
+    "def": 0,
+    "evasion": 0,
+    "spa": -2,
+    "spd": -2,
+    "spe": 1
+  },
+  "status": null,
+  "effects": {},
+  "current_hp_fraction": 1.0,
+  "stab_multiplier": 1.5
+}
+
