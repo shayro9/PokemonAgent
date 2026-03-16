@@ -84,7 +84,7 @@ def convert_metamon_state_to_vector(state: Dict[str, Any], turn) -> np.ndarray:
     vec = []
 
     # Turn (1 dim) - not in metamon, use 0
-    vec.append(turn)
+    vec.append(turn / 30.0)
 
     # Weather (9 dims)
     weather_vec = embed_weather(getattr(Weather, state["weather"], None))
@@ -246,7 +246,6 @@ def convert_metamon_battle(
             continue
 
         state = convert_metamon_state_to_vector(obs, turn_idx)
-
         state_list = state.tolist()
         samples.append({
             "obs": state_list,
@@ -255,6 +254,9 @@ def convert_metamon_battle(
             "battle_id": battle_id,
             "player": "p1",
         })
+
+    outcome = 1 if observations[-1]['battle_won'] else 0
+    samples[-1].update({"outcome": outcome})
 
     return samples
 

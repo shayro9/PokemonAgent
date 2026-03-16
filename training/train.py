@@ -13,6 +13,7 @@ from training.battle_metrics_log import *
 
 from env.env_builder import build_env
 from .evaluation import evaluate_model, print_eval_summary, build_fixed_eval_pool
+from .supervised_warmup import pretrain_from_human_data
 
 LR = 3e-4
 LR_DECAY = 0.9
@@ -113,6 +114,8 @@ def train_model(
         clip_range_vf=0.2,
         n_epochs=5,
     )
+
+    model = pretrain_from_human_data(model=model, data_path="./data/supervised/gen1ou_move.jsonl")
 
     team_label = (
         next(name for name, team in TEAM_BY_NAME.items() if team == train_team)

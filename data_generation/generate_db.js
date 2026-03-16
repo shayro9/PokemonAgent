@@ -7,8 +7,8 @@ const { Teams } = require('../pokemon-showdown/dist/sim/teams');
 const { Dex } = require('../pokemon-showdown/dist/sim/dex');
 
 // ─── CONFIG ────────────────────────────────────────────────────────────────
-const FORMAT = 'gen9randombattle';
-const OUTPUT_FILE = './data/matchups_gen9randombattle_db.json';
+const FORMAT = 'gen1ou';
+const OUTPUT_FILE = './data/matchups_gen1ou_db.json';
 
 // 'teams' → original behaviour (one mon per entry)
 // 'matchups' → paired 1v1 matchups with winnability filter
@@ -61,6 +61,13 @@ function canDamage(attacker, defender) {
 function pickOneMon(team) {
     return team[Math.floor(Math.random() * team.length)];
 }
+
+function normalizeMon(mon) {
+    // Teams.generate() sets gender=false for genderless mons (Gen 1).
+    // poke-env can't handle the stringified 'False' — coerce to '' instead.
+    if (!mon.gender) mon.gender = 'M';
+    return mon;
+}
 // ───────────────────────────────────────────────────────────────────────────
 
 // ─── TEAMS MODE ────────────────────────────────────────────────────────────
@@ -89,7 +96,7 @@ function generateTeamsPool() {
             }
 
             perSpeciesCount.set(sp, cnt + 1);
-            pool.push(mon);
+            pool.push(normalizeMon(mon));
         }
 
         if ((i + 1) % 1000 === 0)
@@ -139,7 +146,7 @@ function generateMatchupsPool() {
             seenKeys.add(key);
         }
 
-        matchups.push({ agent, opponent: opp });
+        matchups.push({ agent: normalizeMon(agent), opponent: normalizeMon(opp) });
 
         if (matchups.length % 1000 === 0)
             console.log(`  collected ${matchups.length} matchups (${attempts} attempts, ${filteredUnwinnable} unwinnable filtered)`);
