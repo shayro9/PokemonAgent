@@ -36,13 +36,13 @@ Each line in the output JSONL file is a single timestep:
 
 import argparse
 import json
+import re
 import sys
 import lz4.frame
 
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 import numpy as np
-from six import moves
 
 from env.embed import (
     embed_status, embed_weather, embed_effects, calc_types_vector, embed_move,
@@ -51,8 +51,6 @@ from env.embed import (
 )
 
 from combat.stats_belief import build_raw_stat_belief
-
-GEN = 1
 
 
 def load_metamon_json(filepath: Path) -> Dict[str, Any]:
@@ -68,10 +66,11 @@ def load_metamon_json(filepath: Path) -> Dict[str, Any]:
         return json.load(f)
 
 
-def convert_metamon_state_to_vector(state: Dict[str, Any], turn) -> np.ndarray:
+def convert_metamon_state_to_vector(state: Dict[str, Any], turn, gen :Optional[int] = 1) -> np.ndarray:
     """Convert a single metamon state dict to your 383-dim observation vector.
 
     Args:
+        :param gen: pokemon generation
         :param state: One element from the 'states' array in metamon JSON
         :param turn: the index of the state
 
@@ -80,6 +79,10 @@ def convert_metamon_state_to_vector(state: Dict[str, Any], turn) -> np.ndarray:
     """
     my_poke = state["player_active_pokemon"]
     opp_poke = state["opponent_active_pokemon"]
+    match = re.search(r'gen(\d+)', state["format"])
+    gen_number = int(match.group(1))
+
+    gen_number = gen_number if gen_number is not None else gen
 
     vec = []
 
@@ -133,7 +136,7 @@ def convert_metamon_state_to_vector(state: Dict[str, Any], turn) -> np.ndarray:
 
     # Opp stat belief (12 dims: 6 means + 6 stds)
     # Metamon doesn't have belief, use base stats as mean with 0 std
-    opp_stats_belief = build_raw_stat_belief(opp_poke, opp_poke["lvl"], GEN).to_array()
+    opp_stats_belief = build_raw_stat_belief(opp_poke, opp_poke["lvl"], gen_number).to_array()
     vec.extend(opp_stats_belief)
 
     # Opp boosts (7 dims)
@@ -170,22 +173,22 @@ def convert_metamon_state_to_vector(state: Dict[str, Any], turn) -> np.ndarray:
 
     my_types = list(filter(lambda x: x is not None, my_raw_types))
     opp_types = list(filter(lambda x: x is not None, opp_raw_types))
-    vec.extend(calc_types_vector(my_types, opp_tera_type, GEN, True))
+    vec.extend(calc_types_vector(my_types, opp_tera_type, gen_number, True))
 
 
     # My moves (MAX_MOVES * MOVE_EMBED_LEN dims)
     my_moves_vec = np.zeros(MAX_MOVES * MOVE_EMBED_LEN, dtype=np.float32)
     for i, move_dict in enumerate(my_poke.get("moves", [])[:MAX_MOVES]):
-        move = Move(move_id=move_dict["name"], gen=GEN)
-        move_emb = embed_move(move, opp_types, my_types, GEN)
+        move = Move(move_id=move_dict["name"], gen=gen_number)
+        move_emb = embed_move(move, opp_types, my_types, gen_number)
         my_moves_vec[i * MOVE_EMBED_LEN:(i + 1) * MOVE_EMBED_LEN] = move_emb
     vec.extend(my_moves_vec)
 
     # Opp moves (MAX_MOVES * MOVE_EMBED_LEN dims)
     opp_moves_vec = np.zeros(MAX_MOVES * MOVE_EMBED_LEN, dtype=np.float32)
     for i, move_dict in enumerate(opp_poke.get("moves", [])[:MAX_MOVES]):
-        move = Move(move_id=move_dict["name"], gen=GEN)
-        move_emb = embed_move(move, my_types, opp_types, GEN)
+        move = Move(move_id=move_dict["name"], gen=gen_number)
+        move_emb = embed_move(move, my_types, opp_types, gen_number)
         opp_moves_vec[i * MOVE_EMBED_LEN:(i + 1) * MOVE_EMBED_LEN] = move_emb
     vec.extend(opp_moves_vec)
 
@@ -200,12 +203,14 @@ def convert_metamon_state_to_vector(state: Dict[str, Any], turn) -> np.ndarray:
 def convert_metamon_battle(
     battle_data: Dict[str, Any],
     battle_id: str,
+    gen: Optional[int] = 0,
 ) -> List[Dict[str, Any]]:
     """Convert a single metamon battle to your sample format.
 
     Args:
         battle_data: Metamon parsed battle data
         battle_id: Battle identifier
+        gen: pokemon generation number
 
     Returns:
         List of sample dicts in your format
@@ -237,15 +242,17 @@ def convert_metamon_battle(
 
         # Determine action type based on action index
         # This is a heuristic - adjust based on your action space
-        if action > 3:  # Assuming 4-8 are switches
+        if 4 <= action <= 9 :  # Assuming 4-9 are switches
             action_type = "switch"
+            action = action - 4
         elif 0 <= action <= 3:  # 0-3 are moves
             action_type = "move"
+            action = action + 6
         else:
             # skip
             continue
 
-        state = convert_metamon_state_to_vector(obs, turn_idx)
+        state = convert_metamon_state_to_vector(obs, turn_idx, gen)
         state_list = state.tolist()
         samples.append({
             "obs": state_list,
@@ -255,7 +262,7 @@ def convert_metamon_battle(
             "player": "p1",
         })
 
-    outcome = 1 if observations[-1]['battle_won'] else 0
+    outcome = 1 if observations[-1]['battle_won'] else -1
     samples[-1].update({"outcome": outcome})
 
     return samples
@@ -267,6 +274,7 @@ def convert_dataset(
     split_actions: bool = False,
     max_battles: Optional[int] = None,
     auto_search: bool = True,
+    gen: int = 0,
 ) -> None:
     """Convert metamon JSON files to your format.
 
@@ -276,6 +284,7 @@ def convert_dataset(
         split_actions: If True, create separate files for moves/switches
         max_battles: Maximum number of battles to process (None = all)
         auto_search: If True, automatically search subdirectories for JSON files
+        gen: pokemon generation number
     """
     # Find all JSON files
     json_files = list(input_dir.rglob("*.json.lz4"))
@@ -405,6 +414,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Maximum number of battles to process (default: all)",
     )
     parser.add_argument(
+        "--gen",
+        type=int,
+        default=1,
+        help="relevant gen (default: gen1)",
+    )
+    parser.add_argument(
         "--no-auto-search",
         action="store_true",
         help="Don't automatically search subdirectories for JSON files",
@@ -428,6 +443,7 @@ def main():
         split_actions=args.split_actions,
         max_battles=args.max_battles,
         auto_search=not args.no_auto_search,
+        gen=args.gen,
     )
 
 
