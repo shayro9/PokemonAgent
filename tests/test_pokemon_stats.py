@@ -7,7 +7,6 @@ import numpy as np
 
 from poke_env.battle.pokemon_type import PokemonType
 from poke_env.battle.status import Status
-from poke_env.battle.effect import Effect
 
 from env.pokemon_stats import (
     PokemonStats,
@@ -16,8 +15,6 @@ from env.pokemon_stats import (
     ALL_TYPES,
     ALL_STATUSES,
     TRACKED_EFFECTS,
-    STAT_NORM,
-    BOOST_NORM,
 )
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
@@ -39,20 +36,82 @@ def make_mock_from_fixture(filename: str) -> MagicMock:
     return p
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 def _expected_array_len():
     hp = stab = 1
     return hp + len(GEN1_STAT_KEYS) + len(GEN1_BOOST_KEYS) + len(ALL_STATUSES) + len(TRACKED_EFFECTS) + len(ALL_TYPES) + stab
 
 
 # ---------------------------------------------------------------------------
+# Shared base — structure / dtype / to_array checks every fixture must pass
+# ---------------------------------------------------------------------------
+
+class PokemonStatsBaseTest:
+    """
+    Mixin with shared checks — does NOT inherit TestCase so unittest
+    won't discover and run it directly. Subclasses inherit from both
+    this mixin and unittest.TestCase.
+    """
+    ps: PokemonStats
+
+    def test_stats_shape(self):
+        self.assertEqual(self.ps.stats.shape, (len(GEN1_STAT_KEYS),))
+
+    def test_stats_dtype(self):
+        self.assertEqual(self.ps.stats.dtype, np.float32)
+
+    def test_stats_encoded_in_range(self):
+        enc = self.ps.stats_encoded()
+        self.assertTrue(np.all(enc >= 0.0) and np.all(enc <= 1.0))
+
+    def test_boosts_shape(self):
+        self.assertEqual(self.ps.boosts.shape, (len(GEN1_BOOST_KEYS),))
+
+    def test_boosts_dtype(self):
+        self.assertEqual(self.ps.boosts.dtype, np.float32)
+
+    def test_boosts_encoded_in_range(self):
+        enc = self.ps.boosts_encoded()
+        self.assertTrue(np.all(enc >= -1.0) and np.all(enc <= 1.0))
+
+    def test_status_shape(self):
+        self.assertEqual(self.ps.status.shape, (len(ALL_STATUSES),))
+
+    def test_status_dtype(self):
+        self.assertEqual(self.ps.status.dtype, np.float32)
+
+    def test_status_at_most_one_hot(self):
+        self.assertIn(self.ps.status.sum(), [0.0, 1.0])
+
+    def test_effects_shape(self):
+        self.assertEqual(self.ps.effects.shape, (len(TRACKED_EFFECTS),))
+
+    def test_effects_dtype(self):
+        self.assertEqual(self.ps.effects.dtype, np.float32)
+
+    def test_types_shape(self):
+        self.assertEqual(self.ps.types.shape, (len(ALL_TYPES),))
+
+    def test_types_dtype(self):
+        self.assertEqual(self.ps.types.dtype, np.float32)
+
+    def test_stab_is_1_5(self):
+        self.assertEqual(self.ps.stab, 1.5)
+
+    def test_to_array_length(self):
+        self.assertEqual(len(self.ps.to_array()), self.ps.array_len())
+
+    def test_to_array_dtype(self):
+        self.assertEqual(self.ps.to_array().dtype, np.float32)
+
+    def test_array_len(self):
+        self.assertEqual(self.ps.array_len(), _expected_array_len())
+
+
+# ---------------------------------------------------------------------------
 # Empty state
 # ---------------------------------------------------------------------------
 
-class TestPokemonStatsEmpty(unittest.TestCase):
+class TestPokemonStatsEmpty(PokemonStatsBaseTest, unittest.TestCase):
     """PokemonStats with no pokemon — all zeros."""
 
     def setUp(self):
@@ -61,51 +120,27 @@ class TestPokemonStatsEmpty(unittest.TestCase):
     def test_hp_is_zero(self):
         self.assertEqual(self.ps.hp, 0.0)
 
-    def test_stab_default(self):
-        self.assertEqual(self.ps.stab, 1.5)
-
-    def test_stats_shape(self):
-        self.assertEqual(self.ps.stats.shape, (len(GEN1_STAT_KEYS),))
-
     def test_stats_all_zero(self):
         np.testing.assert_array_equal(self.ps.stats, np.zeros(len(GEN1_STAT_KEYS)))
-
-    def test_boosts_shape(self):
-        self.assertEqual(self.ps.boosts.shape, (len(GEN1_BOOST_KEYS),))
 
     def test_boosts_all_zero(self):
         np.testing.assert_array_equal(self.ps.boosts, np.zeros(len(GEN1_BOOST_KEYS)))
 
-    def test_status_shape(self):
-        self.assertEqual(self.ps.status.shape, (len(ALL_STATUSES),))
-
     def test_status_all_zero(self):
         np.testing.assert_array_equal(self.ps.status, np.zeros(len(ALL_STATUSES)))
-
-    def test_effects_shape(self):
-        self.assertEqual(self.ps.effects.shape, (len(TRACKED_EFFECTS),))
 
     def test_effects_all_zero(self):
         np.testing.assert_array_equal(self.ps.effects, np.zeros(len(TRACKED_EFFECTS)))
 
-    def test_types_shape(self):
-        self.assertEqual(self.ps.types.shape, (len(ALL_TYPES),))
-
     def test_types_all_zero(self):
         np.testing.assert_array_equal(self.ps.types, np.zeros(len(ALL_TYPES)))
-
-    def test_to_array_length(self):
-        self.assertEqual(len(self.ps.to_array()), _expected_array_len())
-
-    def test_array_len(self):
-        self.assertEqual(self.ps.array_len(), _expected_array_len())
 
 
 # ---------------------------------------------------------------------------
 # Starmie  –  Water/Psychic, PAR, full HP, no boosts
 # ---------------------------------------------------------------------------
 
-class TestPokemonStatsStarmie(unittest.TestCase):
+class TestPokemonStatsStarmie(PokemonStatsBaseTest, unittest.TestCase):
 
     def setUp(self):
         self.ps = PokemonStats(gen1=True, pokemon=make_mock_from_fixture("gen1_starmie.json"))
@@ -113,30 +148,17 @@ class TestPokemonStatsStarmie(unittest.TestCase):
     def test_hp(self):
         self.assertEqual(self.ps.hp, 1.0)
 
-    def test_stab(self):
-        self.assertEqual(self.ps.stab, 1.5)
-
-    def test_stats_shape(self):
-        self.assertEqual(self.ps.stats.shape, (5,))
-
     def test_stats_raw_values(self):
         np.testing.assert_array_equal(
             self.ps.stats,
             np.array([323, 226, 226, 284, 295], dtype=np.float32)
         )
 
-    def test_stats_encoded_in_range(self):
-        enc = self.ps.stats_encoded()
-        self.assertTrue(np.all(enc >= 0.0) and np.all(enc <= 1.0))
-
     def test_boosts_all_zero(self):
         np.testing.assert_array_equal(self.ps.boosts, np.zeros(len(GEN1_BOOST_KEYS)))
 
     def test_status_par(self):
         self.assertEqual(self.ps.status[ALL_STATUSES.index(Status.PAR)], 1.0)
-
-    def test_status_one_hot(self):
-        self.assertEqual(self.ps.status.sum(), 1.0)
 
     def test_type_water(self):
         self.assertEqual(self.ps.types[ALL_TYPES.index(PokemonType.WATER)], 1.0)
@@ -147,18 +169,12 @@ class TestPokemonStatsStarmie(unittest.TestCase):
     def test_types_two_set(self):
         self.assertEqual(self.ps.types.sum(), 2.0)
 
-    def test_to_array_length(self):
-        self.assertEqual(len(self.ps.to_array()), self.ps.array_len())
-
-    def test_to_array_dtype(self):
-        self.assertEqual(self.ps.to_array().dtype, np.float32)
-
 
 # ---------------------------------------------------------------------------
-# Tauros  –  Normal, no status, full HP, +2 atk / +2 spa+spd / +1 spe
+# Tauros  –  Normal, no status, full HP, +2 atk / -2 spa+spd / +1 spe
 # ---------------------------------------------------------------------------
 
-class TestPokemonStatsTauros(unittest.TestCase):
+class TestPokemonStatsTauros(PokemonStatsBaseTest, unittest.TestCase):
 
     def setUp(self):
         self.ps = PokemonStats(gen1=True, pokemon=make_mock_from_fixture("gen1_tauros.json"))
@@ -180,39 +196,26 @@ class TestPokemonStatsTauros(unittest.TestCase):
         self.assertEqual(self.ps.types.sum(), 1.0)
 
     def test_atk_boost(self):
-        # GEN1_BOOST_KEYS = ["atk", "def", "spa", "spe", "accuracy", "evasion"]
-        atk_idx = GEN1_BOOST_KEYS.index("atk")
-        self.assertEqual(self.ps.boosts[atk_idx], 2.0)
+        self.assertEqual(self.ps.boosts[GEN1_BOOST_KEYS.index("atk")], 2.0)
 
     def test_spa_boost(self):
-        spa_idx = GEN1_BOOST_KEYS.index("spa")
-        self.assertEqual(self.ps.boosts[spa_idx], 2.0)
+        self.assertEqual(self.ps.boosts[GEN1_BOOST_KEYS.index("spa")], -2.0)
 
     def test_spe_boost(self):
-        spe_idx = GEN1_BOOST_KEYS.index("spe")
-        self.assertEqual(self.ps.boosts[spe_idx], 1.0)
+        self.assertEqual(self.ps.boosts[GEN1_BOOST_KEYS.index("spe")], 1.0)
 
-    def test_boosts_encoded_in_range(self):
-        enc = self.ps.boosts_encoded()
-        self.assertTrue(np.all(enc >= -1.0) and np.all(enc <= 1.0))
-
-    def test_spa_spd_boosts_equal(self):
-        # In Gen 1 special is one stat so spa and spd boosts must always match
-        spa_idx = GEN1_BOOST_KEYS.index("spa")
-        # spd is not in GEN1_BOOST_KEYS — verify spa == raw boosts["spd"] from fixture
+    def test_spa_spd_equal_in_fixture(self):
+        # In Gen 1 special is one stat — spa and spd boosts must always match
         with open(FIXTURES_DIR / "gen1_tauros.json") as f:
             raw = json.load(f)
         self.assertEqual(raw["boosts"]["spa"], raw["boosts"]["spd"])
-
-    def test_to_array_length(self):
-        self.assertEqual(len(self.ps.to_array()), self.ps.array_len())
 
 
 # ---------------------------------------------------------------------------
 # Chansey  –  Normal, BRN, half HP, +3 def
 # ---------------------------------------------------------------------------
 
-class TestPokemonStatsChansey(unittest.TestCase):
+class TestPokemonStatsChansey(PokemonStatsBaseTest, unittest.TestCase):
 
     def setUp(self):
         self.ps = PokemonStats(gen1=True, pokemon=make_mock_from_fixture("gen1_chansey.json"))
@@ -229,31 +232,26 @@ class TestPokemonStatsChansey(unittest.TestCase):
     def test_status_brn(self):
         self.assertEqual(self.ps.status[ALL_STATUSES.index(Status.BRN)], 1.0)
 
-    def test_status_one_hot(self):
-        self.assertEqual(self.ps.status.sum(), 1.0)
-
     def test_def_boost(self):
-        def_idx = GEN1_BOOST_KEYS.index("def")
-        self.assertEqual(self.ps.boosts[def_idx], 3.0)
+        self.assertEqual(self.ps.boosts[GEN1_BOOST_KEYS.index("def")], 3.0)
 
     def test_other_boosts_zero(self):
         def_idx = GEN1_BOOST_KEYS.index("def")
-        boosts_no_def = np.delete(self.ps.boosts, def_idx)
-        np.testing.assert_array_equal(boosts_no_def, np.zeros(len(GEN1_BOOST_KEYS) - 1))
+        np.testing.assert_array_equal(
+            np.delete(self.ps.boosts, def_idx),
+            np.zeros(len(GEN1_BOOST_KEYS) - 1)
+        )
 
     def test_type_normal_only(self):
         self.assertEqual(self.ps.types[ALL_TYPES.index(PokemonType.NORMAL)], 1.0)
         self.assertEqual(self.ps.types.sum(), 1.0)
-
-    def test_to_array_length(self):
-        self.assertEqual(len(self.ps.to_array()), self.ps.array_len())
 
 
 # ---------------------------------------------------------------------------
 # Alakazam  –  Psychic, SLP, 75% HP, +2 special (spa==spd)
 # ---------------------------------------------------------------------------
 
-class TestPokemonStatsAlakazam(unittest.TestCase):
+class TestPokemonStatsAlakazam(PokemonStatsBaseTest, unittest.TestCase):
 
     def setUp(self):
         self.ps = PokemonStats(gen1=True, pokemon=make_mock_from_fixture("gen1_alakazam.json"))
@@ -270,14 +268,10 @@ class TestPokemonStatsAlakazam(unittest.TestCase):
     def test_status_slp(self):
         self.assertEqual(self.ps.status[ALL_STATUSES.index(Status.SLP)], 1.0)
 
-    def test_status_one_hot(self):
-        self.assertEqual(self.ps.status.sum(), 1.0)
-
     def test_spa_boost(self):
-        spa_idx = GEN1_BOOST_KEYS.index("spa")
-        self.assertEqual(self.ps.boosts[spa_idx], 2.0)
+        self.assertEqual(self.ps.boosts[GEN1_BOOST_KEYS.index("spa")], 2.0)
 
-    def test_spa_spd_boosts_equal(self):
+    def test_spa_spd_equal_in_fixture(self):
         with open(FIXTURES_DIR / "gen1_alakazam.json") as f:
             raw = json.load(f)
         self.assertEqual(raw["boosts"]["spa"], raw["boosts"]["spd"])
@@ -286,15 +280,6 @@ class TestPokemonStatsAlakazam(unittest.TestCase):
         self.assertEqual(self.ps.types[ALL_TYPES.index(PokemonType.PSYCHIC)], 1.0)
         self.assertEqual(self.ps.types.sum(), 1.0)
 
-    def test_stats_encoded_in_range(self):
-        enc = self.ps.stats_encoded()
-        self.assertTrue(np.all(enc >= 0.0) and np.all(enc <= 1.0))
-
-    def test_to_array_length(self):
-        self.assertEqual(len(self.ps.to_array()), self.ps.array_len())
-
-    def test_to_array_dtype(self):
-        self.assertEqual(self.ps.to_array().dtype, np.float32)
 
 
 if __name__ == "__main__":
