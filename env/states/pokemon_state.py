@@ -71,6 +71,7 @@ class PokemonState(ABC):
             self.hp      = pokemon.current_hp_fraction
             self.species = pokemon.species
             self.boosts  = self._encode_boosts(pokemon.boosts, self.BOOST_KEYS)
+            self.types   = self._encode_types(pokemon.types)
             self.status  = self._encode_status(pokemon.status)
             self.effects = self._encode_effects(pokemon.effects)
             self.stab    = self._encode_stab(pokemon)
@@ -78,6 +79,7 @@ class PokemonState(ABC):
             self.hp      = 0.0
             self.species = "none"
             self.boosts  = np.zeros(len(self.BOOST_KEYS),  dtype=np.float32)
+            self.types   = np.zeros(len(ALL_TYPES), dtype=np.int32)
             self.status  = self._encode_status(None)
             self.effects = self._encode_effects({})
             self.stab    = self._encode_stab(None)
