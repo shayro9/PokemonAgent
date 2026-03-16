@@ -38,6 +38,7 @@ class PokemonState:
     def __init__(self, pokemon: Optional[Pokemon] = None):
         if pokemon is not None:
             self.hp      = pokemon.current_hp_fraction
+            self.species = pokemon.species
             self.stats   = self._encode_stats(pokemon.stats,   self.STAT_KEYS)
             self.boosts  = self._encode_boosts(pokemon.boosts, self.BOOST_KEYS)
             self.status  = self._encode_status(pokemon.status)
@@ -46,6 +47,7 @@ class PokemonState:
             self.stab    = self._encode_stab(pokemon)
         else:
             self.hp      = 0.0
+            self.species = "none"
             self.stats   = np.zeros(len(self.STAT_KEYS),   dtype=np.float32)
             self.boosts  = np.zeros(len(self.BOOST_KEYS),  dtype=np.float32)
             self.status  = self._encode_status(None)
@@ -112,3 +114,33 @@ class PokemonState:
     def array_len(self) -> int:
         # +1 fo hp and +1 for stab, the rest are variable-length lists
         return 1 + len(self.stats) + len(self.boosts) + len(self.status) + len(self.effects) + len(self.types) + 1
+
+    def describe(self) -> str:
+        """Human-readable breakdown of the pokemon state. Useful for debugging."""
+        active_status  = [ALL_STATUSES[i].name for i, v in enumerate(self.status)  if v == 1.0]
+        active_effects = [TRACKED_EFFECTS[i].name for i, v in enumerate(self.effects) if v == 1.0]
+        active_types   = [ALL_TYPES[i].name for i, v in enumerate(self.types) if v == 1.0]
+
+        stat_lines = " | ".join(
+            f"{k}={int(v)}" for k, v in zip(self.STAT_KEYS, self.stats)
+        )
+        boost_lines = " | ".join(
+            f"{k}={int(v):+d}" for k, v in zip(self.BOOST_KEYS, self.boosts) if v != 0
+        )
+
+        lines = [
+            f"Species       : {self.species}",
+            f"HP            : {self.hp:.2f}",
+            f"Stats         : {stat_lines}",
+            f"Boosts        : {boost_lines if boost_lines else 'none'}",
+            f"Status        : {active_status  if active_status  else 'none'}",
+            f"Effects       : {active_effects if active_effects else 'none'}",
+            f"Types         : {active_types}",
+            f"STAB          : {self.stab}",
+            f"Array length  : {self.array_len()}",
+        ]
+        return "\n".join(lines)
+
+    def __repr__(self) -> str:
+        return self.describe()
+

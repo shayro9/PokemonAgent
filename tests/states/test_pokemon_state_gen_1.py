@@ -26,6 +26,9 @@ class TestPokemonStatsStarmie(PokemonStatsBaseTest, unittest.TestCase):
     def test_hp(self):
         self.assertEqual(self.ps.hp, 1.0)
 
+    def test_species(self):
+        self.assertEqual(self.ps.species, "starmie")
+
     def test_stats_raw_values(self):
         np.testing.assert_array_equal(
             self.ps.stats,
@@ -59,6 +62,9 @@ class TestPokemonStatsTauros(PokemonStatsBaseTest, unittest.TestCase):
 
     def test_hp(self):
         self.assertEqual(self.ps.hp, 1.0)
+
+    def test_species(self):
+        self.assertEqual(self.ps.species, "tauros")
 
     def test_stats_raw_values(self):
         np.testing.assert_array_equal(
@@ -101,6 +107,9 @@ class TestPokemonStatsChansey(PokemonStatsBaseTest, unittest.TestCase):
     def test_hp_fraction(self):
         self.assertAlmostEqual(self.ps.hp, 0.5)
 
+    def test_species(self):
+        self.assertEqual(self.ps.species, "chansey")
+
     def test_stats_raw_values(self):
         np.testing.assert_array_equal(
             self.ps.stats,
@@ -136,6 +145,9 @@ class TestPokemonStatsAlakazam(PokemonStatsBaseTest, unittest.TestCase):
 
     def test_hp_fraction(self):
         self.assertAlmostEqual(self.ps.hp, 0.75)
+
+    def test_species(self):
+        self.assertEqual(self.ps.species, "alakazam")
 
     def test_stats_raw_values(self):
         np.testing.assert_array_equal(
