@@ -41,7 +41,7 @@ GEN1_BOOST_KEYS     = ["atk", "def", "spa", "spe", "accuracy", "evasion"]  # 6
 MODERN_BOOST_KEYS   = ["atk", "def", "spa", "spd", "spe", "accuracy", "evasion"]  # 7
 
 STAT_NORM   = 512.0  # divide raw stats → [0, 1]
-BOOST_NORM  = 6.0  # boost stages −6…+6 → [−1, +1]
+BOOST_NORM  = 6.0    # boost stages −6…+6 → [−1, +1]
 
 
 class PokemonState(ABC):
@@ -104,7 +104,6 @@ class PokemonState(ABC):
     @abstractmethod
     def __repr__(self) -> str:
         pass
-
 
     # ------------------------------------------------------------------
     # Shared encoding helpers

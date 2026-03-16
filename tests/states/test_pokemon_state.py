@@ -8,9 +8,9 @@ import numpy as np
 from poke_env.battle.pokemon_type import PokemonType
 from poke_env.battle.status import Status
 
+from env.states.my_pokemon_state import MyPokemonState
 from env.states.pokemon_state import (
     PokemonState,
-    ALL_TYPES,
     ALL_STATUSES,
     TRACKED_EFFECTS,
 )
@@ -37,7 +37,7 @@ def make_mock_from_fixture(filename: str) -> MagicMock:
 
 def _expected_array_len():
     hp = stab = 1
-    return hp + len(PokemonState.STAT_KEYS) + len(PokemonState.BOOST_KEYS) + len(ALL_STATUSES) + len(TRACKED_EFFECTS) + len(ALL_TYPES) + stab
+    return hp + len(PokemonState.STAT_KEYS) + len(PokemonState.BOOST_KEYS) + len(ALL_STATUSES) + len(TRACKED_EFFECTS) + stab
 
 
 # ---------------------------------------------------------------------------
@@ -50,7 +50,9 @@ class PokemonStatsBaseTest:
     won't discover and run it directly. Subclasses inherit from both
     this mixin and unittest.TestCase.
     """
-    ps: PokemonState
+    ps: MyPokemonState
+
+    # ── stats ────────────────────────────────────────────────────────────
 
     def test_stats_shape(self):
         self.assertEqual(self.ps.stats.shape, (len(PokemonState.STAT_KEYS),))
@@ -62,6 +64,8 @@ class PokemonStatsBaseTest:
         enc = self.ps.stats_encoded()
         self.assertTrue(np.all(enc >= 0.0) and np.all(enc <= 1.0))
 
+    # ── boosts ───────────────────────────────────────────────────────────
+
     def test_boosts_shape(self):
         self.assertEqual(self.ps.boosts.shape, (len(PokemonState.BOOST_KEYS),))
 
@@ -72,6 +76,8 @@ class PokemonStatsBaseTest:
         enc = self.ps.boosts_encoded()
         self.assertTrue(np.all(enc >= -1.0) and np.all(enc <= 1.0))
 
+    # ── status ───────────────────────────────────────────────────────────
+
     def test_status_shape(self):
         self.assertEqual(self.ps.status.shape, (len(ALL_STATUSES),))
 
@@ -81,20 +87,20 @@ class PokemonStatsBaseTest:
     def test_status_at_most_one_hot(self):
         self.assertIn(self.ps.status.sum(), [0.0, 1.0])
 
+    # ── effects ──────────────────────────────────────────────────────────
+
     def test_effects_shape(self):
         self.assertEqual(self.ps.effects.shape, (len(TRACKED_EFFECTS),))
 
     def test_effects_dtype(self):
         self.assertEqual(self.ps.effects.dtype, np.float32)
 
-    def test_types_shape(self):
-        self.assertEqual(self.ps.types.shape, (len(ALL_TYPES),))
-
-    def test_types_dtype(self):
-        self.assertEqual(self.ps.types.dtype, np.float32)
+    # ── stab: raw multiplier stored on object; normalised inside to_array ─
 
     def test_stab_is_1_5(self):
-        self.assertEqual(self.ps.stab, 1.5)
+        self.assertEqual(self.ps.stab, 1.5 / 2.0)
+
+    # ── to_array ─────────────────────────────────────────────────────────
 
     def test_to_array_length(self):
         self.assertEqual(len(self.ps.to_array()), self.ps.array_len())
@@ -107,14 +113,14 @@ class PokemonStatsBaseTest:
 
 
 # ---------------------------------------------------------------------------
-# Empty state
+# Empty state (no pokemon)
 # ---------------------------------------------------------------------------
 
 class TestPokemonStatsEmpty(PokemonStatsBaseTest, unittest.TestCase):
-    """PokemonStats with no pokemon — all zeros."""
+    """MyPokemonState with no pokemon — all zeros (except stab = 1.5)."""
 
     def setUp(self):
-        self.ps = PokemonState()
+        self.ps = MyPokemonState()
 
     def test_hp_is_zero(self):
         self.assertEqual(self.ps.hp, 0.0)
@@ -134,9 +140,9 @@ class TestPokemonStatsEmpty(PokemonStatsBaseTest, unittest.TestCase):
     def test_effects_all_zero(self):
         np.testing.assert_array_equal(self.ps.effects, np.zeros(len(TRACKED_EFFECTS)))
 
-    def test_types_all_zero(self):
-        np.testing.assert_array_equal(self.ps.types, np.zeros(len(ALL_TYPES)))
+    def test_stab_is_1_5(self):
+        self.assertEqual(self.ps.stab, 0.75)
+
 
 if __name__ == "__main__":
     unittest.main()
-
