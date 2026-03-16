@@ -89,7 +89,6 @@ class PokemonState(ABC):
     @abstractmethod
     def to_array(self) -> np.ndarray:
         """Return the flat float32 feature vector for this Pokémon."""
-        ...
 
     @abstractmethod
     def array_len(self) -> int:
@@ -97,7 +96,15 @@ class PokemonState(ABC):
 
         Must satisfy ``len(self.to_array()) == self.array_len()`` at all times.
         """
-        ...
+
+    @abstractmethod
+    def describe(self) -> str:
+        """Human-readable breakdown of the pokemon state. Useful for debugging."""
+
+    @abstractmethod
+    def __repr__(self) -> str:
+        pass
+
 
     # ------------------------------------------------------------------
     # Shared encoding helpers

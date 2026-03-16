@@ -25,7 +25,7 @@ from poke_env.battle.pokemon import Pokemon
 
 from env.states.pokemon_state import (
     PokemonState,
-    STAT_NORM,
+    STAT_NORM, ALL_STATUSES, TRACKED_EFFECTS,
 )
 
 
@@ -102,3 +102,30 @@ class MyPokemonState(PokemonState):
             + len(TRACKED_EFFECTS)  # effects
             + 1                     # stab
         )
+
+    def describe(self) -> str:
+        """Human-readable breakdown of the pokemon state. Useful for debugging."""
+        active_status  = [ALL_STATUSES[i].name for i, v in enumerate(self.status)  if v == 1.0]
+        active_effects = [TRACKED_EFFECTS[i].name for i, v in enumerate(self.effects) if v == 1.0]
+
+        stat_lines = " | ".join(
+            f"{k}={int(v)}" for k, v in zip(self.STAT_KEYS, self.stats)
+        )
+        boost_lines = " | ".join(
+            f"{k}={int(v):+d}" for k, v in zip(self.BOOST_KEYS, self.boosts) if v != 0
+        )
+
+        lines = [
+            f"Species       : {self.species}",
+            f"HP            : {self.hp:.2f}",
+            f"Stats         : {stat_lines}",
+            f"Boosts        : {boost_lines if boost_lines else 'none'}",
+            f"Status        : {active_status  if active_status  else 'none'}",
+            f"Effects       : {active_effects if active_effects else 'none'}",
+            f"STAB          : {self.stab}",
+            f"Array length  : {self.array_len()}",
+        ]
+        return "\n".join(lines)
+
+    def __repr__(self) -> str:
+        return self.describe()
