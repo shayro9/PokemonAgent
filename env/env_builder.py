@@ -41,7 +41,7 @@ def build_env(
         agent_team_generator=None,
         battle_team_generator=None,
         use_action_masking: bool = False,
-        strict: bool = False,
+        strict: bool = True,
 ) -> SingleAgentWrapper:
     """Construct the single-agent battle environment.
     
