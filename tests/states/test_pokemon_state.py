@@ -25,6 +25,7 @@ def make_mock_from_fixture(filename: str) -> MagicMock:
 
     p = MagicMock()
     p.current_hp_fraction = data["current_hp_fraction"]
+    p.species             = data["species"]
     p.stats               = data["stats"]
     p.boosts              = data["boosts"]
     p.status              = Status[data["status"]] if data["status"] else None
@@ -117,6 +118,9 @@ class TestPokemonStatsEmpty(PokemonStatsBaseTest, unittest.TestCase):
 
     def test_hp_is_zero(self):
         self.assertEqual(self.ps.hp, 0.0)
+
+    def test_species_is_none(self):
+        self.assertEqual(self.ps.species, "none")
 
     def test_stats_all_zero(self):
         np.testing.assert_array_equal(self.ps.stats, np.zeros(len(PokemonState.STAT_KEYS)))

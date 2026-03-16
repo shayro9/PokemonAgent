@@ -38,6 +38,7 @@ class PokemonState:
     def __init__(self, pokemon: Optional[Pokemon] = None):
         if pokemon is not None:
             self.hp      = pokemon.current_hp_fraction
+            self.species = pokemon.species
             self.stats   = self._encode_stats(pokemon.stats,   self.STAT_KEYS)
             self.boosts  = self._encode_boosts(pokemon.boosts, self.BOOST_KEYS)
             self.status  = self._encode_status(pokemon.status)
@@ -46,6 +47,7 @@ class PokemonState:
             self.stab    = self._encode_stab(pokemon)
         else:
             self.hp      = 0.0
+            self.species = "none"
             self.stats   = np.zeros(len(self.STAT_KEYS),   dtype=np.float32)
             self.boosts  = np.zeros(len(self.BOOST_KEYS),  dtype=np.float32)
             self.status  = self._encode_status(None)
@@ -127,6 +129,7 @@ class PokemonState:
         )
 
         lines = [
+            f"Species       : {self.species}",
             f"HP            : {self.hp:.2f}",
             f"Stats         : {stat_lines}",
             f"Boosts        : {boost_lines if boost_lines else 'none'}",
