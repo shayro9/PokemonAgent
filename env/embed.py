@@ -118,11 +118,11 @@ def embed_move(
     assert len(result) == MOVE_EMBED_LEN, f"embed_move: expected {MOVE_EMBED_LEN}, got {len(result)}"
     return result
 
-
+#delete later
 def embed_status(status) -> np.ndarray:
     return np.array([1.0 if status == s else 0.0 for s in MOVE_STATUSES], dtype=np.float32)
 
-
+#delete later
 def embed_effects(effects) -> np.ndarray:
     return np.array([int(e in effects) for e in TRACKED_EFFECTS])
 
