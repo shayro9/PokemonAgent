@@ -140,7 +140,7 @@ class TestPokemonStatsEmpty(PokemonStatsBaseTest, unittest.TestCase):
     def test_effects_all_zero(self):
         np.testing.assert_array_equal(self.ps.effects, np.zeros(len(TRACKED_EFFECTS)))
 
-    def test_stab_is_1_5(self):
+    def test_stab_is_0_75(self):
         self.assertEqual(self.ps.stab, 0.75)
 
 

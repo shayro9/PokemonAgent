@@ -80,7 +80,7 @@ class PokemonState(ABC):
             self.boosts  = np.zeros(len(self.BOOST_KEYS),  dtype=np.float32)
             self.status  = self._encode_status(None)
             self.effects = self._encode_effects({})
-            self.stab    = 1.5
+            self.stab    = self._encode_stab(None)
 
     # ------------------------------------------------------------------
     # Abstract interface
