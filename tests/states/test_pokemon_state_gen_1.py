@@ -3,12 +3,11 @@ import unittest
 
 import numpy as np
 
-from poke_env.battle.pokemon_type import PokemonType
 from poke_env.battle.status import Status
 
+from env.states.my_pokemon_state import MyPokemonState
 from env.states.pokemon_state import (
     PokemonState,
-    ALL_TYPES,
     ALL_STATUSES,
 )
 from tests.states.test_pokemon_state import PokemonStatsBaseTest, FIXTURES_DIR, make_mock_from_fixture
@@ -21,7 +20,7 @@ from tests.states.test_pokemon_state import PokemonStatsBaseTest, FIXTURES_DIR, 
 class TestPokemonStatsStarmie(PokemonStatsBaseTest, unittest.TestCase):
 
     def setUp(self):
-        self.ps = PokemonState(pokemon=make_mock_from_fixture("gen1_starmie.json"))
+        self.ps = MyPokemonState(pokemon=make_mock_from_fixture("gen1_starmie.json"))
 
     def test_hp(self):
         self.assertEqual(self.ps.hp, 1.0)
@@ -41,14 +40,6 @@ class TestPokemonStatsStarmie(PokemonStatsBaseTest, unittest.TestCase):
     def test_status_par(self):
         self.assertEqual(self.ps.status[ALL_STATUSES.index(Status.PAR)], 1.0)
 
-    def test_type_water(self):
-        self.assertEqual(self.ps.types[ALL_TYPES.index(PokemonType.WATER)], 1.0)
-
-    def test_type_psychic(self):
-        self.assertEqual(self.ps.types[ALL_TYPES.index(PokemonType.PSYCHIC)], 1.0)
-
-    def test_types_two_set(self):
-        self.assertEqual(self.ps.types.sum(), 2.0)
 
 
 # ---------------------------------------------------------------------------
@@ -58,7 +49,7 @@ class TestPokemonStatsStarmie(PokemonStatsBaseTest, unittest.TestCase):
 class TestPokemonStatsTauros(PokemonStatsBaseTest, unittest.TestCase):
 
     def setUp(self):
-        self.ps = PokemonState(pokemon=make_mock_from_fixture("gen1_tauros.json"))
+        self.ps = MyPokemonState(pokemon=make_mock_from_fixture("gen1_tauros.json"))
 
     def test_hp(self):
         self.assertEqual(self.ps.hp, 1.0)
@@ -74,10 +65,6 @@ class TestPokemonStatsTauros(PokemonStatsBaseTest, unittest.TestCase):
 
     def test_no_status(self):
         self.assertEqual(self.ps.status.sum(), 0.0)
-
-    def test_type_normal_only(self):
-        self.assertEqual(self.ps.types[ALL_TYPES.index(PokemonType.NORMAL)], 1.0)
-        self.assertEqual(self.ps.types.sum(), 1.0)
 
     def test_atk_boost(self):
         self.assertEqual(self.ps.boosts[PokemonState.BOOST_KEYS.index("atk")], 2.0)
@@ -102,7 +89,7 @@ class TestPokemonStatsTauros(PokemonStatsBaseTest, unittest.TestCase):
 class TestPokemonStatsChansey(PokemonStatsBaseTest, unittest.TestCase):
 
     def setUp(self):
-        self.ps = PokemonState(pokemon=make_mock_from_fixture("gen1_chansey.json"))
+        self.ps = MyPokemonState(pokemon=make_mock_from_fixture("gen1_chansey.json"))
 
     def test_hp_fraction(self):
         self.assertAlmostEqual(self.ps.hp, 0.5)
@@ -129,10 +116,6 @@ class TestPokemonStatsChansey(PokemonStatsBaseTest, unittest.TestCase):
             np.zeros(len(PokemonState.BOOST_KEYS) - 1)
         )
 
-    def test_type_normal_only(self):
-        self.assertEqual(self.ps.types[ALL_TYPES.index(PokemonType.NORMAL)], 1.0)
-        self.assertEqual(self.ps.types.sum(), 1.0)
-
 
 # ---------------------------------------------------------------------------
 # Alakazam  –  Psychic, SLP, 75% HP, +2 special (spa==spd)
@@ -141,7 +124,7 @@ class TestPokemonStatsChansey(PokemonStatsBaseTest, unittest.TestCase):
 class TestPokemonStatsAlakazam(PokemonStatsBaseTest, unittest.TestCase):
 
     def setUp(self):
-        self.ps = PokemonState(pokemon=make_mock_from_fixture("gen1_alakazam.json"))
+        self.ps = MyPokemonState(pokemon=make_mock_from_fixture("gen1_alakazam.json"))
 
     def test_hp_fraction(self):
         self.assertAlmostEqual(self.ps.hp, 0.75)
@@ -165,11 +148,6 @@ class TestPokemonStatsAlakazam(PokemonStatsBaseTest, unittest.TestCase):
         with open(FIXTURES_DIR / "gen1_alakazam.json") as f:
             raw = json.load(f)
         self.assertEqual(raw["boosts"]["spa"], raw["boosts"]["spd"])
-
-    def test_type_psychic_only(self):
-        self.assertEqual(self.ps.types[ALL_TYPES.index(PokemonType.PSYCHIC)], 1.0)
-        self.assertEqual(self.ps.types.sum(), 1.0)
-
 
 
 if __name__ == "__main__":
