@@ -26,6 +26,7 @@ MODERN_BOOST_KEYS   = ["atk", "def", "spa", "spd", "spe", "accuracy", "evasion"]
 
 STAT_NORM   = 600.0
 BOOST_NORM  = 6.0
+STAB_NORM   = 2.25
 
 
 class PokemonState(ABC):
@@ -111,6 +112,9 @@ class PokemonState(ABC):
         """
         return np.minimum(self.stats / STAT_NORM, 1.0).astype(np.float32)
 
+    def normalize_stab(self) -> np.ndarray:
+        return np.minimum(self.stab / STAB_NORM, 1.0).astype(np.float32)
+
     # ------------------------------------------------------------------
     # Encoders
     # ------------------------------------------------------------------
@@ -181,4 +185,4 @@ class PokemonState(ABC):
 
     @staticmethod
     def _encode_stab(pokemon):
-        return float(getattr(pokemon, "stab_multiplier", 1.5)) / 2.25
+        return float(getattr(pokemon, "stab_multiplier", 1.5))

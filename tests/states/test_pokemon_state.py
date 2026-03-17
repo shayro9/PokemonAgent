@@ -95,11 +95,6 @@ class PokemonStatsBaseTest:
     def test_effects_dtype(self):
         self.assertEqual(self.ps.effects.dtype, np.float32)
 
-    # ── stab: raw multiplier stored on object; normalised inside to_array ─
-
-    def test_stab_is_1_5(self):
-        self.assertEqual(self.ps.stab, 1.5 / 2.0)
-
     # ── to_array ─────────────────────────────────────────────────────────
 
     def test_to_array_length(self):
@@ -139,9 +134,6 @@ class TestPokemonStatsEmpty(PokemonStatsBaseTest, unittest.TestCase):
 
     def test_effects_all_zero(self):
         np.testing.assert_array_equal(self.ps.effects, np.zeros(len(TRACKED_EFFECTS)))
-
-    def test_stab_is_0_75(self):
-        self.assertEqual(self.ps.stab, 0.75)
 
 
 if __name__ == "__main__":

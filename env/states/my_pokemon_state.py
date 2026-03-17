@@ -50,7 +50,7 @@ class MyPokemonState(PokemonState):
             self.normalize_boosts(),        # (len(BOOST_KEYS),)
             self.status,                    # (len(ALL_STATUSES),)
             self.effects,                   # (len(TRACKED_EFFECTS),)
-            [self.stab],                    # scalar, normalised to match BattleState
+            [self.normalize_stab()],        # scalar, normalised to match BattleState
         ]).astype(np.float32)
 
         assert len(arr) == self.array_len(), (

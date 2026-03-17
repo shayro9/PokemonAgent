@@ -101,7 +101,7 @@ class OpponentPokemonState(PokemonState):
             self.effects,               # (3)
             [self.preparing],           # (1)
             [self.must_recharge],       # (1)
-            [self.stab],                # (1)
+            [self.normalize_stab()],    # (1)
             self.normalize_protect(),   # (1)
         ]).astype(np.float32)
 
