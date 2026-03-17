@@ -1,30 +1,3 @@
-"""
-======================================
-Concrete PokemonState for the opponent's Pokémon.
-
-Stats are NOT known exactly — replaced by a Gaussian posterior belief
-(``StatBelief``, 12 dims: mean × 6 + std × 6, all / STAT_NORM).
-
-Extra fields compared to ``MyPokemonState``
---------------------------------------------
-* stat_belief       (12) — Bayesian posterior mean + std for all 6 stats
-* preparing         (1)  — opponent is charging a two-turn move
-* protect_belief    (1)  — P(opponent uses Protect this turn)
-
-to_array() layout
------------------
-    hp                  (1)
-    stat_belief         (12)
-    boosts_encoded      (7)
-    status              (7)
-    effects             (3)
-    preparing           (1)
-    stab                (1)   stab_multiplier / 2.0
-    protect_belief      (1)
-                       -----
-    total               33
-"""
-
 from __future__ import annotations
 
 import math
@@ -39,21 +12,10 @@ from env.states.pokemon_state import (
     TRACKED_EFFECTS,
 )
 
-_STAT_BELIEF_DIM = 12
-
 
 class OpponentPokemonState(PokemonState):
     """
     Opponent-side Pokémon state.
-
-    Differs from ``MyPokemonState`` in two fundamental ways:
-      1. Stats are unknown — represented by a Bayesian ``StatBelief``
-         (12-dim normalised array) instead of exact values.
-      2. Several opponent-specific fields are added: preparing flag,
-         protect belief.
-
-    The ``stats`` field present on ``MyPokemonState`` is NOT populated
-    use ``stat_belief`` for any stat-dependent logic.
     """
 
     # ------------------------------------------------------------------
@@ -86,10 +48,9 @@ class OpponentPokemonState(PokemonState):
     def estimate_stats(self, pokemon: Pokemon) -> np.ndarray:
         base_stats = self._encode_stats(pokemon.base_stats, self.STAT_KEYS)
 
-        level = 100
+        level = self.level
         dv = 15
-        ev = 65535
-        ev_term = int(math.sqrt(ev) / 4)  # ≈63
+        ev_term = 64
 
         stats = []
 

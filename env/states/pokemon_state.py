@@ -1,19 +1,3 @@
-"""
-Abstract base class for a single Pokémon's in-battle state.
-
-Subclasses
-----------
-MyPokemonState
-OpponentPokemonState
-
-Shared responsibilities (this file)
--------------------------------------
-* Encoding all fields that are identical on both sides:
-    hp, boosts, status, effects, types, stab
-* All static encoding helpers used by both subclasses.
-* Class-level STAT_KEYS / BOOST_KEYS that subclasses override for gen or role.
-"""
-
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -34,14 +18,14 @@ ALL_STATUSES    = list(Status)
 TRACKED_EFFECTS = [Effect.CONFUSION, Effect.ENCORE]
 
 # Per-gen stat schemas
-GEN1_STAT_KEYS      = ["hp", "atk", "def", "spc", "spe"]  # 5  (no spa/spd split)
-MODERN_STAT_KEYS    = ["hp", "atk", "def", "spa", "spd", "spe"]  # 6  (Gen 2+)
+GEN1_STAT_KEYS      = ["hp", "atk", "def", "spc", "spe"]
+MODERN_STAT_KEYS    = ["hp", "atk", "def", "spa", "spd", "spe"]
 
-GEN1_BOOST_KEYS     = ["atk", "def", "spa", "spe", "accuracy", "evasion"]  # 6
-MODERN_BOOST_KEYS   = ["atk", "def", "spa", "spd", "spe", "accuracy", "evasion"]  # 7
+GEN1_BOOST_KEYS     = ["atk", "def", "spa", "spe", "accuracy", "evasion"]
+MODERN_BOOST_KEYS   = ["atk", "def", "spa", "spd", "spe", "accuracy", "evasion"]
 
-STAT_NORM   = 512.0  # divide raw stats → [0, 1]
-BOOST_NORM  = 6.0    # boost stages −6…+6 → [−1, +1]
+STAT_NORM   = 600.0
+BOOST_NORM  = 6.0
 
 
 class PokemonState(ABC):
@@ -68,6 +52,7 @@ class PokemonState(ABC):
     # ------------------------------------------------------------------
     def __init__(self, pokemon: Optional[Pokemon] = None):
         self.level = 100
+        self.stats = np.zeros(len(self.STAT_KEYS), dtype=np.float32)
         if pokemon is not None:
             self.hp      = pokemon.current_hp_fraction
             self.species = pokemon.species
@@ -196,4 +181,4 @@ class PokemonState(ABC):
 
     @staticmethod
     def _encode_stab(pokemon):
-        return float(getattr(pokemon, "stab_multiplier", 1.5)) / 2.0
+        return float(getattr(pokemon, "stab_multiplier", 1.5)) / 2.25
