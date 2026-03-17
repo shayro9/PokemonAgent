@@ -60,6 +60,9 @@ class MoveState:
 
     def to_array(self) -> np.ndarray:
         """Return the fixed-length feature vector for this move."""
+        if getattr(self, "_is_zero", False):
+            return np.zeros(self.array_len(), dtype=np.float32)
+
         arr = np.concatenate([
             [normalize(self.base_power, 200.0)],
             [self.accuracy],
@@ -129,13 +132,11 @@ class MoveState:
     # Default (null) move
     # ------------------------------------------------------------------
     @classmethod
-    def zeros(cls) -> np.ndarray:
-        """Return an all-zero feature vector of the same length as to_array().
-
-        Useful as a placeholder when a move slot is empty or unknown.
-        """
-        length = 14 + len(MOVE_CATEGORIES) + len(ALL_STATUSES) + 2 * len(cls.BOOST_KEYS)
-        return np.zeros(length, dtype=np.float32)
+    def zero(cls) -> "MoveState":
+        """return an empty move_state."""
+        obj = cls.__new__(cls)  # bypass __init__
+        obj._is_zero = True
+        return obj
 
     # ------------------------------------------------------------------
     # Encoders
