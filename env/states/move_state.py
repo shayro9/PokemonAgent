@@ -6,7 +6,7 @@ from poke_env.battle import Move, MoveCategory, Status, PokemonType
 
 from combat.combat_utils import type_chart_for_gen
 from env.states.state_utils import (
-    normalize, normalize_vector, encode_enum,
+    normalize, normalize_vector, encode_enum, encode_dicts,
     BOOST_NORM, GEN1_BOOST_KEYS, ALL_STATUSES,
 )
 
@@ -74,8 +74,8 @@ class MoveState:
             [self.breaks_protect],
             [self.is_stab],
             encode_enum(self.status, ALL_STATUSES),
-            normalize_vector(self.opp_boosts.values(), BOOST_NORM, symmetric=True),
-            normalize_vector(self.self_boost.values(), BOOST_NORM, symmetric=True),
+            normalize_vector(encode_dicts(self.opp_boosts, self.BOOST_KEYS), BOOST_NORM, symmetric=True),
+            normalize_vector(encode_dicts(self.self_boost, self.BOOST_KEYS), BOOST_NORM, symmetric=True),
             self._encode_type_multiplier(self.type_multiplier),
             [self.recoil],
             [self.drain],

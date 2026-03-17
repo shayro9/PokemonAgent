@@ -18,8 +18,6 @@ def normalize_vector(vec, vec_max, symmetric: bool = False) -> np.ndarray:
     if np.any(vec_max <= 0):
         return np.zeros_like(vec, dtype=np.float32)
 
-    vec = np.asarray(list(vec), dtype=np.float32)
-
     y = (vec / vec_max)
 
     if symmetric:
@@ -46,12 +44,6 @@ def encode_enum(value, enums_list) -> np.ndarray:
     else:
         return np.zeros(len(enums_list), dtype=np.float32)
 
-#############################################################
-#############################################################
-############# Tell me if you think is relevant ##############
-############# | | | | | | | | | | | | | | | |  ##############
-############# V V V V V V V V V V V V V V V V  ##############
-# it's like .values() but making sure every item is in keys #
 def encode_dicts(_dict: dict, _keys: list[str]) -> np.ndarray:
     """Extract raw boost stage values in the given key order.
 
