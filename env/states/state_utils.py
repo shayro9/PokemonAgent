@@ -18,7 +18,9 @@ def normalize_vector(vec, vec_max, symmetric: bool = False) -> np.ndarray:
     if np.any(vec_max <= 0):
         return np.zeros_like(vec, dtype=np.float32)
 
-    y = vec / vec_max
+    vec = np.asarray(list(vec), dtype=np.float32)
+
+    y = (vec / vec_max)
 
     if symmetric:
         y = np.clip(y, -1.0, 1.0)

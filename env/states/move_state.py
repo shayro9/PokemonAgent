@@ -88,7 +88,7 @@ class MoveState:
         return arr
 
     def array_len(self) -> int:
-        return 14 + len(MOVE_CATEGORIES) + len(ALL_STATUSES) + 2 * len(self.BOOST_KEYS)
+        return 13 + len(MOVE_CATEGORIES) + len(ALL_STATUSES) + 2 * len(self.BOOST_KEYS)
 
     def describe(self) -> str:
         """Human-readable breakdown of the move state. Useful for debugging."""
@@ -143,4 +143,5 @@ class MoveState:
     # ------------------------------------------------------------------
     @staticmethod
     def _encode_type_multiplier(type_multiplier: float) -> np.ndarray:
-        return np.array(-1.0 if type_multiplier == 0.0 else float(np.log2(type_multiplier) / 2.0))
+        val = -1.0 if type_multiplier == 0.0 else float(np.log2(type_multiplier) / 2.0)
+        return np.array([val], dtype=np.float32)
