@@ -40,6 +40,7 @@ class MoveState:
         )
 
         acc = getattr(move, "accuracy", None)
+        self.id              = getattr(move, "id", None)
         self.base_power      = getattr(move, "base_power", 0.0) or 0.0
         self.accuracy        = 1.0 if acc is True else (acc or 0.0)
         self.max_pp          = getattr(move, "max_pp", 0.0) or 0.0
@@ -87,32 +88,54 @@ class MoveState:
         return 14 + len(MOVE_CATEGORIES) + len(ALL_STATUSES) + 2 * len(self.BOOST_KEYS)
 
     def describe(self) -> str:
-        """Human-readable breakdown of the pokemon state. Useful for debugging."""
-        active_status  = [ALL_STATUSES[i].name for i, v in enumerate(self.status)  if v == 1.0]
-        boost_lines = " | ".join(
-            f"{k}={int(v):+d}" for k, v in zip(self.BOOST_KEYS, self.boosts) if v != 0
+        """Human-readable breakdown of the move state. Useful for debugging."""
+        opp_boost_str = " | ".join(
+            f"{k}={int(v):+d}" for k, v in self.opp_boosts.items() if v != 0
         )
-
+        self_boost_str = " | ".join(
+            f"{k}={int(v):+d}" for k, v in self.self_boost.items() if v != 0
+        )
         lines = [
-            f"Species       : {self.species}",
-            f"HP            : {self.hp:.2f}",
-            f"Stats         : {stat_lines}",
-            f"Boosts        : {boost_lines if boost_lines else 'none'}",
-            f"Status        : {active_status  if active_status  else 'none'}",
-            f"Effects       : {active_effects if active_effects else 'none'}",
-            f"STAB          : {self.stab}",
-            f"Array length  : {self.array_len()}",
+            f"Move           : {self.id}  "    
+            f"Base power     : {self.base_power}",
+            f"Category       : {self.category.name if self.category else 'none'}",
+            f"Accuracy       : {self.accuracy}",
+            f"Max PP         : {self.max_pp}",
+            f"Priority       : {self.priority:+d}",
+            f"Type multiplier: {self.type_multiplier}x",
+            f"STAB           : {bool(self.is_stab)}",
+            f"Hits           : {self.min_hits}–{self.max_hits}",
+            f"Crit ratio     : {self.crit_ratio}",
+            f"Heal           : {self.heal}",
+            f"Recoil         : {self.recoil}",
+            f"Drain          : {self.drain}",
+            f"Status inflict : {self.status.name if self.status else 'none'}",
+            f"Opp boosts     : {opp_boost_str if opp_boost_str else 'none'}",
+            f"Self boosts    : {self_boost_str if self_boost_str else 'none'}",
+            f"Protect move   : {bool(self.is_protect_move)}",
+            f"Breaks protect : {bool(self.breaks_protect)}",
+            f"Array length   : {self.array_len()}",
         ]
         return "\n".join(lines)
 
     def __repr__(self) -> str:
-        return self.describe()
-    def __repr__(self) -> str:
         return (
             f"MoveState(base_power={self.base_power}, category={self.category}, "
-            f"type_multiplier={self.type_multiplier}, "
+            f"type_multiplier={self.type_multiplier})"
             # f"damage_fraction={self.damage_fraction})"
         )
+
+    # ------------------------------------------------------------------
+    # Default (null) move
+    # ------------------------------------------------------------------
+    @classmethod
+    def zeros(cls) -> np.ndarray:
+        """Return an all-zero feature vector of the same length as to_array().
+
+        Useful as a placeholder when a move slot is empty or unknown.
+        """
+        length = 14 + len(MOVE_CATEGORIES) + len(ALL_STATUSES) + 2 * len(cls.BOOST_KEYS)
+        return np.zeros(length, dtype=np.float32)
 
     # ------------------------------------------------------------------
     # Encoders
