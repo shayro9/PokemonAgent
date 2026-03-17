@@ -1,21 +1,3 @@
-"""
-================================
-Concrete PokemonState for the learning agent's own Pokémon.
-
-Stats are known exactly (read directly from battle.active_pokemon.stats).
-
-to_array() layout
------------------
-    hp              (1)
-    stats_encoded   (6)   raw stats / STAT_NORM, clipped to [0, 1]
-    boosts_encoded  (7)   boost stages / BOOST_NORM, clipped to [−1, +1]
-    status          (7)
-    effects         (3)
-    stab            (1)   stab_multiplier
-                   -----
-    total           25
-"""
-
 from __future__ import annotations
 
 from typing import Optional
@@ -25,7 +7,7 @@ from poke_env.battle.pokemon import Pokemon
 
 from env.states.pokemon_state import (
     PokemonState,
-    STAT_NORM, ALL_STATUSES, TRACKED_EFFECTS,
+    ALL_STATUSES, TRACKED_EFFECTS,
 )
 
 
@@ -68,7 +50,7 @@ class MyPokemonState(PokemonState):
             self.normalize_boosts(),        # (len(BOOST_KEYS),)
             self.status,                    # (len(ALL_STATUSES),)
             self.effects,                   # (len(TRACKED_EFFECTS),)
-            [self.stab],                    # scalar, normalised to match BattleState
+            [self.normalize_stab()],        # scalar, normalised to match BattleState
         ]).astype(np.float32)
 
         assert len(arr) == self.array_len(), (

@@ -50,8 +50,7 @@ FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 
 # ── Gen 1 formula constants (mirror production code) ────────────────────────
 _DV      = 15
-_EV      = 65535
-_EV_TERM = int(math.sqrt(_EV) / 4)   # 63
+_EV_TERM = 64
 _LEVEL   = 100
 
 # Correct array length for Gen 1 opponent (see BUG-1 above)
@@ -214,8 +213,7 @@ class OpponentPokemonStateBaseTest:
     # ── stab ─────────────────────────────────────────────────────────────
 
     def test_stab_raw_value(self):
-        self.assertEqual(self.ops.stab, 0.75)
-
+        self.assertEqual(self.ops.stab, 1.5)
     # ── to_array: dtype / key positions ──────────────────────────────────
 
     def test_to_array_dtype(self):
@@ -669,12 +667,12 @@ class TestEstimateStats(unittest.TestCase):
 
     def test_hp_formula(self):
         ops = self._make_ops({"hp": 100, "atk": 50, "def": 50, "spc": 50, "spe": 50})
-        self.assertAlmostEqual(float(ops.stats[0]), (100 + 15) * 2 + 63 + 100 + 10)
+        self.assertAlmostEqual(float(ops.stats[0]), (100 + 15) * 2 + _EV_TERM + _LEVEL + 10)
 
     def test_non_hp_formula(self):
         ops = self._make_ops({"hp": 50, "atk": 80, "def": 80, "spc": 80, "spe": 80})
         self.assertAlmostEqual(float(ops.stats[GEN1_STAT_KEYS.index("atk")]),
-                               (80 + 15) * 2 + 63 + 5)
+                               (80 + 15) * 2 + 64 + 5)
 
     def test_hp_greater_than_non_hp_for_equal_bases(self):
         ops = self._make_ops({"hp": 80, "atk": 80, "def": 80, "spc": 80, "spe": 80})
@@ -686,9 +684,6 @@ class TestEstimateStats(unittest.TestCase):
         low  = self._make_ops({"hp": 45, "atk": 49, "def": 49, "spc": 45, "spe": 45})
         high = self._make_ops({"hp": 75, "atk": 100,"def": 95, "spc": 70, "spe": 110})
         self.assertTrue(np.all(high.stats > low.stats))
-
-    def test_ev_term_is_63(self):
-        self.assertEqual(_EV_TERM, 63)
 
     def test_output_dtype(self):
         self.assertEqual(
