@@ -61,7 +61,7 @@ class PokemonStatsBaseTest:
         self.assertEqual(self.ps.stats.dtype, np.float32)
 
     def test_stats_encoded_in_range(self):
-        enc = self.ps.stats_encoded()
+        enc = self.ps.normalize_stats()
         self.assertTrue(np.all(enc >= 0.0) and np.all(enc <= 1.0))
 
     # ── boosts ───────────────────────────────────────────────────────────
@@ -73,7 +73,7 @@ class PokemonStatsBaseTest:
         self.assertEqual(self.ps.boosts.dtype, np.float32)
 
     def test_boosts_encoded_in_range(self):
-        enc = self.ps.boosts_encoded()
+        enc = self.ps.normalize_boosts()
         self.assertTrue(np.all(enc >= -1.0) and np.all(enc <= 1.0))
 
     # ── status ───────────────────────────────────────────────────────────

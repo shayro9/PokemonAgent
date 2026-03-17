@@ -31,7 +31,7 @@ from poke_env.battle.status import Status
 
 ALL_TYPES       = list(PokemonType)
 ALL_STATUSES    = list(Status)
-TRACKED_EFFECTS = [Effect.CONFUSION, Effect.MUST_RECHARGE, Effect.ENCORE]
+TRACKED_EFFECTS = [Effect.CONFUSION, Effect.ENCORE]
 
 # Per-gen stat schemas
 GEN1_STAT_KEYS      = ["hp", "atk", "def", "spc", "spe"]  # 5  (no spa/spd split)
@@ -67,6 +67,7 @@ class PokemonState(ABC):
     # init
     # ------------------------------------------------------------------
     def __init__(self, pokemon: Optional[Pokemon] = None):
+        self.level = 100
         if pokemon is not None:
             self.hp      = pokemon.current_hp_fraction
             self.species = pokemon.species
@@ -111,12 +112,23 @@ class PokemonState(ABC):
     # Shared encoding helpers
     # ------------------------------------------------------------------
 
-    def boosts_encoded(self) -> np.ndarray:
+    def normalize_boosts(self) -> np.ndarray:
         """Normalise raw boost stages → [−1, +1].
 
         :returns: Float32 array of length ``len(BOOST_KEYS)``.
         """
         return (self.boosts / BOOST_NORM).astype(np.float32)
+
+    def normalize_stats(self) -> np.ndarray:
+        """Normalise raw stats → [0, 1] by dividing by ``STAT_NORM``.
+
+        :returns: Float32 array of length ``len(STAT_KEYS)``.
+        """
+        return np.minimum(self.stats / STAT_NORM, 1.0).astype(np.float32)
+
+    # ------------------------------------------------------------------
+    # Encoders
+    # ------------------------------------------------------------------
 
     @staticmethod
     def _encode_status(status) -> np.ndarray:

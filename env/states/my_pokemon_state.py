@@ -54,17 +54,6 @@ class MyPokemonState(PokemonState):
             self.stats = np.zeros(len(self.STAT_KEYS), dtype=np.float32)
 
     # ------------------------------------------------------------------
-    # Encoding helpers
-    # ------------------------------------------------------------------
-
-    def stats_encoded(self) -> np.ndarray:
-        """Normalise raw stats → [0, 1] by dividing by ``STAT_NORM``.
-
-        :returns: Float32 array of length ``len(STAT_KEYS)``.
-        """
-        return np.minimum(self.stats / STAT_NORM, 1.0).astype(np.float32)
-
-    # ------------------------------------------------------------------
     # Serialisation
     # ------------------------------------------------------------------
 
@@ -75,11 +64,11 @@ class MyPokemonState(PokemonState):
         """
         arr = np.concatenate([
             [self.hp],
-            self.stats_encoded(),       # (len(STAT_KEYS),)
-            self.boosts_encoded(),      # (len(BOOST_KEYS),)
-            self.status,                # (len(ALL_STATUSES),)
-            self.effects,               # (len(TRACKED_EFFECTS),)
-            [self.stab],          # scalar, normalised to match BattleState
+            self.normalize_stats(),         # (len(STAT_KEYS),)
+            self.normalize_boosts(),        # (len(BOOST_KEYS),)
+            self.status,                    # (len(ALL_STATUSES),)
+            self.effects,                   # (len(TRACKED_EFFECTS),)
+            [self.stab],                    # scalar, normalised to match BattleState
         ]).astype(np.float32)
 
         assert len(arr) == self.array_len(), (

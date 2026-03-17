@@ -27,19 +27,12 @@ to_array() layout
 
 from __future__ import annotations
 
+import math
 from typing import Optional
 
 import numpy as np
-from poke_env.battle import Battle
 from poke_env.battle.pokemon import Pokemon
 
-from combat.stats_belief import StatBelief
-from env.embed import (
-    MAX_MOVES,
-    MOVE_EMBED_LEN,
-    embed_move,
-    calc_types_vector,
-)
 from env.states.pokemon_state import (
     PokemonState,
     ALL_STATUSES,
@@ -70,37 +63,63 @@ class OpponentPokemonState(PokemonState):
     def __init__(
         self,
         pokemon: Optional[Pokemon] = None,
-        *,
-        stat_belief: Optional[StatBelief] = None,
-        protect_belief: float = 0.0,
     ) -> None:
         """
         :param pokemon: Opponent's active ``Pokemon`` object, or ``None`` for a
             zero placeholder.
-        :param stat_belief: Current ``StatBelief`` posterior over the opponent's
-            six stats.  When ``None``, the belief vector is all zeros.
-        :param protect_belief: Scalar in [0, 1] — probability the opponent will
-            use Protect this turn, from ``ProtectBelief.expected_next_protect_belief()``.
         """
         super().__init__(pokemon)   # sets hp, boosts, status, effects, types, stab
+        if pokemon is not None:
+            self.stats          : np.ndarray = self.estimate_stats(pokemon)
+            self.preparing      : float      = self.is_preparing(pokemon)
+            self.must_recharge  : float      = self.is_recharge(pokemon)
+            self.protect        : float      = self.protect_counter(pokemon)
+        else:
+            self.stats          : np.ndarray = np.zeros(len(self.STAT_KEYS), dtype=np.float32)
+            self.preparing      : float      = 0.0
+            self.must_recharge  : float      = 0.0
+            self.protect        : float      = 0.0
 
-        # ── Stat belief ──────────────────────────────────────────────────
-        _belief: np.ndarray = (
-            stat_belief.to_array()
-            if stat_belief is not None
-            else np.zeros(_STAT_BELIEF_DIM, dtype=np.float32)
-        )
-        self.stats: np.ndarray      = _belief[:_STAT_BELIEF_DIM // 2]
-        self.stats_std: np.ndarray  = _belief[_STAT_BELIEF_DIM // 2:]
+    # ------------------------------------------------------------------
+    # Initializations
+    # ------------------------------------------------------------------
+    def estimate_stats(self, pokemon: Pokemon) -> np.ndarray:
+        base_stats = self._encode_stats(pokemon.base_stats, self.STAT_KEYS)
 
-        # ── Opponent-specific flags ──────────────────────────────────────
-        self.preparing: float = (
-            float(getattr(pokemon, "preparing", False))
-            if pokemon is not None else 0.0
-        )
+        level = 100
+        dv = 15
+        ev = 65535
+        ev_term = int(math.sqrt(ev) / 4)  # ≈63
 
-        # ── Protect belief ───────────────────────────────────────────────
-        self.protect_belief: float = float(protect_belief)
+        stats = []
+
+        for i, base in enumerate(base_stats):
+            if self.STAT_KEYS[i] == "hp":
+                stat = ((base + dv) * 2 + ev_term) + level + 10
+            else:
+                stat = ((base + dv) * 2 + ev_term) + 5
+            stats.append(stat)
+
+        return np.array(stats, dtype=np.float32)
+
+    @staticmethod
+    def is_preparing(pokemon) -> bool:
+        return float(getattr(pokemon, "preparing", False)) if pokemon is not None else False
+
+    @staticmethod
+    def is_recharge(pokemon) -> bool:
+        return float(getattr(pokemon, "must_recharge", False)) if pokemon is not None else False
+
+    @staticmethod
+    def protect_counter(pokemon) -> float:
+        return float(getattr(pokemon, "protect_counter", 0.0)) if pokemon is not None else 0.0
+
+    # ------------------------------------------------------------------
+    # Encoding helpers
+    # ------------------------------------------------------------------
+    def normalize_protect(self) -> np.ndarray:
+        value = 0.3 ** self.protect
+        return np.array([value], dtype=np.float32)
 
     # ------------------------------------------------------------------
     # Serialisation
@@ -115,14 +134,14 @@ class OpponentPokemonState(PokemonState):
         """
         arr = np.concatenate([
             [self.hp],                  # (1)
-            self.stats,                 # (6)
-            self.stats_std,             # (6)
-            self.boosts_encoded(),      # (7)
+            self.normalize_stats(),     # (6)
+            self.normalize_boosts(),    # (7)
             self.status,                # (7)
             self.effects,               # (3)
             [self.preparing],           # (1)
-            [self.stab],          # (1)
-            [self.protect_belief],      # (1)
+            [self.must_recharge],       # (1)
+            [self.stab],                # (1)
+            self.normalize_protect(),   # (1)
         ]).astype(np.float32)
 
         assert len(arr) == self.array_len(), (
@@ -135,13 +154,14 @@ class OpponentPokemonState(PokemonState):
         """Expected flat vector length."""
         return (
             1                       # hp
-            + _STAT_BELIEF_DIM      # stat_belief
+            + len(self.STAT_KEYS)   # stats
             + len(self.BOOST_KEYS)  # boosts
             + len(ALL_STATUSES)     # status
             + len(TRACKED_EFFECTS)  # effects
             + 1                     # preparing
+            + 1                     # recharge
             + 1                     # stab
-            + 1                     # protect_belief
+            + 1                     # protect
         )
 
     def describe(self) -> str:
@@ -152,9 +172,6 @@ class OpponentPokemonState(PokemonState):
         stat_lines = " | ".join(
             f"{k}={int(v)}" for k, v in zip(self.STAT_KEYS, self.stats)
         )
-        stat_std_lines = " | ".join(
-            f"{k}={int(v)}" for k, v in zip(self.STAT_KEYS, self.stats_std)
-        )
         boost_lines = " | ".join(
             f"{k}={int(v):+d}" for k, v in zip(self.BOOST_KEYS, self.boosts) if v != 0
         )
@@ -163,13 +180,13 @@ class OpponentPokemonState(PokemonState):
             f"Species       : {self.species}",
             f"HP            : {self.hp:.2f}",
             f"Stats         : {stat_lines}",
-            f"Stats STD     : {stat_std_lines}",
             f"Boosts        : {boost_lines if boost_lines else 'none'}",
             f"Status        : {active_status  if active_status  else 'none'}",
             f"Effects       : {active_effects if active_effects else 'none'}",
             f"STAB          : {self.stab}",
             f"Preparing     : {self.preparing}",
-            f"protect       : {self.protect_belief}",
+            f"MustRecharge  : {self.must_recharge}",
+            f"protect       : {self.protect}",
             f"Array length  : {self.array_len()}",
         ]
         return "\n".join(lines)
