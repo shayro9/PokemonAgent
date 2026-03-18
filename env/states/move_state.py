@@ -1,12 +1,11 @@
 from __future__ import annotations
-from typing import Optional, Tuple, Union, List
 
 import numpy as np
-from poke_env.battle import Move, MoveCategory, Status, PokemonType
+from poke_env.battle import Move, MoveCategory
 
 from combat.combat_utils import type_chart_for_gen
 from env.states.state_utils import (
-    normalize, normalize_vector, encode_enum, encode_dicts,
+    normalize, normalize_vector, encode_enum, encode_dicts, pull_attribute,
     BOOST_NORM, GEN1_BOOST_KEYS, ALL_STATUSES,
 )
 
@@ -19,44 +18,50 @@ class MoveState:
 
     def __init__(
         self,
-        move: Move,
+        move: Move | None,
         opp_types,
         my_types,
         gen: int,
         # damage_fraction: float = 0.0,
     ):
-        # Multi-hit bounds
-        if isinstance(move.n_hit, tuple):
-            self.min_hits, self.max_hits = move.n_hit
-        elif isinstance(move.n_hit, int):
-            self.min_hits = self.max_hits = move.n_hit
+        # Multi-hit bounds — 0 when no move, 1 as fallback for unknown n_hit on a real move
+        if move is None:
+            self.min_hits = self.max_hits = 0
         else:
-            self.min_hits = self.max_hits = 1
+            n_hit = pull_attribute(move, "n_hit", 1, lambda x: x)
+            if isinstance(n_hit, tuple):
+                self.min_hits, self.max_hits = n_hit
+            elif isinstance(n_hit, int):
+                self.min_hits = self.max_hits = n_hit
+            else:
+                self.min_hits = self.max_hits = 1
 
         # Type multiplier
-        type1, type2 = (list(opp_types) + [None])[:2]
-        self.type_multiplier = move.type.damage_multiplier(
-            type1, type2, type_chart=type_chart_for_gen(gen)
-        )
+        if move is not None:
+            type1, type2 = (list(opp_types) + [None])[:2]
+            self.type_multiplier = move.type.damage_multiplier(
+                type1, type2, type_chart=type_chart_for_gen(gen)
+            )
+        else:
+            self.type_multiplier = 1.0
 
-        acc = getattr(move, "accuracy", None)
-        self.id              = getattr(move, "id", None)
-        self.base_power      = getattr(move, "base_power", 0.0) or 0.0
-        self.accuracy        = 1.0 if acc is True else (acc or 0.0)
-        self.max_pp          = getattr(move, "max_pp", 0.0) or 0.0
-        self.priority        = getattr(move, "priority", 0)
-        self.heal            = getattr(move, "heal", 0.0) or 0.0
-        self.crit_ratio      = getattr(move, "crit_ratio", 0.0) or 0.0
-        self.category        = getattr(move, "category", None)
-        self.is_protect_move = float(getattr(move, "is_protect_move", False) or False)
-        self.breaks_protect  = float(getattr(move, "breaks_protect", False) or False)
-        self.is_stab         = float(getattr(move, "type", None) in my_types)
-        self.status          = getattr(move, "status", None)
-        self.opp_boosts      = dict(getattr(move, "boosts", {}) or {})
-        self.self_boost      = dict(getattr(move, "self_boost", {}) or {})
-        self.recoil          = getattr(move, "recoil", 0.0) or 0.0
-        self.drain           = getattr(move, "drain", 0.0) or 0.0
-        # self.damage_fraction = damage_fraction
+        acc = pull_attribute(move, "accuracy", None, lambda x: x)
+        self.id              = pull_attribute(move, "id",              None,  lambda x: x)
+        self.base_power      = pull_attribute(move, "base_power",      0.0,   float)
+        self.accuracy        = 1.0 if acc is True else pull_attribute(move, "accuracy", 0.0, float)
+        self.max_pp          = pull_attribute(move, "max_pp",          0.0,   float)
+        self.priority        = pull_attribute(move, "priority",        0,     int)
+        self.heal            = pull_attribute(move, "heal",            0.0,   float)
+        self.crit_ratio      = pull_attribute(move, "crit_ratio",      0.0,   float)
+        self.category        = pull_attribute(move, "category",        None,  lambda x: x)
+        self.is_protect_move = pull_attribute(move, "is_protect_move", False, float)
+        self.breaks_protect  = pull_attribute(move, "breaks_protect",  False, float)
+        self.is_stab         = float(pull_attribute(move, "type",      None,  lambda x: x) in my_types)
+        self.status          = pull_attribute(move, "status",          None,  lambda x: x)
+        self.opp_boosts      = dict(pull_attribute(move, "boosts",     {},    lambda x: x) or {})
+        self.self_boost      = dict(pull_attribute(move, "self_boost", {},    lambda x: x) or {})
+        self.recoil          = pull_attribute(move, "recoil",          0.0,   float)
+        self.drain           = pull_attribute(move, "drain",           0.0,   float)
 
     def to_array(self) -> np.ndarray:
         """Return the fixed-length feature vector for this move."""
