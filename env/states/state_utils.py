@@ -18,6 +18,8 @@ GEN1_STAT_KEYS      = ["hp", "atk", "def", "spc", "spe"]
 MODERN_STAT_KEYS    = ["hp", "atk", "def", "spa", "spd", "spe"]
 MODERN_BOOST_KEYS   = ["atk", "def", "spa", "spd", "spe", "accuracy", "evasion"]
 
+MAX_MOVES = 4
+
 def normalize(x: float, max_x: float = 1.0, symmetric: bool = False) -> float:
     if max_x <= 0:
         return 0.0
@@ -81,4 +83,5 @@ def encode_dicts(_dict: dict, _keys: list[str]) -> np.ndarray:
 def pull_attribute(obj, key, default_value, type_value):
     if obj is None or key is None:
         return type_value(default_value)
-    return type_value(getattr(obj, key, default_value) or default_value)
+    val = getattr(obj, key, default_value)
+    return type_value(val) if val is not None else default_value
