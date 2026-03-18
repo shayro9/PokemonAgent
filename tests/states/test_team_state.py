@@ -10,7 +10,6 @@ with lightweight stubs so tests stay fast and dependency-free.
 from __future__ import annotations
 
 import numpy as np
-import pytest
 from dataclasses import dataclass, field
 from typing import Optional
 
