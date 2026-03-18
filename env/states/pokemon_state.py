@@ -6,7 +6,7 @@ import numpy as np
 from poke_env.battle.pokemon import Pokemon
 from poke_env.battle.effect import Effect
 
-from env.states.state_utils import GEN1_BOOST_KEYS, ALL_STATUSES, GEN1_TRACKED_EFFECTS, GEN1_STAT_KEYS, BOOST_NORM
+from env.states.state_utils import GEN1_BOOST_KEYS, ALL_STATUSES, GEN1_TRACKED_EFFECTS, GEN1_STAT_KEYS
 from env.states.state_utils import normalize, normalize_vector, encode_enum, encode_dicts, pull_attribute
 
 
@@ -44,6 +44,8 @@ class PokemonState(ABC):
             self.status  = self.encode_enum(pokemon.status, ALL_STATUSES)
             self.effects = self.encode_enum(pokemon.effects, self.TRACKED_EFFECTS)
             self.stab    = self.pull_attribute(pokemon, "stab_multiplier", default_value=0.0, type_value=float)
+            self.active  = self.pull_attribute(pokemon, "active", default_value=0.0, type_value=float)
+            self.fainted = self.pull_attribute(pokemon, "fainted", default_value=0.0, type_value=float)
         else:
             self.hp      = 0.0
             self.species = "none"
@@ -53,6 +55,8 @@ class PokemonState(ABC):
             self.status = self.encode_enum(None, ALL_STATUSES)
             self.effects = self.encode_enum(None, self.TRACKED_EFFECTS)
             self.stab    = self.pull_attribute(None, "stab_multiplier", default_value=0.0, type_value=float)
+            self.active = self.pull_attribute(None, "active", default_value=0.0, type_value=float)
+            self.fainted = self.pull_attribute(None, "fainted", default_value=0.0, type_value=float)
 
     # ------------------------------------------------------------------
     # Abstract interface
