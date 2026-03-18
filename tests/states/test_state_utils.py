@@ -324,6 +324,14 @@ class TestPullAttribute(unittest.TestCase):
     def test_none_obj_returns_default_float(self):
         self.assertAlmostEqual(pull_attribute(None, "stab_multiplier", 1.5, float), 1.5)
 
+    def test_none_key_returns_default(self):
+        class Obj:
+            hp = 250
+        self.assertEqual(pull_attribute(Obj(), None, 99, int), 99)
+
+    def test_none_obj_and_none_key_returns_default(self):
+        self.assertEqual(pull_attribute(None, None, 0, int), 0)
+
 
 
 if __name__ == '__main__':
