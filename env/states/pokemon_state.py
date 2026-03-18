@@ -40,11 +40,11 @@ class PokemonState(ABC):
     # ------------------------------------------------------------------
     def __init__(self, pokemon: Optional[Pokemon] = None):
         self.level = 100
-        self.stats = self.encode_enum(None, self.STAT_KEYS)
+        self.stats = self.encode_dicts({}, self.STAT_KEYS)
         if pokemon is not None:
             self.hp      = pokemon.current_hp_fraction
             self.species = pokemon.species
-            self.boosts  = self.encode_enum(pokemon.boosts, self.BOOST_KEYS)
+            self.boosts  = self.encode_dicts(pokemon.boosts, self.BOOST_KEYS)
             self.types   = pokemon.types
             self.status  = self.encode_enum(pokemon.status, ALL_STATUSES)
             self.effects = self.encode_enum(pokemon.effects, self.TRACKED_EFFECTS)
@@ -52,7 +52,7 @@ class PokemonState(ABC):
         else:
             self.hp      = 0.0
             self.species = "none"
-            self.boosts  = np.zeros(len(self.BOOST_KEYS),  dtype=np.float32)
+            self.boosts  = self.encode_dicts({}, self.BOOST_KEYS)
             self.types   = [None]
             self.status = self.encode_enum(None, ALL_STATUSES)
             self.effects = self.encode_enum(None, self.TRACKED_EFFECTS)

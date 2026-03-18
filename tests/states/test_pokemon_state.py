@@ -1,28 +1,36 @@
 import json
 import unittest
-from pathlib import Path
 from unittest.mock import MagicMock
-
 import numpy as np
-
-from poke_env.battle.pokemon_type import PokemonType
 from poke_env.battle.status import Status
-
-from env.states.my_pokemon_state import MyPokemonState
-from env.states.pokemon_state import (
-    PokemonState,
+from poke_env.battle.effect import Effect
+from env.states.pokemon_state import PokemonState
+from env.states.state_utils import (
+    GEN1_BOOST_KEYS,
+    GEN1_STAT_KEYS,
+    GEN1_TRACKED_EFFECTS,
     ALL_STATUSES,
-    TRACKED_EFFECTS,
 )
+from pathlib import Path
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
 
 
+# ---------------------------------------------------------------------------
+# Minimal concrete stub — implements the abstract interface with no extras
+# so we test only PokemonState.__init__, not any subclass logic
+# ---------------------------------------------------------------------------
+
+class _StubState(PokemonState):
+    def to_array(self): return np.array([])
+    def array_len(self): return 0
+    def describe(self): return ""
+    def __repr__(self): return ""
+
+
 def make_mock_from_fixture(filename: str) -> MagicMock:
-    """Load a fixture JSON and return a mock Pokemon object."""
     with open(FIXTURES_DIR / filename) as f:
         data = json.load(f)
-
     p = MagicMock()
     p.current_hp_fraction = data["current_hp_fraction"]
     p.species             = data["species"]
@@ -30,110 +38,178 @@ def make_mock_from_fixture(filename: str) -> MagicMock:
     p.boosts              = data["boosts"]
     p.status              = Status[data["status"]] if data["status"] else None
     p.effects             = {}
-    p.types               = tuple(PokemonType[t] for t in data["types"])
+    p.types               = tuple(data["types"])
     p.stab_multiplier     = data["stab_multiplier"]
     return p
 
 
-def _expected_array_len():
-    hp = stab = 1
-    return hp + len(PokemonState.STAT_KEYS) + len(PokemonState.BOOST_KEYS) + len(ALL_STATUSES) + len(TRACKED_EFFECTS) + stab
+# ---------------------------------------------------------------------------
+# Class constants — must REFERENCE state_utils objects, not copies
+# ---------------------------------------------------------------------------
+
+class TestPokemonStateClassConstants(unittest.TestCase):
+
+    def test_stat_keys_are_gen1(self):
+        self.assertIs(PokemonState.STAT_KEYS, GEN1_STAT_KEYS)
+
+    def test_boost_keys_are_gen1(self):
+        self.assertIs(PokemonState.BOOST_KEYS, GEN1_BOOST_KEYS)
+
+    def test_tracked_effects_are_gen1(self):
+        self.assertIs(PokemonState.TRACKED_EFFECTS, GEN1_TRACKED_EFFECTS)
 
 
 # ---------------------------------------------------------------------------
-# Shared base — structure / dtype / to_array checks every fixture must pass
+# Empty state (pokemon=None) — every field must be a safe zero/default
 # ---------------------------------------------------------------------------
 
-class PokemonStatsBaseTest:
-    """
-    Mixin with shared checks — does NOT inherit TestCase so unittest
-    won't discover and run it directly. Subclasses inherit from both
-    this mixin and unittest.TestCase.
-    """
-    ps: MyPokemonState
-
-    # ── stats ────────────────────────────────────────────────────────────
-
-    def test_stats_shape(self):
-        self.assertEqual(self.ps.stats.shape, (len(PokemonState.STAT_KEYS),))
-
-    def test_stats_dtype(self):
-        self.assertEqual(self.ps.stats.dtype, np.float32)
-
-    def test_stats_encoded_in_range(self):
-        enc = self.ps.normalize_stats()
-        self.assertTrue(np.all(enc >= 0.0) and np.all(enc <= 1.0))
-
-    # ── boosts ───────────────────────────────────────────────────────────
-
-    def test_boosts_shape(self):
-        self.assertEqual(self.ps.boosts.shape, (len(PokemonState.BOOST_KEYS),))
-
-    def test_boosts_dtype(self):
-        self.assertEqual(self.ps.boosts.dtype, np.float32)
-
-    def test_boosts_encoded_in_range(self):
-        enc = self.ps.normalize_boosts()
-        self.assertTrue(np.all(enc >= -1.0) and np.all(enc <= 1.0))
-
-    # ── status ───────────────────────────────────────────────────────────
-
-    def test_status_shape(self):
-        self.assertEqual(self.ps.status.shape, (len(ALL_STATUSES),))
-
-    def test_status_dtype(self):
-        self.assertEqual(self.ps.status.dtype, np.float32)
-
-    def test_status_at_most_one_hot(self):
-        self.assertIn(self.ps.status.sum(), [0.0, 1.0])
-
-    # ── effects ──────────────────────────────────────────────────────────
-
-    def test_effects_shape(self):
-        self.assertEqual(self.ps.effects.shape, (len(TRACKED_EFFECTS),))
-
-    def test_effects_dtype(self):
-        self.assertEqual(self.ps.effects.dtype, np.float32)
-
-    # ── to_array ─────────────────────────────────────────────────────────
-
-    def test_to_array_length(self):
-        self.assertEqual(len(self.ps.to_array()), self.ps.array_len())
-
-    def test_to_array_dtype(self):
-        self.assertEqual(self.ps.to_array().dtype, np.float32)
-
-    def test_array_len(self):
-        self.assertEqual(self.ps.array_len(), _expected_array_len())
-
-
-# ---------------------------------------------------------------------------
-# Empty state (no pokemon)
-# ---------------------------------------------------------------------------
-
-class TestPokemonStatsEmpty(PokemonStatsBaseTest, unittest.TestCase):
-    """MyPokemonState with no pokemon — all zeros (except stab = 1.5)."""
+class TestPokemonStateInitEmpty(unittest.TestCase):
 
     def setUp(self):
-        self.ps = MyPokemonState()
+        self.ps = _StubState()
+
+    def test_level_is_100(self):
+        self.assertEqual(self.ps.level, 100)
 
     def test_hp_is_zero(self):
         self.assertEqual(self.ps.hp, 0.0)
 
-    def test_species_is_none(self):
+    def test_species_is_none_string(self):
         self.assertEqual(self.ps.species, "none")
 
+    def test_stab_is_default(self):
+        self.assertAlmostEqual(self.ps.stab, 1.5)
+
+    def test_types_is_none_list(self):
+        self.assertEqual(self.ps.types, [None])
+
     def test_stats_all_zero(self):
-        np.testing.assert_array_equal(self.ps.stats, np.zeros(len(PokemonState.STAT_KEYS)))
+        np.testing.assert_array_equal(self.ps.stats, np.zeros(len(GEN1_STAT_KEYS)))
 
     def test_boosts_all_zero(self):
-        np.testing.assert_array_equal(self.ps.boosts, np.zeros(len(PokemonState.BOOST_KEYS)))
+        np.testing.assert_array_equal(self.ps.boosts, np.zeros(len(GEN1_BOOST_KEYS)))
 
     def test_status_all_zero(self):
         np.testing.assert_array_equal(self.ps.status, np.zeros(len(ALL_STATUSES)))
 
     def test_effects_all_zero(self):
-        np.testing.assert_array_equal(self.ps.effects, np.zeros(len(TRACKED_EFFECTS)))
+        np.testing.assert_array_equal(self.ps.effects, np.zeros(len(GEN1_TRACKED_EFFECTS)))
+
+
+# ---------------------------------------------------------------------------
+# Populated state — every field read from pokemon correctly
+# Chansey: BRN, hp=0.5, +3 def, Normal type
+# ---------------------------------------------------------------------------
+
+class TestPokemonStateInitPopulated(unittest.TestCase):
+
+    def setUp(self):
+        self.ps = _StubState(make_mock_from_fixture("gen1_chansey.json"))
+
+    def test_level_always_100(self):
+        self.assertEqual(self.ps.level, 100)
+
+    def test_hp_read_from_pokemon(self):
+        self.assertAlmostEqual(self.ps.hp, 0.5)
+
+    def test_species_read_from_pokemon(self):
+        self.assertEqual(self.ps.species, "chansey")
+
+    def test_stab_read_from_pokemon(self):
+        self.assertAlmostEqual(self.ps.stab, 1.5)
+
+    def test_types_read_from_pokemon(self):
+        self.assertIn("NORMAL", self.ps.types)
+
+    def test_dual_types_both_stored(self):
+        # Starmie: WATER + PSYCHIC — both must be present
+        ps = _StubState(make_mock_from_fixture("gen1_starmie.json"))
+        self.assertIn("WATER", ps.types)
+        self.assertIn("PSYCHIC", ps.types)
+
+    def test_status_brn_encoded_at_correct_index(self):
+        brn_idx = ALL_STATUSES.index(Status.BRN)
+        self.assertEqual(self.ps.status[brn_idx], 1.0)
+        self.assertEqual(self.ps.status.sum(), 1.0)
+
+    def test_boosts_def_encoded_correctly(self):
+        # Chansey has +3 def
+        def_idx = GEN1_BOOST_KEYS.index("def")
+        self.assertEqual(self.ps.boosts[def_idx], 3.0)
+
+    def test_boosts_zeroed_keys_are_zero(self):
+        atk_idx = GEN1_BOOST_KEYS.index("atk")
+        self.assertEqual(self.ps.boosts[atk_idx], 0.0)
+
+    def test_negative_boosts_stored_correctly(self):
+        # Tauros: spa=-2 — negative stages must be preserved as-is
+        ps = _StubState(make_mock_from_fixture("gen1_tauros.json"))
+        spa_idx = GEN1_BOOST_KEYS.index("spa")
+        self.assertEqual(ps.boosts[spa_idx], -2.0)
+
+    def test_stats_initialised_to_zero_by_base(self):
+        # PokemonState.__init__ sets stats = encode_dicts({}, STAT_KEYS) → zeros
+        # subclasses are responsible for populating stats from pokemon.stats
+        np.testing.assert_array_equal(self.ps.stats, np.zeros(len(GEN1_STAT_KEYS)))
+
+
+# ---------------------------------------------------------------------------
+# Status field — one test per status variant present in fixtures
+# Starmie=PAR, Alakazam=SLP, Tauros=no status
+# ---------------------------------------------------------------------------
+
+class TestPokemonStateStatusPAR(unittest.TestCase):
+    def setUp(self):
+        self.ps = _StubState(make_mock_from_fixture("gen1_starmie.json"))
+
+    def test_par_at_correct_index(self):
+        par_idx = ALL_STATUSES.index(Status.PAR)
+        self.assertEqual(self.ps.status[par_idx], 1.0)
+        self.assertEqual(self.ps.status.sum(), 1.0)
+
+
+class TestPokemonStateStatusSLP(unittest.TestCase):
+    def setUp(self):
+        self.ps = _StubState(make_mock_from_fixture("gen1_alakazam.json"))
+
+    def test_slp_at_correct_index(self):
+        slp_idx = ALL_STATUSES.index(Status.SLP)
+        self.assertEqual(self.ps.status[slp_idx], 1.0)
+        self.assertEqual(self.ps.status.sum(), 1.0)
+
+
+class TestPokemonStateStatusNone(unittest.TestCase):
+    def setUp(self):
+        self.ps = _StubState(make_mock_from_fixture("gen1_tauros.json"))
+
+    def test_no_status_all_zero(self):
+        self.assertEqual(self.ps.status.sum(), 0.0)
+
+
+# ---------------------------------------------------------------------------
+# Effects field — fixtures have no active effects, inject one via mock
+# Base: Starmie (real fixture), effects overridden
+# ---------------------------------------------------------------------------
+
+class TestPokemonStateEffects(unittest.TestCase):
+
+    def test_active_effect_bit_set(self):
+        mock = make_mock_from_fixture("gen1_starmie.json")
+        mock.effects = {Effect.CONFUSION: MagicMock()}
+        ps = _StubState(mock)
+        confusion_idx = GEN1_TRACKED_EFFECTS.index(Effect.CONFUSION)
+        self.assertEqual(ps.effects[confusion_idx], 1.0)
+
+    def test_inactive_effect_bit_zero(self):
+        mock = make_mock_from_fixture("gen1_starmie.json")
+        mock.effects = {Effect.CONFUSION: MagicMock()}
+        ps = _StubState(mock)
+        encore_idx = GEN1_TRACKED_EFFECTS.index(Effect.ENCORE)
+        self.assertEqual(ps.effects[encore_idx], 0.0)
+
+    def test_no_effects_all_zero(self):
+        ps = _StubState(make_mock_from_fixture("gen1_starmie.json"))
+        np.testing.assert_array_equal(ps.effects, np.zeros(len(GEN1_TRACKED_EFFECTS)))
 
 
 if __name__ == "__main__":
