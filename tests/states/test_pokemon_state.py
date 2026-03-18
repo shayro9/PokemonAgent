@@ -147,10 +147,11 @@ class TestPokemonStateInitPopulated(unittest.TestCase):
         spa_idx = GEN1_BOOST_KEYS.index("spa")
         self.assertEqual(ps.boosts[spa_idx], -2.0)
 
-    def test_stats_initialised_to_zero_by_base(self):
-        # PokemonState.__init__ sets stats = encode_dicts({}, STAT_KEYS) → zeros
-        # subclasses are responsible for populating stats from pokemon.stats
-        np.testing.assert_array_equal(self.ps.stats, np.zeros(len(GEN1_STAT_KEYS)))
+    def test_stats_populated_from_pokemon(self):
+        # PokemonState.__init__ calls encode_dicts(pokemon.stats, STAT_KEYS)
+        # Chansey: hp=703, atk=35, def=105, spc=195, spe=188
+        expected = np.array([703, 35, 105, 195, 188], dtype=np.float32)
+        np.testing.assert_array_equal(self.ps.stats, expected)
 
 
 # ---------------------------------------------------------------------------
