@@ -94,6 +94,7 @@ class OpponentPokemonStateGen1(PokemonState):
         )
         return arr
 
+    @classmethod
     def array_len(cls) -> int:
         """Expected flat vector length."""
         return (
