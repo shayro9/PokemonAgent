@@ -76,9 +76,10 @@ class ArenaState:
             self.opp_screens,
         ]).astype(np.float32)
 
-    def array_len(self) -> int:
+    @classmethod
+    def array_len(cls) -> int:
         turn = 1
-        return turn + len(self.my_screens) + len(self.opp_screens)
+        return turn + len(cls.TRACKED_SCREENS) * 2
 
     def describe(self) -> str:
         """Human-readable breakdown of the arena state. Useful for debugging."""

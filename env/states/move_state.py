@@ -92,8 +92,9 @@ class MoveState:
         assert len(arr) == self.array_len(), f"embed: expected {self.array_len()}, got {len(arr)}"
         return arr
 
-    def array_len(self) -> int:
-        return 13 + len(MOVE_CATEGORIES) + len(ALL_STATUSES) + 2 * len(self.BOOST_KEYS)
+    @classmethod
+    def array_len(cls) -> int:
+        return 13 + len(MOVE_CATEGORIES) + len(ALL_STATUSES) + 2 * len(cls.BOOST_KEYS)
 
     def describe(self) -> str:
         """Human-readable breakdown of the move state. Useful for debugging."""
