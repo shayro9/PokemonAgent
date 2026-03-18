@@ -284,6 +284,13 @@ class TestEncodeDicts(unittest.TestCase):
         result = encode_dicts({"atk": 2.5}, ["atk"])
         self.assertAlmostEqual(float(result[0]), 2.5)
 
+    def test_none_value_treated_as_zero(self):
+        # dict.get(k, 0) returns None when the key exists with value None
+        # the function must treat None as 0 rather than raising TypeError
+        result = encode_dicts({"atk": None, "def": 3}, ["atk", "def"])
+        self.assertEqual(float(result[0]), 0.0)
+        self.assertEqual(float(result[1]), 3.0)
+
 
 class TestPullAttribute(unittest.TestCase):
     def test_existing_attribute(self):
