@@ -62,6 +62,8 @@ class PokemonState(ABC):
             self.status  = self._encode_status(pokemon.status)
             self.effects = self._encode_effects(pokemon.effects)
             self.stab    = self._encode_stab(pokemon)
+            self.active  = pokemon.active
+            self.fainted = pokemon.fainted
         else:
             self.hp      = 0.0
             self.species = "none"
@@ -70,6 +72,8 @@ class PokemonState(ABC):
             self.status  = self._encode_status(None)
             self.effects = self._encode_effects({})
             self.stab    = self._encode_stab(None)
+            self.active  = False
+            self.fainted = False
 
     # ------------------------------------------------------------------
     # Abstract interface
