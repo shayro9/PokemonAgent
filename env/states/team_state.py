@@ -36,19 +36,9 @@ class TeamState:
         :param max_size:  Maximum number of slots (default 6).
         """
         self.max_size = max_size
-        self.state_cls = state_cls
-
-        # --- build filled slots ---
         pokemons.sort()
-        filled: list[PokemonState] = [
-            state_cls(p) for p in pokemons[:max_size]
-        ]
-
-        # --- pad with zero-initialised placeholders ---
-        n_pad = max_size - len(filled)
-        padding: list[PokemonState] = [state_cls(None) for _ in range(n_pad)]
-
-        self.members: list[PokemonState] = filled + padding
+        self.members: list[PokemonState] = ([state_cls(p) for p in pokemons[:max_size]]
+                                          + [state_cls(None) for _ in range(max_size - len(pokemons[:max_size]))])
         self.alive_vector = self.encode_active_and_faint()
         self.active = self.get_active()
 
@@ -82,11 +72,11 @@ class TeamState:
         return sum(1 for m in self.members if m.species != "none" and not m.fainted)
 
     def encode_active_and_faint(self) -> np.ndarray:
+        def status(m) -> float:
+            return 1.0 if m.active else -1.0 if m.fainted else 0.0
+
         vec = np.zeros(self.max_size, dtype=np.float32)
-        vec[:len(self.members)] = [
-            1.0 if m.active else -1.0 if m.fainted else 0.0
-            for m in self.members
-        ]
+        vec[:len(self.members)] = [status(p) for p in self.members]
         return vec
 
     def get_active(self):
@@ -94,7 +84,7 @@ class TeamState:
 
     def describe(self) -> str:
         lines = [f"Team  ({self.alive_count()} alive / {self.max_size} slots):",
-                 f"Alive vector: {self.alive_vector}"]
+                 f"Alive vector: {self.alive_vector} Active: ({self.active.species if self.active else "None"})",]
         for i, member in enumerate(self.members):
             tag = "(empty)" if member.species == "none" else ""
             lines.append(

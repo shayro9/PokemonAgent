@@ -1,17 +1,16 @@
 from __future__ import annotations
-
 from typing import Optional
 
 import numpy as np
 from poke_env.battle.pokemon import Pokemon
 
+from env.states.state_utils import STAT_NORM, BOOST_NORM, STAB_NORM, ALL_STATUSES
 from env.states.pokemon_state import (
-    PokemonState,
-    ALL_STATUSES, TRACKED_EFFECTS,
+    PokemonState
 )
 
 
-class MyPokemonState(PokemonState):
+class MyPokemonStateGen1(PokemonState):
     """
     Agent-side Pokémon state.
 
@@ -30,11 +29,6 @@ class MyPokemonState(PokemonState):
         """
         super().__init__(pokemon)
 
-        if pokemon is not None:
-            self.stats: np.ndarray = self._encode_stats(pokemon.stats, self.STAT_KEYS)
-        else:
-            self.stats = np.zeros(len(self.STAT_KEYS), dtype=np.float32)
-
     # ------------------------------------------------------------------
     # Serialisation
     # ------------------------------------------------------------------
@@ -46,11 +40,11 @@ class MyPokemonState(PokemonState):
         """
         arr = np.concatenate([
             [self.hp],
-            self.normalize_stats(),         # (len(STAT_KEYS),)
-            self.normalize_boosts(),        # (len(BOOST_KEYS),)
-            self.status,                    # (len(ALL_STATUSES),)
-            self.effects,                   # (len(TRACKED_EFFECTS),)
-            [self.normalize_stab()],        # scalar, normalised to match BattleState
+            self.normalize_vector(self.stats, STAT_NORM),  # (len(STAT_KEYS),)
+            self.normalize_vector(self.boosts, BOOST_NORM, symmetric=True),# (len(BOOST_KEYS),)
+            self.status,                              # (len(ALL_STATUSES),)
+            self.effects,                             # (len(TRACKED_EFFECTS),)
+            [self.normalize(self.stab, STAB_NORM)],        # scalar, normalised to match BattleState
         ]).astype(np.float32)
 
         assert len(arr) == self.array_len(), (
@@ -65,18 +59,18 @@ class MyPokemonState(PokemonState):
                     + len(TRACKED_EFFECTS) + 1
         """
         return (
-            1                       # hp
-            + len(self.STAT_KEYS)   # stats
-            + len(self.BOOST_KEYS)  # boosts
-            + len(ALL_STATUSES)     # status
-            + len(TRACKED_EFFECTS)  # effects
-            + 1                     # stab
+            1                            # hp
+            + len(self.STAT_KEYS)        # stats
+            + len(self.BOOST_KEYS)       # boosts
+            + len(ALL_STATUSES)          # status
+            + len(self.TRACKED_EFFECTS)  # effects
+            + 1                          # stab
         )
 
     def describe(self) -> str:
         """Human-readable breakdown of the pokemon state. Useful for debugging."""
         active_status  = [ALL_STATUSES[i].name for i, v in enumerate(self.status)  if v == 1.0]
-        active_effects = [TRACKED_EFFECTS[i].name for i, v in enumerate(self.effects) if v == 1.0]
+        active_effects = [self.TRACKED_EFFECTS[i].name for i, v in enumerate(self.effects) if v == 1.0]
 
         stat_lines = " | ".join(
             f"{k}={int(v)}" for k, v in zip(self.STAT_KEYS, self.stats)
