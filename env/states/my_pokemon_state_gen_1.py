@@ -10,7 +10,7 @@ from env.states.pokemon_state import (
 )
 
 
-class MyPokemonState(PokemonState):
+class MyPokemonStateGen1(PokemonState):
     """
     Agent-side Pokémon state.
 
@@ -29,9 +29,6 @@ class MyPokemonState(PokemonState):
         """
         super().__init__(pokemon)
 
-        if pokemon is not None:
-            self.stats: np.ndarray = self.encode_enum(pokemon.stats, self.STAT_KEYS)
-
     # ------------------------------------------------------------------
     # Serialisation
     # ------------------------------------------------------------------
@@ -44,7 +41,7 @@ class MyPokemonState(PokemonState):
         arr = np.concatenate([
             [self.hp],
             self.normalize_vector(self.stats, STAT_NORM),  # (len(STAT_KEYS),)
-            self.normalize_vector(self.boosts, BOOST_NORM),# (len(BOOST_KEYS),)
+            self.normalize_vector(self.boosts, BOOST_NORM, symmetric=True),# (len(BOOST_KEYS),)
             self.status,                              # (len(ALL_STATUSES),)
             self.effects,                             # (len(TRACKED_EFFECTS),)
             [self.normalize(self.stab, STAB_NORM)],        # scalar, normalised to match BattleState
