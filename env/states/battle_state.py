@@ -17,7 +17,6 @@ class BattleState:
     """
 
     GEN: int = 1
-    MAX_MOVES: int = MAX_MOVES
     MAX_TEAM_SIZE: int = MAX_TEAM_SIZE
 
     def __init__(self, battle: Battle) -> None:
@@ -37,9 +36,9 @@ class BattleState:
     def to_array(self) -> np.ndarray:
         """Return the full flat float32 feature vector for this turn."""
         arr = np.concatenate([
-            self.arena_state.to_array(),  # arena
-            self.my_bench.to_array(),  # my bench
-            self.opp_bench.to_array(),  # opp bench
+            self.arena_state.to_array(),
+            self.my_bench.to_array(),
+            self.opp_bench.to_array(),
         ]).astype(np.float32)
 
         assert len(arr) == self.array_len(), (
