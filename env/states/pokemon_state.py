@@ -4,17 +4,16 @@ from typing import Optional
 
 import numpy as np
 from poke_env.battle.pokemon import Pokemon
-from poke_env.battle.pokemon_type import PokemonType
+from poke_env.battle.effect import Effect
 
-from env.states.state_utils import encode_enum, GEN1_BOOST_KEYS, ALL_STATUSES, GEN1_TRACKED_EFFECTS, GEN1_STAT_KEYS
+
+from env.states.state_utils import GEN1_BOOST_KEYS, ALL_STATUSES, GEN1_TRACKED_EFFECTS, GEN1_STAT_KEYS
+from env.states.state_utils import normalize, normalize_vector, encode_enum
 # ---------------------------------------------------------------------------
 # Shared constants
 # ---------------------------------------------------------------------------
 
-STAT_NORM   = 600.0
 BOOST_NORM  = 6.0
-STAB_NORM   = 2.25
-
 
 class PokemonState(ABC):
     """
@@ -34,29 +33,29 @@ class PokemonState(ABC):
 
     STAT_KEYS: list[str]    = GEN1_STAT_KEYS
     BOOST_KEYS: list[str]   = GEN1_BOOST_KEYS
-    TRACKED_EFFECTS: list[str] = GEN1_TRACKED_EFFECTS
+    TRACKED_EFFECTS: list[Effect] = GEN1_TRACKED_EFFECTS
 
     # ------------------------------------------------------------------
     # init
     # ------------------------------------------------------------------
     def __init__(self, pokemon: Optional[Pokemon] = None):
         self.level = 100
-        self.stats = np.zeros(len(self.STAT_KEYS), dtype=np.float32)
+        self.stats = self.encode_enum(None, self.STAT_KEYS)
         if pokemon is not None:
             self.hp      = pokemon.current_hp_fraction
             self.species = pokemon.species
-            self.boosts  = encode_enum(pokemon.boosts, self.BOOST_KEYS)
+            self.boosts  = self.encode_enum(pokemon.boosts, self.BOOST_KEYS)
             self.types   = pokemon.types
-            self.status  = encode_enum(pokemon.status, ALL_STATUSES)
-            self.effects = encode_enum(pokemon.effects, self.TRACKED_EFFECTS)
+            self.status  = self.encode_enum(pokemon.status, ALL_STATUSES)
+            self.effects = self.encode_enum(pokemon.effects, self.TRACKED_EFFECTS)
             self.stab    = self._encode_stab(pokemon)
         else:
             self.hp      = 0.0
             self.species = "none"
             self.boosts  = np.zeros(len(self.BOOST_KEYS),  dtype=np.float32)
             self.types   = [None]
-            self.status = encode_enum(None, ALL_STATUSES)
-            self.effects = encode_enum(None, self.TRACKED_EFFECTS)
+            self.status = self.encode_enum(None, ALL_STATUSES)
+            self.effects = self.encode_enum(None, self.TRACKED_EFFECTS)
             self.stab    = self._encode_stab(None)
 
     # ------------------------------------------------------------------
@@ -86,22 +85,30 @@ class PokemonState(ABC):
     # Shared encoding helpers
     # ------------------------------------------------------------------
 
-    def normalize_boosts(self) -> np.ndarray:
-        """Normalise raw boost stages → [−1, +1].
+    @staticmethod
+    def normalize(x: float, max_x: float = 1.0, symmetric: bool = False) -> float:
+        return normalize(x, max_x=max_x, symmetric=symmetric)
 
-        :returns: Float32 array of length ``len(BOOST_KEYS)``.
+    @staticmethod
+    def normalize_vector(vec, vec_max, symmetric: bool = False) -> np.ndarray:
+        return normalize_vector(vec, vec_max, symmetric=symmetric)
+
+    @staticmethod
+    def encode_enum(value, enums_list) -> np.ndarray:
+        return encode_enum(value, enums_list)
+
+    @staticmethod
+    def encode_dicts(_dict: dict, _keys: list[str]) -> np.ndarray:
+        """Extract raw boost stage values in the given key order.
+
+        :param _dict: dictionary to encode
+        :param _keys: Ordered list of keys to extract.
+        :returns: Float32 array of raw values stage values.
         """
-        return (self.boosts / BOOST_NORM).astype(np.float32)
-
-    def normalize_stats(self) -> np.ndarray:
-        """Normalise raw stats → [0, 1] by dividing by ``STAT_NORM``.
-
-        :returns: Float32 array of length ``len(STAT_KEYS)``.
-        """
-        return np.minimum(self.stats / STAT_NORM, 1.0).astype(np.float32)
-
-    def normalize_stab(self) -> np.ndarray:
-        return np.minimum(self.stab / STAB_NORM, 1.0).astype(np.float32)
+        return np.array(
+            [_dict.get(k, 0) for k in _keys],
+            dtype=np.float32,
+        )
 
     # ------------------------------------------------------------------
     # Encoders

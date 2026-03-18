@@ -1,10 +1,20 @@
 import numpy as np
 from poke_env.battle.status import Status
+from poke_env.battle.effect import Effect
 
 
 BOOST_NORM      = 6.0
-GEN1_BOOST_KEYS = ["atk", "def", "spa", "spe", "accuracy", "evasion"]
+STAT_NORM   = 600.0
+STAB_NORM   = 2.25
+
 ALL_STATUSES    = list(Status)
+
+GEN1_TRACKED_EFFECTS = [Effect.CONFUSION, Effect.ENCORE]
+GEN1_BOOST_KEYS = ["atk", "def", "spa", "spe", "accuracy", "evasion"]
+GEN1_STAT_KEYS      = ["hp", "atk", "def", "spc", "spe"]
+
+MODERN_STAT_KEYS    = ["hp", "atk", "def", "spa", "spd", "spe"]
+MODERN_BOOST_KEYS   = ["atk", "def", "spa", "spd", "spe", "accuracy", "evasion"]
 
 def normalize(x: float, max_x: float = 1.0, symmetric: bool = False) -> float:
     if max_x <= 0:
