@@ -64,7 +64,6 @@ class MyPokemonState(PokemonState):
         :returns: 1 + len(STAT_KEYS) + len(BOOST_KEYS) + len(ALL_STATUSES)
                     + len(TRACKED_EFFECTS) + 1
         """
-        from env.states.pokemon_state import ALL_STATUSES, TRACKED_EFFECTS
         return (
             1                       # hp
             + len(self.STAT_KEYS)   # stats
