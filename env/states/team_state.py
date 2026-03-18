@@ -8,7 +8,7 @@ from env.states.pokemon_state import PokemonState
 MAX_TEAM_SIZE = 6
 MAX_MOVES = 4
 
-class Team:
+class TeamState:
     """
     Holds up to MAX_TEAM_SIZE Pokémon state objects for one side of the field.
 
@@ -50,6 +50,7 @@ class Team:
 
         self.members: list[PokemonState] = filled + padding
         self.alive_vector = self.encode_active_and_faint()
+        self.active = self.get_active()
 
         # slot length is fixed by the state class
         self._slot_len: int = self.members[0].array_len()
@@ -80,11 +81,16 @@ class Team:
         """Number of non-fainted, non-placeholder members."""
         return sum(1 for m in self.members if m.species != "none" and not m.fainted)
 
-    def encode_active_and_faint(self):
-        return np.array([
+    def encode_active_and_faint(self) -> np.ndarray:
+        vec = np.zeros(self.max_size, dtype=np.float32)
+        vec[:len(self.members)] = [
             1.0 if m.active else -1.0 if m.fainted else 0.0
             for m in self.members
-        ], dtype=np.float32)
+        ]
+        return vec
+
+    def get_active(self):
+        return next((m for m in self.members if m.active), None)
 
     def describe(self) -> str:
         lines = [f"Team  ({self.alive_count()} alive / {self.max_size} slots):",
