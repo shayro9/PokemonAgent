@@ -13,18 +13,16 @@
     "spe": 295
   },
   "boosts": {
-    "accuracy": 0,
     "atk": 0,
     "def": 0,
-    "evasion": 0,
     "spa": 0,
     "spd": 0,
-    "spe": 0
+    "spe": 0,
+    "accuracy": 0,
+    "evasion": 0
   },
   "status": "PAR",
-  "effects": {},
+  "effects": [],
   "current_hp_fraction": 1.0,
   "stab_multiplier": 1.5
 }
-
-

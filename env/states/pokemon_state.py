@@ -1,32 +1,13 @@
 from __future__ import annotations
-
 from abc import ABC, abstractmethod
 from typing import Optional
 
 import numpy as np
-from poke_env.battle.effect import Effect
 from poke_env.battle.pokemon import Pokemon
-from poke_env.battle.pokemon_type import PokemonType
-from poke_env.battle.status import Status
+from poke_env.battle.effect import Effect
 
-# ---------------------------------------------------------------------------
-# Shared constants
-# ---------------------------------------------------------------------------
-
-ALL_TYPES       = list(PokemonType)
-ALL_STATUSES    = list(Status)
-TRACKED_EFFECTS = [Effect.CONFUSION, Effect.ENCORE]
-
-# Per-gen stat schemas
-GEN1_STAT_KEYS      = ["hp", "atk", "def", "spc", "spe"]
-MODERN_STAT_KEYS    = ["hp", "atk", "def", "spa", "spd", "spe"]
-
-GEN1_BOOST_KEYS     = ["atk", "def", "spa", "spe", "accuracy", "evasion"]
-MODERN_BOOST_KEYS   = ["atk", "def", "spa", "spd", "spe", "accuracy", "evasion"]
-
-STAT_NORM   = 600.0
-BOOST_NORM  = 6.0
-STAB_NORM   = 2.25
+from env.states.state_utils import GEN1_BOOST_KEYS, ALL_STATUSES, GEN1_TRACKED_EFFECTS, GEN1_STAT_KEYS, BOOST_NORM
+from env.states.state_utils import normalize, normalize_vector, encode_enum, encode_dicts, pull_attribute
 
 
 class PokemonState(ABC):
@@ -47,33 +28,31 @@ class PokemonState(ABC):
 
     STAT_KEYS: list[str]    = GEN1_STAT_KEYS
     BOOST_KEYS: list[str]   = GEN1_BOOST_KEYS
+    TRACKED_EFFECTS: list[Effect] = GEN1_TRACKED_EFFECTS
 
     # ------------------------------------------------------------------
     # init
     # ------------------------------------------------------------------
     def __init__(self, pokemon: Optional[Pokemon] = None):
         self.level = 100
-        self.stats = np.zeros(len(self.STAT_KEYS), dtype=np.float32)
         if pokemon is not None:
             self.hp      = pokemon.current_hp_fraction
             self.species = pokemon.species
-            self.boosts  = self._encode_boosts(pokemon.boosts, self.BOOST_KEYS)
+            self.stats = self.encode_dicts(pokemon.stats, self.STAT_KEYS)
+            self.boosts  = self.encode_dicts(pokemon.boosts, self.BOOST_KEYS)
             self.types   = pokemon.types
-            self.status  = self._encode_status(pokemon.status)
-            self.effects = self._encode_effects(pokemon.effects)
-            self.stab    = self._encode_stab(pokemon)
-            self.active  = pokemon.active
-            self.fainted = pokemon.fainted
+            self.status  = self.encode_enum(pokemon.status, ALL_STATUSES)
+            self.effects = self.encode_enum(pokemon.effects, self.TRACKED_EFFECTS)
+            self.stab    = self.pull_attribute(pokemon, "stab_multiplier", default_value=0.0, type_value=float)
         else:
             self.hp      = 0.0
             self.species = "none"
-            self.boosts  = np.zeros(len(self.BOOST_KEYS),  dtype=np.float32)
+            self.stats = self.encode_dicts({}, self.STAT_KEYS)
+            self.boosts  = self.encode_dicts({}, self.BOOST_KEYS)
             self.types   = [None]
-            self.status  = self._encode_status(None)
-            self.effects = self._encode_effects({})
-            self.stab    = self._encode_stab(None)
-            self.active  = False
-            self.fainted = False
+            self.status = self.encode_enum(None, ALL_STATUSES)
+            self.effects = self.encode_enum(None, self.TRACKED_EFFECTS)
+            self.stab    = self.pull_attribute(None, "stab_multiplier", default_value=0.0, type_value=float)
 
     # ------------------------------------------------------------------
     # Abstract interface
@@ -102,91 +81,23 @@ class PokemonState(ABC):
     # Shared encoding helpers
     # ------------------------------------------------------------------
 
-    def normalize_boosts(self) -> np.ndarray:
-        """Normalise raw boost stages → [−1, +1].
-
-        :returns: Float32 array of length ``len(BOOST_KEYS)``.
-        """
-        return (self.boosts / BOOST_NORM).astype(np.float32)
-
-    def normalize_stats(self) -> np.ndarray:
-        """Normalise raw stats → [0, 1] by dividing by ``STAT_NORM``.
-
-        :returns: Float32 array of length ``len(STAT_KEYS)``.
-        """
-        return np.minimum(self.stats / STAT_NORM, 1.0).astype(np.float32)
-
-    def normalize_stab(self) -> np.ndarray:
-        return np.minimum(self.stab / STAB_NORM, 1.0).astype(np.float32)
-
-    # ------------------------------------------------------------------
-    # Encoders
-    # ------------------------------------------------------------------
+    @staticmethod
+    def normalize(x: float, max_x: float = 1.0, symmetric: bool = False) -> float:
+        return normalize(x, max_x=max_x, symmetric=symmetric)
 
     @staticmethod
-    def _encode_status(status) -> np.ndarray:
-        """One-hot encode a status condition over ``ALL_STATUSES``.
-
-        :param status: poke-env ``Status`` enum value, or ``None``.
-        :returns: Float32 one-hot vector of length ``len(ALL_STATUSES)``.
-        """
-        return np.array(
-            [1.0 if status == s else 0.0 for s in ALL_STATUSES],
-            dtype=np.float32,
-        )
+    def normalize_vector(vec, vec_max, symmetric: bool = False) -> np.ndarray:
+        return normalize_vector(vec, vec_max, symmetric=symmetric)
 
     @staticmethod
-    def _encode_effects(effects) -> np.ndarray:
-        """Binary-encode tracked in-battle effects.
-
-        :param effects: Mapping or set of active ``Effect`` values.
-        :returns: Float32 binary vector of length ``len(TRACKED_EFFECTS)``.
-        """
-        return np.array(
-            [float(e in effects) for e in TRACKED_EFFECTS],
-            dtype=np.float32,
-        )
+    def encode_enum(value, enums_list) -> np.ndarray:
+        return encode_enum(value, enums_list)
 
     @staticmethod
-    def _encode_types(types) -> np.ndarray:
-        """One-hot encode Pokémon typing over ``ALL_TYPES``.
-
-        Dual-typed Pokémon produce two 1s.
-
-        :param types: Iterable of ``PokemonType`` values.
-        :returns: Float32 multi-hot vector of length ``len(ALL_TYPES)``.
-        """
-        return np.array(
-            [1.0 if t in types else 0.0 for t in ALL_TYPES],
-            dtype=np.float32,
-        )
+    def encode_dicts(_dict: dict, _keys: list[str]) -> np.ndarray:
+        return encode_dicts(_dict, _keys)
 
     @staticmethod
-    def _encode_stats(stats: dict, stat_keys: list[str]) -> np.ndarray:
-        """Extract raw stat values in the given key order.
+    def pull_attribute(obj, key, default_value, type_value):
+        return pull_attribute(obj, key, default_value, type_value)
 
-        :param stats: Mapping of stat name → raw integer value.
-        :param stat_keys: Ordered list of keys to extract.
-        :returns: Float32 array of raw stat values.
-        """
-        return np.array(
-            [stats.get(k, 0) for k in stat_keys],
-            dtype=np.float32,
-        )
-
-    @staticmethod
-    def _encode_boosts(boosts: dict, boost_keys: list[str]) -> np.ndarray:
-        """Extract raw boost stage values in the given key order.
-
-        :param boosts: Mapping of boost name → stage integer.
-        :param boost_keys: Ordered list of keys to extract.
-        :returns: Float32 array of raw boost stage values.
-        """
-        return np.array(
-            [boosts.get(k, 0) for k in boost_keys],
-            dtype=np.float32,
-        )
-
-    @staticmethod
-    def _encode_stab(pokemon):
-        return float(getattr(pokemon, "stab_multiplier", 1.5))

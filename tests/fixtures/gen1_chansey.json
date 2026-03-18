@@ -13,17 +13,16 @@
     "spe": 188
   },
   "boosts": {
-    "accuracy": 0,
     "atk": 0,
     "def": 3,
-    "evasion": 0,
     "spa": 0,
     "spd": 0,
-    "spe": 0
+    "spe": 0,
+    "accuracy": 0,
+    "evasion": 0
   },
   "status": "BRN",
-  "effects": {},
+  "effects": [],
   "current_hp_fraction": 0.5,
   "stab_multiplier": 1.5
 }
-
