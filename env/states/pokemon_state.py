@@ -1,28 +1,15 @@
 from __future__ import annotations
-
 from abc import ABC, abstractmethod
 from typing import Optional
 
 import numpy as np
-from poke_env.battle.effect import Effect
 from poke_env.battle.pokemon import Pokemon
 from poke_env.battle.pokemon_type import PokemonType
-from poke_env.battle.status import Status
 
+from env.states.state_utils import encode_enum, GEN1_BOOST_KEYS, ALL_STATUSES, GEN1_TRACKED_EFFECTS, GEN1_STAT_KEYS
 # ---------------------------------------------------------------------------
 # Shared constants
 # ---------------------------------------------------------------------------
-
-ALL_TYPES       = list(PokemonType)
-ALL_STATUSES    = list(Status)
-TRACKED_EFFECTS = [Effect.CONFUSION, Effect.ENCORE]
-
-# Per-gen stat schemas
-GEN1_STAT_KEYS      = ["hp", "atk", "def", "spc", "spe"]
-MODERN_STAT_KEYS    = ["hp", "atk", "def", "spa", "spd", "spe"]
-
-GEN1_BOOST_KEYS     = ["atk", "def", "spa", "spe", "accuracy", "evasion"]
-MODERN_BOOST_KEYS   = ["atk", "def", "spa", "spd", "spe", "accuracy", "evasion"]
 
 STAT_NORM   = 600.0
 BOOST_NORM  = 6.0
@@ -47,6 +34,7 @@ class PokemonState(ABC):
 
     STAT_KEYS: list[str]    = GEN1_STAT_KEYS
     BOOST_KEYS: list[str]   = GEN1_BOOST_KEYS
+    TRACKED_EFFECTS: list[str] = GEN1_TRACKED_EFFECTS
 
     # ------------------------------------------------------------------
     # init
@@ -57,18 +45,18 @@ class PokemonState(ABC):
         if pokemon is not None:
             self.hp      = pokemon.current_hp_fraction
             self.species = pokemon.species
-            self.boosts  = self._encode_boosts(pokemon.boosts, self.BOOST_KEYS)
+            self.boosts  = encode_enum(pokemon.boosts, self.BOOST_KEYS)
             self.types   = pokemon.types
-            self.status  = self._encode_status(pokemon.status)
-            self.effects = self._encode_effects(pokemon.effects)
+            self.status  = encode_enum(pokemon.status, ALL_STATUSES)
+            self.effects = encode_enum(pokemon.effects, self.TRACKED_EFFECTS)
             self.stab    = self._encode_stab(pokemon)
         else:
             self.hp      = 0.0
             self.species = "none"
             self.boosts  = np.zeros(len(self.BOOST_KEYS),  dtype=np.float32)
             self.types   = [None]
-            self.status  = self._encode_status(None)
-            self.effects = self._encode_effects({})
+            self.status = encode_enum(None, ALL_STATUSES)
+            self.effects = encode_enum(None, self.TRACKED_EFFECTS)
             self.stab    = self._encode_stab(None)
 
     # ------------------------------------------------------------------
@@ -120,44 +108,6 @@ class PokemonState(ABC):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _encode_status(status) -> np.ndarray:
-        """One-hot encode a status condition over ``ALL_STATUSES``.
-
-        :param status: poke-env ``Status`` enum value, or ``None``.
-        :returns: Float32 one-hot vector of length ``len(ALL_STATUSES)``.
-        """
-        return np.array(
-            [1.0 if status == s else 0.0 for s in ALL_STATUSES],
-            dtype=np.float32,
-        )
-
-    @staticmethod
-    def _encode_effects(effects) -> np.ndarray:
-        """Binary-encode tracked in-battle effects.
-
-        :param effects: Mapping or set of active ``Effect`` values.
-        :returns: Float32 binary vector of length ``len(TRACKED_EFFECTS)``.
-        """
-        return np.array(
-            [float(e in effects) for e in TRACKED_EFFECTS],
-            dtype=np.float32,
-        )
-
-    @staticmethod
-    def _encode_types(types) -> np.ndarray:
-        """One-hot encode Pokémon typing over ``ALL_TYPES``.
-
-        Dual-typed Pokémon produce two 1s.
-
-        :param types: Iterable of ``PokemonType`` values.
-        :returns: Float32 multi-hot vector of length ``len(ALL_TYPES)``.
-        """
-        return np.array(
-            [1.0 if t in types else 0.0 for t in ALL_TYPES],
-            dtype=np.float32,
-        )
-
-    @staticmethod
     def _encode_stats(stats: dict, stat_keys: list[str]) -> np.ndarray:
         """Extract raw stat values in the given key order.
 
@@ -167,19 +117,6 @@ class PokemonState(ABC):
         """
         return np.array(
             [stats.get(k, 0) for k in stat_keys],
-            dtype=np.float32,
-        )
-
-    @staticmethod
-    def _encode_boosts(boosts: dict, boost_keys: list[str]) -> np.ndarray:
-        """Extract raw boost stage values in the given key order.
-
-        :param boosts: Mapping of boost name → stage integer.
-        :param boost_keys: Ordered list of keys to extract.
-        :returns: Float32 array of raw boost stage values.
-        """
-        return np.array(
-            [boosts.get(k, 0) for k in boost_keys],
             dtype=np.float32,
         )
 
