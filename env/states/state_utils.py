@@ -38,21 +38,31 @@ def normalize_vector(vec, vec_max, symmetric: bool = False) -> np.ndarray:
     return y.astype(np.float32)
 
 def encode_enum(value, enums_list) -> np.ndarray:
-    """One-hot encode an enum condition over enums_list.
+    """Encode an enum condition over enums_list.
 
-    :param value: value to encode
-    :param enums_list: enums to encode
-    :returns: Float32 one-hot vector of length ``len(enums_list)``.
+    - ``None``            → all-zero vector (unknown / no value).
+    - Single enum value   → one-hot vector  (e.g. a Status).
+    - Collection (dict/set/list) → multi-hot vector, one bit per member
+                           (e.g. pokemon.effects which may have several
+                           active Effects at once).
+
+    :param value: ``None``, a single enum member, or a collection of enum members.
+    :param enums_list: ordered list of enum members to encode against.
+    :returns: Float32 binary vector of length ``len(enums_list)``.
     """
     if enums_list is None:
         raise ValueError("enums_list cannot be None")
-    if value is not None:
+    if value is None:
+        return np.zeros(len(enums_list), dtype=np.float32)
+    if isinstance(value, (dict, set, list, frozenset)):
         return np.array(
-            [1.0 if value == s else 0.0 for s in enums_list],
+            [1.0 if s in value else 0.0 for s in enums_list],
             dtype=np.float32,
         )
-    else:
-        return np.zeros(len(enums_list), dtype=np.float32)
+    return np.array(
+        [1.0 if value == s else 0.0 for s in enums_list],
+        dtype=np.float32,
+    )
 
 def encode_dicts(_dict: dict, _keys: list[str]) -> np.ndarray:
     """Extract raw boost stage values in the given key order.
@@ -67,4 +77,4 @@ def encode_dicts(_dict: dict, _keys: list[str]) -> np.ndarray:
     )
 
 def pull_attribute(obj, key, default_value, type_value):
-    return type_value(getattr(obj, key, default_value)) if object is not None else default_value
+    return type_value(getattr(obj, key, default_value))
