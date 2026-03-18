@@ -74,7 +74,7 @@ def encode_dicts(_dict: dict, _keys: list[str]) -> np.ndarray:
     :returns: Float32 array of raw values stage values.
     """
     return np.array(
-        [_dict.get(k, 0) for k in _keys],
+        [_dict.get(k) or 0 for k in _keys],
         dtype=np.float32,
     )
 
