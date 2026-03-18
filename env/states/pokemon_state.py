@@ -6,14 +6,9 @@ import numpy as np
 from poke_env.battle.pokemon import Pokemon
 from poke_env.battle.effect import Effect
 
-
-from env.states.state_utils import GEN1_BOOST_KEYS, ALL_STATUSES, GEN1_TRACKED_EFFECTS, GEN1_STAT_KEYS
+from env.states.state_utils import GEN1_BOOST_KEYS, ALL_STATUSES, GEN1_TRACKED_EFFECTS, GEN1_STAT_KEYS, BOOST_NORM
 from env.states.state_utils import normalize, normalize_vector, encode_enum, encode_dicts, pull_attribute
-# ---------------------------------------------------------------------------
-# Shared constants
-# ---------------------------------------------------------------------------
 
-BOOST_NORM  = 6.0
 
 class PokemonState(ABC):
     """

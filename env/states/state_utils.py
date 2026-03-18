@@ -2,7 +2,9 @@ import numpy as np
 from poke_env.battle.status import Status
 from poke_env.battle.effect import Effect
 
-
+# ---------------------------------------------------------------------------
+# Shared constants
+# ---------------------------------------------------------------------------
 BOOST_NORM      = 6.0
 STAT_NORM   = 600.0
 STAB_NORM   = 2.25
