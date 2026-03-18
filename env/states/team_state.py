@@ -50,7 +50,7 @@ class TeamState:
 
         self.members: list[PokemonState] = filled + padding
         self.alive_vector = self.encode_active_and_faint()
-        self.active = self.get_active()
+        self.active = self.get_active() or self.members[0]
 
         # slot length is fixed by the state class
         self._slot_len: int = self.members[0].array_len()
@@ -94,7 +94,7 @@ class TeamState:
 
     def describe(self) -> str:
         lines = [f"Team  ({self.alive_count()} alive / {self.max_size} slots):",
-                 f"Alive vector: {self.alive_vector}"]
+                 f"Alive vector: {self.alive_vector} Active: ({self.active.species})",]
         for i, member in enumerate(self.members):
             tag = "(empty)" if member.species == "none" else ""
             lines.append(
