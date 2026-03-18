@@ -332,6 +332,13 @@ class TestPullAttribute(unittest.TestCase):
     def test_none_obj_and_none_key_returns_default(self):
         self.assertEqual(pull_attribute(None, None, 0, int), 0)
 
+    def test_attribute_value_is_none_returns_default(self):
+        # getattr returns None when the attribute exists but its value is None
+        # pull_attribute must fall back to default_value in this case
+        class Obj:
+            stab_multiplier = None
+        self.assertAlmostEqual(pull_attribute(Obj(), "stab_multiplier", 1.5, float), 1.5)
+
 
 
 if __name__ == '__main__':
