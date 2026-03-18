@@ -22,8 +22,7 @@
     "spe": 0
   },
   "status": "SLP",
-  "effects": {},
+  "effects": [],
   "current_hp_fraction": 0.75,
   "stab_multiplier": 1.5
 }
-
