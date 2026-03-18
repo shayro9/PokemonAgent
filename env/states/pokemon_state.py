@@ -48,7 +48,7 @@ class PokemonState(ABC):
             self.types   = pokemon.types
             self.status  = self.encode_enum(pokemon.status, ALL_STATUSES)
             self.effects = self.encode_enum(pokemon.effects, self.TRACKED_EFFECTS)
-            self.stab    = self.pull_attribute(pokemon, "stab_multiplier", default_value=1.5, type_value=float)
+            self.stab    = self.pull_attribute(pokemon, "stab_multiplier", default_value=0.0, type_value=float)
         else:
             self.hp      = 0.0
             self.species = "none"
@@ -57,7 +57,7 @@ class PokemonState(ABC):
             self.types   = [None]
             self.status = self.encode_enum(None, ALL_STATUSES)
             self.effects = self.encode_enum(None, self.TRACKED_EFFECTS)
-            self.stab    = self.pull_attribute(None, "stab_multiplier", default_value=1.5, type_value=float)
+            self.stab    = self.pull_attribute(None, "stab_multiplier", default_value=0.0, type_value=float)
 
     # ------------------------------------------------------------------
     # Abstract interface

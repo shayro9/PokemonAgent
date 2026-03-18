@@ -143,7 +143,7 @@ class TestMyPokemonStateGen1BoostsSlice(unittest.TestCase):
 
 # ---------------------------------------------------------------------------
 # to_array() — None pokemon: full array verification
-# Every slice must be zero except stab which defaults to 1.5/STAB_NORM
+# Every slice must be zero except stab which defaults to 0.0/STAB_NORM = 0.0
 # ---------------------------------------------------------------------------
 
 class TestMyPokemonStateGen1ToArrayEmpty(unittest.TestCase):
@@ -170,7 +170,7 @@ class TestMyPokemonStateGen1ToArrayEmpty(unittest.TestCase):
         np.testing.assert_array_equal(self.arr[_EFFECTS_S], np.zeros(_N_EFFECTS))
 
     def test_stab_is_default_normalised(self):
-        self.assertAlmostEqual(float(self.arr[_STAB_IDX]), 1.5 / STAB_NORM, places=5)
+        self.assertAlmostEqual(float(self.arr[_STAB_IDX]), 0.0, places=5)
 
 
 # ---------------------------------------------------------------------------

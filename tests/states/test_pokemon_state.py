@@ -78,7 +78,7 @@ class TestPokemonStateInitEmpty(unittest.TestCase):
         self.assertEqual(self.ps.species, "none")
 
     def test_stab_is_default(self):
-        self.assertAlmostEqual(self.ps.stab, 1.5)
+        self.assertAlmostEqual(self.ps.stab, 0.0)
 
     def test_types_is_none_list(self):
         self.assertEqual(self.ps.types, [None])

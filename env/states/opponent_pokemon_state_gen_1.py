@@ -11,7 +11,7 @@ from env.states.pokemon_state import (
 )
 
 
-class OpponentPokemonState(PokemonState):
+class OpponentPokemonStateGen1(PokemonState):
     """
     Opponent-side Pokémon state.
     """
@@ -29,16 +29,13 @@ class OpponentPokemonState(PokemonState):
             zero placeholder.
         """
         super().__init__(pokemon)   # sets hp, boosts, status, effects, types, stab
+        self.preparing: float = self.pull_attribute(pokemon, "preparing", 0.0, float)
+        self.must_recharge: float = self.pull_attribute(pokemon, "must_recharge", 0.0, float)
+        self.protect: float = self.pull_attribute(pokemon, "protect_counter", 0.0, float)
         if pokemon is not None:
-            self.stats          : np.ndarray = self.estimate_stats(pokemon)
-            self.preparing      : float      = self.pull_attribute(pokemon, "preparing", False, bool)
-            self.must_recharge  : float      = self.pull_attribute(pokemon, "must_recharge", False, bool)
-            self.protect        : float      = self.pull_attribute(pokemon, "protect_counter", 0.0, float)
+            self.stats: np.ndarray = self.estimate_stats(pokemon)
         else:
-            self.stats          : np.ndarray = self.encode_enum(None, self.STAT_KEYS)
-            self.preparing      : float      = 0.0
-            self.must_recharge  : float      = 0.0
-            self.protect        : float      = 0.0
+            self.stats: np.ndarray = self.encode_enum(None, self.STAT_KEYS)
 
     # ------------------------------------------------------------------
     # Initializations
@@ -82,7 +79,7 @@ class OpponentPokemonState(PokemonState):
         arr = np.concatenate([
             [self.hp],                  # (1)
             self.normalize_vector(self.stats, STAT_NORM),     # (6)
-            self.normalize_vector(self.boosts, BOOST_NORM),    # (7)
+            self.normalize_vector(self.boosts, BOOST_NORM, symmetric=True),    # (7)
             self.status,                # (7)
             self.effects,               # (3)
             [self.preparing],           # (1)
