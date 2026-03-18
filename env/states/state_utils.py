@@ -65,3 +65,6 @@ def encode_dicts(_dict: dict, _keys: list[str]) -> np.ndarray:
         [_dict.get(k, 0) for k in _keys],
         dtype=np.float32,
     )
+
+def pull_attribute(obj, key, default_value, type_value):
+    return type_value(getattr(obj, key, default_value)) if object is not None else default_value

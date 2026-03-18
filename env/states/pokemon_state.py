@@ -8,7 +8,7 @@ from poke_env.battle.effect import Effect
 
 
 from env.states.state_utils import GEN1_BOOST_KEYS, ALL_STATUSES, GEN1_TRACKED_EFFECTS, GEN1_STAT_KEYS
-from env.states.state_utils import normalize, normalize_vector, encode_enum
+from env.states.state_utils import normalize, normalize_vector, encode_enum, encode_dicts, pull_attribute
 # ---------------------------------------------------------------------------
 # Shared constants
 # ---------------------------------------------------------------------------
@@ -48,7 +48,7 @@ class PokemonState(ABC):
             self.types   = pokemon.types
             self.status  = self.encode_enum(pokemon.status, ALL_STATUSES)
             self.effects = self.encode_enum(pokemon.effects, self.TRACKED_EFFECTS)
-            self.stab    = self._encode_stab(pokemon)
+            self.stab    = self.pull_attribute(pokemon, "stab_multiplier", default_value=1.5, type_value=float)
         else:
             self.hp      = 0.0
             self.species = "none"
@@ -56,7 +56,7 @@ class PokemonState(ABC):
             self.types   = [None]
             self.status = self.encode_enum(None, ALL_STATUSES)
             self.effects = self.encode_enum(None, self.TRACKED_EFFECTS)
-            self.stab    = self._encode_stab(None)
+            self.stab    = self.pull_attribute(None, "stab_multiplier", default_value=1.5, type_value=float)
 
     # ------------------------------------------------------------------
     # Abstract interface
@@ -99,34 +99,9 @@ class PokemonState(ABC):
 
     @staticmethod
     def encode_dicts(_dict: dict, _keys: list[str]) -> np.ndarray:
-        """Extract raw boost stage values in the given key order.
-
-        :param _dict: dictionary to encode
-        :param _keys: Ordered list of keys to extract.
-        :returns: Float32 array of raw values stage values.
-        """
-        return np.array(
-            [_dict.get(k, 0) for k in _keys],
-            dtype=np.float32,
-        )
-
-    # ------------------------------------------------------------------
-    # Encoders
-    # ------------------------------------------------------------------
+        return encode_dicts(_dict, _keys)
 
     @staticmethod
-    def _encode_stats(stats: dict, stat_keys: list[str]) -> np.ndarray:
-        """Extract raw stat values in the given key order.
+    def pull_attribute(obj, key, default_value, type_value):
+        return pull_attribute(obj, key, default_value, type_value)
 
-        :param stats: Mapping of stat name → raw integer value.
-        :param stat_keys: Ordered list of keys to extract.
-        :returns: Float32 array of raw stat values.
-        """
-        return np.array(
-            [stats.get(k, 0) for k in stat_keys],
-            dtype=np.float32,
-        )
-
-    @staticmethod
-    def _encode_stab(pokemon):
-        return float(getattr(pokemon, "stab_multiplier", 1.5))

@@ -1,15 +1,13 @@
 from __future__ import annotations
-
-import math
 from typing import Optional
 
 import numpy as np
 from poke_env.battle.pokemon import Pokemon
 
+from env.states.state_utils import STAT_NORM, STAB_NORM, BOOST_NORM
 from env.states.pokemon_state import (
     PokemonState,
     ALL_STATUSES,
-    TRACKED_EFFECTS,
 )
 
 
@@ -33,11 +31,11 @@ class OpponentPokemonState(PokemonState):
         super().__init__(pokemon)   # sets hp, boosts, status, effects, types, stab
         if pokemon is not None:
             self.stats          : np.ndarray = self.estimate_stats(pokemon)
-            self.preparing      : float      = self.is_preparing(pokemon)
-            self.must_recharge  : float      = self.is_recharge(pokemon)
-            self.protect        : float      = self.protect_counter(pokemon)
+            self.preparing      : float      = self.pull_attribute(pokemon, "preparing", False, bool)
+            self.must_recharge  : float      = self.pull_attribute(pokemon, "must_recharge", False, bool)
+            self.protect        : float      = self.pull_attribute(pokemon, "protect_counter", 0.0, float)
         else:
-            self.stats          : np.ndarray = np.zeros(len(self.STAT_KEYS), dtype=np.float32)
+            self.stats          : np.ndarray = self.encode_enum(None, self.STAT_KEYS)
             self.preparing      : float      = 0.0
             self.must_recharge  : float      = 0.0
             self.protect        : float      = 0.0
@@ -46,10 +44,10 @@ class OpponentPokemonState(PokemonState):
     # Initializations
     # ------------------------------------------------------------------
     def estimate_stats(self, pokemon: Pokemon) -> np.ndarray:
-        base_stats = self._encode_stats(pokemon.base_stats, self.STAT_KEYS)
+        base_stats = self.encode_dicts(pokemon.base_stats, self.STAT_KEYS)
 
         level = self.level
-        dv = 15
+        dv      = 15
         ev_term = 64
 
         stats = []
@@ -62,18 +60,6 @@ class OpponentPokemonState(PokemonState):
             stats.append(stat)
 
         return np.array(stats, dtype=np.float32)
-
-    @staticmethod
-    def is_preparing(pokemon) -> bool:
-        return float(getattr(pokemon, "preparing", False)) if pokemon is not None else False
-
-    @staticmethod
-    def is_recharge(pokemon) -> bool:
-        return float(getattr(pokemon, "must_recharge", False)) if pokemon is not None else False
-
-    @staticmethod
-    def protect_counter(pokemon) -> float:
-        return float(getattr(pokemon, "protect_counter", 0.0)) if pokemon is not None else 0.0
 
     # ------------------------------------------------------------------
     # Encoding helpers
@@ -95,13 +81,13 @@ class OpponentPokemonState(PokemonState):
         """
         arr = np.concatenate([
             [self.hp],                  # (1)
-            self.normalize_stats(),     # (6)
-            self.normalize_boosts(),    # (7)
+            self.normalize_vector(self.stats, STAT_NORM),     # (6)
+            self.normalize_vector(self.boosts, BOOST_NORM),    # (7)
             self.status,                # (7)
             self.effects,               # (3)
             [self.preparing],           # (1)
             [self.must_recharge],       # (1)
-            [self.normalize_stab()],    # (1)
+            [self.normalize(self.stab, STAB_NORM)],    # (1)
             self.normalize_protect(),   # (1)
         ]).astype(np.float32)
 
@@ -118,7 +104,7 @@ class OpponentPokemonState(PokemonState):
             + len(self.STAT_KEYS)   # stats
             + len(self.BOOST_KEYS)  # boosts
             + len(ALL_STATUSES)     # status
-            + len(TRACKED_EFFECTS)  # effects
+            + len(self.TRACKED_EFFECTS)  # effects
             + 1                     # preparing
             + 1                     # recharge
             + 1                     # stab
@@ -128,7 +114,7 @@ class OpponentPokemonState(PokemonState):
     def describe(self) -> str:
         """Human-readable breakdown of the pokemon state. Useful for debugging."""
         active_status  = [ALL_STATUSES[i].name for i, v in enumerate(self.status)  if v == 1.0]
-        active_effects = [TRACKED_EFFECTS[i].name for i, v in enumerate(self.effects) if v == 1.0]
+        active_effects = [self.TRACKED_EFFECTS[i].name for i, v in enumerate(self.effects) if v == 1.0]
 
         stat_lines = " | ".join(
             f"{k}={int(v)}" for k, v in zip(self.STAT_KEYS, self.stats)
