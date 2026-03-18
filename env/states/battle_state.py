@@ -32,30 +32,30 @@ class BattleState:
     MAX_TEAM_SIZE: int = MAX_TEAM_SIZE
 
     def __init__(self, battle: Battle) -> None:
-        self.battle = battle
+        self.battle: Battle = battle
 
         # --- Active Pokémon ---
-        self.my_active = battle.active_pokemon
-        self.opp_active = battle.opponent_active_pokemon
+        self.my_active : Pokemon = battle.active_pokemon
+        self.opp_active: Pokemon = battle.opponent_active_pokemon
 
         # --- Bench ---
         active_species = battle.active_pokemon.species
         opp_active_species = battle.opponent_active_pokemon.species
 
-        self.my_bench = [p for p in battle.team.values()
+        self.my_bench: list[Pokemon] = [p for p in battle.team.values()
                         if p.species != active_species]
-        self.opp_bench = [p for p in battle.opponent_team.values()
+        self.opp_bench: list[Pokemon] = [p for p in battle.opponent_team.values()
                          if p.species != opp_active_species]
 
-        self.my_available_moves = battle.available_moves
-        self.opp_moves = list(battle.opponent_active_pokemon.moves.values())
+        self.my_available_moves: list[Move] = battle.available_moves
+        self.opp_moves: list[Move] = list(battle.opponent_active_pokemon.moves.values())
 
         #-------- States --------
-        self.arena_state     = ArenaState(self.battle)
-        self.my_team_state   = TeamState(self.my_bench  + [self.my_active] , MyPokemonStateGen1      , self.MAX_TEAM_SIZE)
-        self.opp_team_state  = TeamState(self.opp_bench + [self.opp_active], OpponentPokemonStateGen1, self.MAX_TEAM_SIZE)
-        self.opp_moves_state = self._encode_moves(self.opp_moves         , self.opp_active, self.my_active)
-        self.my_moves_state  = self._encode_moves(self.my_available_moves, self.my_active , self.opp_active)
+        self.arena_state    : ArenaState = ArenaState(self.battle)
+        self.my_team_state  : TeamState = TeamState(self.my_bench  + [self.my_active] , MyPokemonStateGen1      , self.MAX_TEAM_SIZE)
+        self.opp_team_state : TeamState = TeamState(self.opp_bench + [self.opp_active], OpponentPokemonStateGen1, self.MAX_TEAM_SIZE)
+        self.opp_moves_state: list[MoveState] = self._encode_moves(self.opp_moves         , self.opp_active, self.my_active)
+        self.my_moves_state : list[MoveState]  = self._encode_moves(self.my_available_moves, self.my_active , self.opp_active)
 
     def _encode_moves(self, available_moves: list[Move], attacking_pokemon: Pokemon, defending_pokemon: Pokemon) -> list[MoveState]:
         """Build up to MAX_MOVES MoveState objects, zero-padded."""
