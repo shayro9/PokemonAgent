@@ -14,7 +14,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     # Core
     parser.add_argument("--format", type=str, default="gen9customgame")
     parser.add_argument("--seed", type=int, default=42, help="Global seed for reproducible training/evaluation.")
-    parser.add_argument("--model-path", default="data/1v1")
+    parser.add_argument("--model-path", default="models/1v1_gen1_500k_steps")
 
     # Training
     parser.add_argument("--train-team", default=None, choices=sorted(TEAM_BY_NAME))
