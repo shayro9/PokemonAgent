@@ -18,15 +18,8 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from env.embed import MAX_MOVES, MOVE_EMBED_LEN
-
 from .attention import CrossAttention
-from .constants import (
-    CONTEXT_BEFORE_MY_MOVES,
-    CONTEXT_DIM,
-    OPP_MOVES_START,
-    OPP_MOVES_LEN,
-)
+from .constants import CONTEXT_LEN, MOVE_LEN, MAX_MOVES
 from .mlp import build_mlp
 
 
@@ -54,8 +47,8 @@ class AttentionPointerExtractor(nn.Module):
     ) -> None:
         super().__init__()
 
-        self.context_encoder = build_mlp(CONTEXT_DIM, context_hidden, context_hidden)
-        self.move_encoder = build_mlp(MOVE_EMBED_LEN, move_hidden, move_hidden)
+        self.context_encoder = build_mlp(CONTEXT_LEN, context_hidden, context_hidden)
+        self.move_encoder = build_mlp(MOVE_LEN, move_hidden, move_hidden)
         self.attn = CrossAttention(context_hidden, move_hidden, n_attention_heads)
         self.trunk = build_mlp(context_hidden + move_hidden, trunk_hidden, trunk_hidden)
 
@@ -77,36 +70,32 @@ class AttentionPointerExtractor(nn.Module):
 
     def forward(self, obs: torch.Tensor) -> torch.Tensor:
         """
-        obs     : (B, OBS_SIZE)
-        returns : (B, trunk_hidden)
+        obs     : (batch_size, OBS_SIZE)
+        returns : (batch_size, trunk_hidden)
         """
         # 1. Slice ──────────────────────────────────────────────────────
-        ctx_before    = obs[:, :CONTEXT_BEFORE_MY_MOVES]
-        my_moves_flat = obs[:, CONTEXT_BEFORE_MY_MOVES:OPP_MOVES_START]
-        opp_moves_flat = obs[:, OPP_MOVES_START:OPP_MOVES_START + OPP_MOVES_LEN]
-        ctx_after     = obs[:, OPP_MOVES_START + OPP_MOVES_LEN:]
-
-        context = torch.cat([ctx_before, opp_moves_flat, ctx_after], dim=-1)
+        battle_context    = obs[:, :CONTEXT_LEN]
+        my_moves_flat = obs[:, CONTEXT_LEN:]
 
         # 2. Encode context ─────────────────────────────────────────────
-        ctx_h = self.context_encoder(context)                    # (B, context_hidden)
+        context_hidden = self.context_encoder(battle_context)                    # (batch_size, context_hidden)
 
         # 3. Encode moves (shared weights → permutation equivariant) ────
-        B = my_moves_flat.shape[0]
-        my_moves = my_moves_flat.reshape(B, MAX_MOVES, MOVE_EMBED_LEN)
-        move_h = self.move_encoder(
-            my_moves.reshape(B * MAX_MOVES, MOVE_EMBED_LEN)
-        ).reshape(B, MAX_MOVES, -1)                              # (B, 4, move_hidden)
+        batch_size = my_moves_flat.shape[0]
+        my_moves = my_moves_flat.reshape(batch_size, MAX_MOVES, MOVE_LEN)
+        move_hidden = self.move_encoder(
+            my_moves.reshape(batch_size * MAX_MOVES, MOVE_LEN)
+        ).reshape(batch_size, MAX_MOVES, -1)                              # (batch_size, 4, move_hidden)
 
-        is_padding = (my_moves.abs().sum(dim=-1) == 0)           # (B, 4)  True = empty slot
+        is_padding = (my_moves.abs().sum(dim=-1) == 0)           # (batch_size, 4)  True = empty slot
 
         # 4. Cross-attention ─────────────────────────────────────────────
-        attended, attn_scores = self.attn(ctx_h, move_h, key_padding_mask=is_padding)
+        attended, attn_scores = self.attn(context_hidden, move_hidden, key_padding_mask=is_padding)
 
-        self.move_hidden = move_h       # (B, 4, move_hidden)
-        self.attn_scores = attn_scores  # (B, n_heads, 4)
+        self.move_hidden = move_hidden      # (batch_size, 4, move_hidden)
+        self.attn_scores = attn_scores      # (batch_size, n_heads, 4)
 
         # 5. Trunk ───────────────────────────────────────────────────────
-        features = self.trunk(torch.cat([ctx_h, attended], dim=-1))  # (B, trunk_hidden)
+        features = self.trunk(torch.cat([context_hidden, attended], dim=-1))  # (batch_size, trunk_hidden)
         return features
 

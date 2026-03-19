@@ -11,7 +11,7 @@ from .extractor import AttentionPointerExtractor
 from .attention import CrossAttention
 from .mlp import build_mlp
 from .constants import (
-    CONTEXT_DIM,
+    CONTEXT_LEN,
     MOVE_ACTION_START,
     N_MOVE_ACTIONS,
     TOTAL_ACTIONS,
@@ -22,7 +22,7 @@ __all__ = [
     "AttentionPointerExtractor",
     "CrossAttention",
     "build_mlp",
-    "CONTEXT_DIM",
+    "CONTEXT_LEN",
     "MOVE_ACTION_START",
     "N_MOVE_ACTIONS",
     "TOTAL_ACTIONS",

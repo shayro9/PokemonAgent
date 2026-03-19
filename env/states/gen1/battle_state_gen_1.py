@@ -97,6 +97,16 @@ class BattleStateGen1:
                 + MoveState.array_len() * MAX_MOVES
         )
 
+    @classmethod
+    def battle_context_len(cls) -> int:
+        """Expected flat vector length (static after construction)."""
+        return (
+                ArenaStateGen1.array_len()
+                + TeamState.compute_array_len(MyPokemonStateGen1, cls.MAX_TEAM_SIZE)
+                + TeamState.compute_array_len(OpponentPokemonStateGen1, cls.MAX_TEAM_SIZE)
+                + MoveState.array_len() * MAX_MOVES
+        )
+
     # ------------------------------------------------------------------
     # Debug
     # ------------------------------------------------------------------
