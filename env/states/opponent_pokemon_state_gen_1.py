@@ -31,7 +31,7 @@ class OpponentPokemonStateGen1(PokemonState):
         super().__init__(pokemon)   # sets hp, boosts, status, effects, types, stab
         self.preparing: float = self.pull_attribute(pokemon, "preparing", 0.0, float)
         self.must_recharge: float = self.pull_attribute(pokemon, "must_recharge", 0.0, float)
-        self.protect: float = self.pull_attribute(pokemon, "protect_counter", 0.0, float)
+        self.protect: float = self.pull_attribute(pokemon, "protect_counter", -1.0, float)
         if pokemon is not None:
             self.stats: np.ndarray = self.estimate_stats(pokemon)
         else:
@@ -62,7 +62,7 @@ class OpponentPokemonStateGen1(PokemonState):
     # Encoding helpers
     # ------------------------------------------------------------------
     def normalize_protect(self) -> np.ndarray:
-        value = 0.3 ** self.protect
+        value = (0.3 ** self.protect) if self.protect >= 0 else 0
         return np.array([value], dtype=np.float32)
 
     # ------------------------------------------------------------------

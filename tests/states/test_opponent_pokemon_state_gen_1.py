@@ -222,7 +222,7 @@ class TestOpponentNewFields(unittest.TestCase):
         self.assertEqual(OpponentPokemonStateGen1().must_recharge, 0.0)
 
     def test_empty_state_protect_zero(self):
-        self.assertEqual(OpponentPokemonStateGen1().protect, 0.0)
+        self.assertEqual(OpponentPokemonStateGen1().protect, -1.0)
 
     def test_preparing_and_recharge_independent(self):
         # Tauros: preparing=True, must_recharge=False
@@ -264,7 +264,7 @@ class TestNormalizeProtect(unittest.TestCase):
 
     def test_always_positive(self):
         for n in range(10):
-            self.assertGreater(float(self._make(n).normalize_protect()[0]), 0.0)
+            self.assertGreaterEqual(float(self._make(n).normalize_protect()[0]), 0.0)
 
     def test_never_exceeds_one(self):
         for n in range(10):
@@ -327,9 +327,8 @@ class TestOpponentToArrayEmpty(unittest.TestCase):
     def test_stab_is_default_normalised(self):
         self.assertAlmostEqual(float(self.arr[_STAB_IDX]), 0.0, places=5)
 
-    def test_protect_is_one_when_counter_zero(self):
-        # 0.3 ** 0 == 1.0
-        self.assertAlmostEqual(float(self.arr[_PROTECT_IDX]), 1.0, places=5)
+    def test_protect_is_zero_when_none(self):
+        self.assertAlmostEqual(float(self.arr[_PROTECT_IDX]), 0.0, places=5)
 
     def test_no_nan(self):
         self.assertFalse(np.any(np.isnan(self.arr)))
