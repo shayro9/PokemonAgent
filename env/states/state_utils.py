@@ -82,7 +82,11 @@ def encode_dicts(_dict: dict, _keys: list[str]) -> np.ndarray:
     )
 
 def pull_attribute(obj, key, default_value, type_value):
-    if obj is None or key is None:
+    try:
+        if obj is None or key is None:
+            return type_value(default_value)
+        val = getattr(obj, key, default_value)
+        return type_value(val) if val is not None else default_value
+    except Exception as e:
+        print(e)
         return type_value(default_value)
-    val = getattr(obj, key, default_value)
-    return type_value(val) if val is not None else default_value

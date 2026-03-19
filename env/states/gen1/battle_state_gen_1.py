@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
-from poke_env.battle import Battle, Move, Pokemon
+from poke_env.battle import AbstractBattle, Move, Pokemon
 
 from env.states.gen1.arena_state_gen1 import ArenaStateGen1
 from env.states.gen1.my_pokemon_state_gen_1 import MyPokemonStateGen1
@@ -31,8 +31,8 @@ class BattleStateGen1:
     MAX_MOVES: int = MAX_MOVES
     MAX_TEAM_SIZE: int = MAX_TEAM_SIZE
 
-    def __init__(self, battle: Battle) -> None:
-        self.battle: Battle = battle
+    def __init__(self, battle: AbstractBattle) -> None:
+        self.battle: AbstractBattle = battle
 
         # --- Active Pokémon ---
         self.my_active : Pokemon = battle.active_pokemon
@@ -54,13 +54,13 @@ class BattleStateGen1:
         self.arena_state    : ArenaStateGen1 = ArenaStateGen1(self.battle)
         self.my_team_state  : TeamState = TeamState(self.my_bench  + [self.my_active] , MyPokemonStateGen1      , self.MAX_TEAM_SIZE)
         self.opp_team_state : TeamState = TeamState(self.opp_bench + [self.opp_active], OpponentPokemonStateGen1, self.MAX_TEAM_SIZE)
-        self.opp_moves_state: list[MoveState] = self._encode_moves(self.opp_moves         , self.opp_active, self.my_active)
+        self.opp_moves_state: list[MoveState]  = self._encode_moves(self.opp_moves         , self.opp_active, self.my_active)
         self.my_moves_state : list[MoveState]  = self._encode_moves(self.my_available_moves, self.my_active , self.opp_active)
 
     def _encode_moves(self, available_moves: list[Move], attacking_pokemon: Pokemon, defending_pokemon: Pokemon) -> list[MoveState]:
         """Build up to MAX_MOVES MoveState objects, zero-padded."""
-        all_moves = list(attacking_pokemon.moves.values())
-        moves_list = [m if m in available_moves else None for m in all_moves]
+        all_moves = list(attacking_pokemon.moves.values()) + [None] * MAX_MOVES
+        moves_list = [m if m in available_moves else None for m in all_moves[:MAX_MOVES]]
         attacking_types = attacking_pokemon.types
         defending_types = defending_pokemon.types
 

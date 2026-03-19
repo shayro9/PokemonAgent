@@ -6,7 +6,7 @@ from stable_baselines3.common.utils import set_random_seed
 from stable_baselines3.common.callbacks import CallbackList
 from wandb.integration.sb3 import WandbCallback
 
-from policy.attention_policy import AttentionPointerPolicy
+from policy.policy import AttentionPointerPolicy
 from .parse import build_arg_parser
 from config.config import *
 from training.battle_metrics_log import *

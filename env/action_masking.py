@@ -55,6 +55,8 @@ def get_valid_action_mask(
         move_mask = [move in available_moves for move in all_moves]
         if not any(move_mask):
             move_mask = [1, 0, 0, 0]
+        while len(move_mask) < MAX_MOVES:
+            move_mask.append(False)
         for slot, action in enumerate(ACTION_MOVE_RANGE):
             mask[action] = move_mask[slot]
 
