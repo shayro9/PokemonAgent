@@ -59,6 +59,10 @@ function canDamage(attacker, defender) {
     });
 }
 
+function hasMirrorMove(mon) {
+    return (mon.moves || []).some(m => Dex.moves.get(m).id === 'mirrormove');
+}
+
 function pickOneMon(team) {
     return team[Math.floor(Math.random() * team.length)];
 }
@@ -95,6 +99,7 @@ function generateTeamsPool() {
         for (const mon of picks) {
             const sp = mon.species;
             if (FILTER_SPECIES && sp !== FILTER_SPECIES) continue;
+            if (hasMirrorMove(mon)) continue;
 
             const cnt = perSpeciesCount.get(sp) || 0;
             if (cnt >= MAX_PER_SPECIES) continue;
@@ -151,6 +156,8 @@ function generateMatchupsPool() {
             filteredUnwinnable++;
             continue;
         }
+
+        if (hasMirrorMove(agent) || hasMirrorMove(opp)) continue;
 
         if (DEDUPE_EXACT_SETS) {
             const key = `${setKey(agent)}__vs__${setKey(opp)}`;
