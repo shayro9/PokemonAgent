@@ -11,7 +11,7 @@ from env.embed import embed_move
 from env.singles_env_wrapper import print_state, PokemonRLWrapper
 
 
-class DebugRLPlayer(RandomPlayer):
+class RandomAgent(RandomPlayer):
     def __init__(self, env, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.env = env
