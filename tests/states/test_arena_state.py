@@ -5,7 +5,7 @@ import numpy as np
 
 from poke_env.battle.side_condition import SideCondition
 
-from env.states.arena_state import ArenaState, TURN_NORM
+from env.states.gen1.arena_state_gen1 import ArenaStateGen1, TURN_NORM
 
 
 def make_battle_mock(
@@ -29,16 +29,16 @@ class ArenaStateBaseTest:
     """
     Mixin — subclasses must set self.arena in setUp().
     """
-    arena: ArenaState
+    arena: ArenaStateGen1
 
     def test_my_screens_shape(self):
-        self.assertEqual(self.arena.my_screens.shape, (len(ArenaState.TRACKED_SCREENS),))
+        self.assertEqual(self.arena.my_screens.shape, (len(ArenaStateGen1.TRACKED_SCREENS),))
 
     def test_my_screens_dtype(self):
         self.assertEqual(self.arena.my_screens.dtype, np.float32)
 
     def test_opp_screens_shape(self):
-        self.assertEqual(self.arena.opp_screens.shape, (len(ArenaState.TRACKED_SCREENS),))
+        self.assertEqual(self.arena.opp_screens.shape, (len(ArenaStateGen1.TRACKED_SCREENS),))
 
     def test_opp_screens_dtype(self):
         self.assertEqual(self.arena.opp_screens.dtype, np.float32)
@@ -50,7 +50,7 @@ class ArenaStateBaseTest:
         self.assertEqual(len(self.arena.to_array()), self.arena.array_len())
 
     def test_array_len(self):
-        expected = 1 + len(ArenaState.TRACKED_SCREENS) * 2
+        expected = 1 + len(ArenaStateGen1.TRACKED_SCREENS) * 2
         self.assertEqual(self.arena.array_len(), expected)
 
     def test_screens_binary(self):
@@ -65,7 +65,7 @@ class ArenaStateBaseTest:
 class TestArenaStateEmpty(ArenaStateBaseTest, unittest.TestCase):
 
     def setUp(self):
-        self.arena = ArenaState()
+        self.arena = ArenaStateGen1()
 
     def test_turn_is_zero(self):
         self.assertEqual(self.arena.turn, 0)
@@ -76,13 +76,13 @@ class TestArenaStateEmpty(ArenaStateBaseTest, unittest.TestCase):
     def test_my_screens_all_zero(self):
         np.testing.assert_array_equal(
             self.arena.my_screens,
-            np.zeros(len(ArenaState.TRACKED_SCREENS))
+            np.zeros(len(ArenaStateGen1.TRACKED_SCREENS))
         )
 
     def test_opp_screens_all_zero(self):
         np.testing.assert_array_equal(
             self.arena.opp_screens,
-            np.zeros(len(ArenaState.TRACKED_SCREENS))
+            np.zeros(len(ArenaStateGen1.TRACKED_SCREENS))
         )
 
 
@@ -93,7 +93,7 @@ class TestArenaStateEmpty(ArenaStateBaseTest, unittest.TestCase):
 class TestArenaStateTurn(ArenaStateBaseTest, unittest.TestCase):
 
     def setUp(self):
-        self.arena = ArenaState(make_battle_mock(turn=15))
+        self.arena = ArenaStateGen1(make_battle_mock(turn=15))
 
     def test_turn_raw(self):
         self.assertEqual(self.arena.turn, 15)
@@ -102,7 +102,7 @@ class TestArenaStateTurn(ArenaStateBaseTest, unittest.TestCase):
         self.assertAlmostEqual(self.arena.turn_encoded(), 15 / TURN_NORM)
 
     def test_turn_encoded_capped_at_1(self):
-        arena = ArenaState(make_battle_mock(turn=999))
+        arena = ArenaStateGen1(make_battle_mock(turn=999))
         self.assertEqual(arena.turn_encoded(), 1.0)
 
     def test_turn_encoded_in_to_array(self):
@@ -116,23 +116,23 @@ class TestArenaStateTurn(ArenaStateBaseTest, unittest.TestCase):
 class TestArenaStateMyReflect(ArenaStateBaseTest, unittest.TestCase):
 
     def setUp(self):
-        self.arena = ArenaState(make_battle_mock(
+        self.arena = ArenaStateGen1(make_battle_mock(
             turn=5,
             my_conditions={SideCondition.REFLECT: 1},
         ))
 
     def test_my_reflect_set(self):
-        reflect_idx = ArenaState.TRACKED_SCREENS.index(SideCondition.REFLECT)
+        reflect_idx = ArenaStateGen1.TRACKED_SCREENS.index(SideCondition.REFLECT)
         self.assertEqual(self.arena.my_screens[reflect_idx], 1.0)
 
     def test_my_light_screen_not_set(self):
-        ls_idx = ArenaState.TRACKED_SCREENS.index(SideCondition.LIGHT_SCREEN)
+        ls_idx = ArenaStateGen1.TRACKED_SCREENS.index(SideCondition.LIGHT_SCREEN)
         self.assertEqual(self.arena.my_screens[ls_idx], 0.0)
 
     def test_opp_screens_all_zero(self):
         np.testing.assert_array_equal(
             self.arena.opp_screens,
-            np.zeros(len(ArenaState.TRACKED_SCREENS))
+            np.zeros(len(ArenaStateGen1.TRACKED_SCREENS))
         )
 
 
@@ -143,23 +143,23 @@ class TestArenaStateMyReflect(ArenaStateBaseTest, unittest.TestCase):
 class TestArenaStateOppLightScreen(ArenaStateBaseTest, unittest.TestCase):
 
     def setUp(self):
-        self.arena = ArenaState(make_battle_mock(
+        self.arena = ArenaStateGen1(make_battle_mock(
             turn=10,
             opp_conditions={SideCondition.LIGHT_SCREEN: 1},
         ))
 
     def test_opp_light_screen_set(self):
-        ls_idx = ArenaState.TRACKED_SCREENS.index(SideCondition.LIGHT_SCREEN)
+        ls_idx = ArenaStateGen1.TRACKED_SCREENS.index(SideCondition.LIGHT_SCREEN)
         self.assertEqual(self.arena.opp_screens[ls_idx], 1.0)
 
     def test_opp_reflect_not_set(self):
-        reflect_idx = ArenaState.TRACKED_SCREENS.index(SideCondition.REFLECT)
+        reflect_idx = ArenaStateGen1.TRACKED_SCREENS.index(SideCondition.REFLECT)
         self.assertEqual(self.arena.opp_screens[reflect_idx], 0.0)
 
     def test_my_screens_all_zero(self):
         np.testing.assert_array_equal(
             self.arena.my_screens,
-            np.zeros(len(ArenaState.TRACKED_SCREENS))
+            np.zeros(len(ArenaStateGen1.TRACKED_SCREENS))
         )
 
 
@@ -170,7 +170,7 @@ class TestArenaStateOppLightScreen(ArenaStateBaseTest, unittest.TestCase):
 class TestArenaStateBothScreensBothSides(ArenaStateBaseTest, unittest.TestCase):
 
     def setUp(self):
-        self.arena = ArenaState(make_battle_mock(
+        self.arena = ArenaStateGen1(make_battle_mock(
             turn=3,
             my_conditions={SideCondition.REFLECT: 1, SideCondition.LIGHT_SCREEN: 1},
             opp_conditions={SideCondition.REFLECT: 1, SideCondition.LIGHT_SCREEN: 1},
@@ -179,13 +179,13 @@ class TestArenaStateBothScreensBothSides(ArenaStateBaseTest, unittest.TestCase):
     def test_my_all_screens_set(self):
         np.testing.assert_array_equal(
             self.arena.my_screens,
-            np.ones(len(ArenaState.TRACKED_SCREENS), dtype=np.float32)
+            np.ones(len(ArenaStateGen1.TRACKED_SCREENS), dtype=np.float32)
         )
 
     def test_opp_all_screens_set(self):
         np.testing.assert_array_equal(
             self.arena.opp_screens,
-            np.ones(len(ArenaState.TRACKED_SCREENS), dtype=np.float32)
+            np.ones(len(ArenaStateGen1.TRACKED_SCREENS), dtype=np.float32)
         )
 
 

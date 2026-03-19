@@ -52,7 +52,8 @@ class MyPokemonStateGen1(PokemonState):
         )
         return arr
 
-    def array_len(self) -> int:
+    @classmethod
+    def array_len(cls) -> int:
         """Expected flat vector length.
 
         :returns: 1 + len(STAT_KEYS) + len(BOOST_KEYS) + len(ALL_STATUSES)
@@ -60,10 +61,10 @@ class MyPokemonStateGen1(PokemonState):
         """
         return (
             1                            # hp
-            + len(self.STAT_KEYS)        # stats
-            + len(self.BOOST_KEYS)       # boosts
+            + len(cls.STAT_KEYS)        # stats
+            + len(cls.BOOST_KEYS)       # boosts
             + len(ALL_STATUSES)          # status
-            + len(self.TRACKED_EFFECTS)  # effects
+            + len(cls.TRACKED_EFFECTS)  # effects
             + 1                          # stab
         )
 

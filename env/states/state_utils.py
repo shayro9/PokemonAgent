@@ -18,6 +18,7 @@ GEN1_STAT_KEYS      = ["hp", "atk", "def", "spc", "spe"]
 MODERN_STAT_KEYS    = ["hp", "atk", "def", "spa", "spd", "spe"]
 MODERN_BOOST_KEYS   = ["atk", "def", "spa", "spd", "spe", "accuracy", "evasion"]
 
+MAX_TEAM_SIZE = 6
 MAX_MOVES = 4
 
 def normalize(x: float, max_x: float = 1.0, symmetric: bool = False) -> float:

@@ -4,9 +4,7 @@ import numpy as np
 from poke_env.battle.pokemon import Pokemon
 
 from env.states.pokemon_state import PokemonState
-
-MAX_TEAM_SIZE = 6
-MAX_MOVES = 4
+from env.states.state_utils import MAX_TEAM_SIZE
 
 class TeamState:
     """
@@ -62,6 +60,10 @@ class TeamState:
     def array_len(self) -> int:
         """Expected total flat vector length."""
         return self._slot_len * self.max_size + self.max_size
+
+    @classmethod
+    def compute_array_len(cls, state_cls: type[PokemonState], max_size: int = MAX_TEAM_SIZE) -> int:
+        return state_cls.array_len() * max_size + max_size
 
     # ------------------------------------------------------------------
     # Helpers
