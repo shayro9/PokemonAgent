@@ -88,5 +88,5 @@ def pull_attribute(obj, key, default_value, type_value):
         val = getattr(obj, key, default_value)
         return type_value(val) if val is not None else default_value
     except Exception as e:
-        print(e)
+        # print(e)
         return type_value(default_value)
