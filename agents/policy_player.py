@@ -53,7 +53,7 @@ class PolicyPlayer(Player):
             action_masks=mask,
         )
 
-        order = self._wrapper.action_to_order(int(action), battle, strict=False)
+        order = self._wrapper.action_to_order(action, battle, strict=False)
 
         if self._verbose:
             print(f"\n→ Chosen action: {action}  →  {order}")
