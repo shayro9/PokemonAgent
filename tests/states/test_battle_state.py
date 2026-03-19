@@ -19,10 +19,10 @@ import numpy as np
 from poke_env.battle.move_category import MoveCategory
 from poke_env.battle.pokemon_type import PokemonType
 
-from env.states.battle_state import BattleState
-from env.states.arena_state import ArenaState
-from env.states.my_pokemon_state_gen_1 import MyPokemonStateGen1
-from env.states.opponent_pokemon_state_gen_1 import OpponentPokemonStateGen1
+from env.states.gen1.battle_state_gen_1 import BattleStateGen1
+from env.states.gen1.arena_state_gen1 import ArenaStateGen1
+from env.states.gen1.my_pokemon_state_gen_1 import MyPokemonStateGen1
+from env.states.gen1.opponent_pokemon_state_gen_1 import OpponentPokemonStateGen1
 from env.states.move_state import MoveState
 from env.states.team_state import TeamState
 from env.states.state_utils import (
@@ -158,13 +158,13 @@ class TestBattleStateArrayLenFormula(unittest.TestCase):
 
     def test_equals_exact_sum_of_parts(self):
         expected = (
-            ArenaState.array_len()
-            + TeamState.compute_array_len(MyPokemonStateGen1, MAX_TEAM_SIZE)
-            + TeamState.compute_array_len(OpponentPokemonStateGen1, MAX_TEAM_SIZE)
-            + MoveState.array_len() * MAX_MOVES   # opp moves
-            + MoveState.array_len() * MAX_MOVES   # my moves
+                ArenaStateGen1.array_len()
+                + TeamState.compute_array_len(MyPokemonStateGen1, MAX_TEAM_SIZE)
+                + TeamState.compute_array_len(OpponentPokemonStateGen1, MAX_TEAM_SIZE)
+                + MoveState.array_len() * MAX_MOVES  # opp moves
+                + MoveState.array_len() * MAX_MOVES   # my moves
         )
-        self.assertEqual(BattleState.array_len(), expected)
+        self.assertEqual(BattleStateGen1.array_len(), expected)
 
     def test_both_move_sides_contribute_equally(self):
         """Opp and my move blocks are the same size."""
@@ -189,10 +189,10 @@ class TestBattleStateArrayLenFormula(unittest.TestCase):
 class TestBattleStateToArray(unittest.TestCase):
 
     def setUp(self):
-        self.bs = BattleState(make_battle_mock())
+        self.bs = BattleStateGen1(make_battle_mock())
 
     def test_length_matches_array_len(self):
-        self.assertEqual(len(self.bs.to_array()), BattleState.array_len())
+        self.assertEqual(len(self.bs.to_array()), BattleStateGen1.array_len())
 
     def test_dtype_float32(self):
         self.assertEqual(self.bs.to_array().dtype, np.float32)
@@ -219,7 +219,7 @@ class TestBattleStateBench(unittest.TestCase):
             my_team_species=["charizard", "pikachu", "snorlax"],
             opp_team_species=["blastoise", "venusaur"],
         )
-        self.bs = BattleState(self.battle)
+        self.bs = BattleStateGen1(self.battle)
 
     def test_my_active_not_in_my_bench(self):
         active_species = self.battle.active_pokemon.species
@@ -241,7 +241,7 @@ class TestBattleStateBench(unittest.TestCase):
 
     def test_opp_bench_empty_when_solo_pokemon(self):
         battle = make_battle_mock(opp_team_species=["blastoise"])
-        bs = BattleState(battle)
+        bs = BattleStateGen1(battle)
         self.assertEqual(len(bs.opp_bench), 0)
 
 
@@ -252,12 +252,12 @@ class TestBattleStateBench(unittest.TestCase):
 class TestBattleStateMoveEncoding(unittest.TestCase):
 
     def test_available_move_has_nonzero_base_power(self):
-        bs = BattleState(make_battle_mock(all_moves_available=True))
+        bs = BattleStateGen1(make_battle_mock(all_moves_available=True))
         for ms in bs.my_moves_state:
             self.assertGreater(ms.base_power, 0.0)
 
     def test_unavailable_move_has_zero_base_power(self):
-        bs = BattleState(make_battle_mock(all_moves_available=False))
+        bs = BattleStateGen1(make_battle_mock(all_moves_available=False))
         for ms in bs.my_moves_state:
             self.assertEqual(ms.base_power, 0.0)
 
@@ -266,23 +266,23 @@ class TestBattleStateMoveEncoding(unittest.TestCase):
         battle = make_battle_mock(all_moves_available=True)
         all_move_objects = list(battle.active_pokemon.moves.values())
         battle.available_moves = [all_move_objects[0]]  # only first move
-        bs = BattleState(battle)
+        bs = BattleStateGen1(battle)
 
         self.assertGreater(bs.my_moves_state[0].base_power, 0.0)
         for ms in bs.my_moves_state[1:]:
             self.assertEqual(ms.base_power, 0.0)
 
     def test_my_moves_state_count_matches_pokemon_move_count(self):
-        bs = BattleState(make_battle_mock())
+        bs = BattleStateGen1(make_battle_mock())
         self.assertEqual(len(bs.my_moves_state), len(bs.my_active.moves))
 
     def test_opp_moves_state_count_matches_pokemon_move_count(self):
-        bs = BattleState(make_battle_mock())
+        bs = BattleStateGen1(make_battle_mock())
         self.assertEqual(len(bs.opp_moves_state), len(bs.opp_active.moves))
 
     def test_all_moves_unavailable_to_array_still_correct_length(self):
-        bs = BattleState(make_battle_mock(all_moves_available=False))
-        self.assertEqual(len(bs.to_array()), BattleState.array_len())
+        bs = BattleStateGen1(make_battle_mock(all_moves_available=False))
+        self.assertEqual(len(bs.to_array()), BattleStateGen1.array_len())
 
 
 # ---------------------------------------------------------------------------
@@ -292,10 +292,10 @@ class TestBattleStateMoveEncoding(unittest.TestCase):
 class TestBattleStateSubStateTypes(unittest.TestCase):
 
     def setUp(self):
-        self.bs = BattleState(make_battle_mock())
+        self.bs = BattleStateGen1(make_battle_mock())
 
     def test_arena_state_is_arena_state(self):
-        self.assertIsInstance(self.bs.arena_state, ArenaState)
+        self.assertIsInstance(self.bs.arena_state, ArenaStateGen1)
 
     def test_my_team_state_is_team_state(self):
         self.assertIsInstance(self.bs.my_team_state, TeamState)
@@ -320,14 +320,14 @@ class TestBattleStateArenaWiring(unittest.TestCase):
 
     def test_turn_propagated_to_arena_state(self):
         battle = make_battle_mock()
-        bs = BattleState(battle)
+        bs = BattleStateGen1(battle)
         self.assertEqual(bs.arena_state.turn, battle.turn)
 
     def test_arena_turn_encoded_in_to_array(self):
         """First element of to_array() is the normalised turn number."""
-        from env.states.arena_state import TURN_NORM
+        from env.states.gen1.arena_state_gen1 import TURN_NORM
         battle = make_battle_mock()
-        bs     = BattleState(battle)
+        bs     = BattleStateGen1(battle)
         expected_turn = min(battle.turn / TURN_NORM, 1.0)
         self.assertAlmostEqual(float(bs.to_array()[0]), expected_turn, places=5)
 
@@ -339,15 +339,15 @@ class TestBattleStateArenaWiring(unittest.TestCase):
 class TestBattleStateDescribe(unittest.TestCase):
 
     def test_describe_returns_string(self):
-        bs = BattleState(make_battle_mock())
+        bs = BattleStateGen1(make_battle_mock())
         self.assertIsInstance(bs.describe(), str)
 
     def test_describe_non_empty(self):
-        bs = BattleState(make_battle_mock())
+        bs = BattleStateGen1(make_battle_mock())
         self.assertTrue(len(bs.describe()) > 0)
 
     def test_repr_equals_describe(self):
-        bs = BattleState(make_battle_mock())
+        bs = BattleStateGen1(make_battle_mock())
         self.assertEqual(repr(bs), bs.describe())
 
 

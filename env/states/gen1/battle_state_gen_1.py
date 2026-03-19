@@ -3,15 +3,15 @@ from __future__ import annotations
 import numpy as np
 from poke_env.battle import Battle, Move, Pokemon
 
-from env.states.arena_state import ArenaState
-from env.states.my_pokemon_state_gen_1 import MyPokemonStateGen1
-from env.states.opponent_pokemon_state_gen_1 import OpponentPokemonStateGen1
+from env.states.gen1.arena_state_gen1 import ArenaStateGen1
+from env.states.gen1.my_pokemon_state_gen_1 import MyPokemonStateGen1
+from env.states.gen1.opponent_pokemon_state_gen_1 import OpponentPokemonStateGen1
 from env.states.move_state import MoveState
 from env.states.team_state import TeamState
 from env.states.state_utils import MAX_TEAM_SIZE, MAX_MOVES
 
 
-class BattleState:
+class BattleStateGen1:
     """
     Full snapshot of a single battle turn, ready for embedding.
 
@@ -51,7 +51,7 @@ class BattleState:
         self.opp_moves: list[Move] = list(battle.opponent_active_pokemon.moves.values())
 
         #-------- States --------
-        self.arena_state    : ArenaState = ArenaState(self.battle)
+        self.arena_state    : ArenaStateGen1 = ArenaStateGen1(self.battle)
         self.my_team_state  : TeamState = TeamState(self.my_bench  + [self.my_active] , MyPokemonStateGen1      , self.MAX_TEAM_SIZE)
         self.opp_team_state : TeamState = TeamState(self.opp_bench + [self.opp_active], OpponentPokemonStateGen1, self.MAX_TEAM_SIZE)
         self.opp_moves_state: list[MoveState] = self._encode_moves(self.opp_moves         , self.opp_active, self.my_active)
@@ -90,7 +90,7 @@ class BattleState:
     def array_len(cls) -> int:
         """Expected flat vector length (static after construction)."""
         return (
-                ArenaState.array_len()
+                ArenaStateGen1.array_len()
                 + TeamState.compute_array_len(MyPokemonStateGen1, cls.MAX_TEAM_SIZE)
                 + TeamState.compute_array_len(OpponentPokemonStateGen1, cls.MAX_TEAM_SIZE)
                 + MoveState.array_len() * MAX_MOVES

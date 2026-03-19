@@ -13,7 +13,7 @@ GEN1_TRACKED_SCREENS = [
 TURN_NORM = 30.0  # normalize turn number
 
 
-class ArenaState:
+class ArenaStateGen1:
     """
     Encodes the global arena state shared by both sides of the field.
 
