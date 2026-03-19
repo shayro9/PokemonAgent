@@ -66,8 +66,9 @@ class PokemonState(ABC):
     def to_array(self) -> np.ndarray:
         """Return the flat float32 feature vector for this Pokémon."""
 
+    @classmethod
     @abstractmethod
-    def array_len(self) -> int:
+    def array_len(cls) -> int:
         """Return the expected length of ``to_array()``.
 
         Must satisfy ``len(self.to_array()) == self.array_len()`` at all times.
