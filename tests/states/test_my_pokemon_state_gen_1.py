@@ -12,7 +12,7 @@ import json
 import unittest
 import numpy as np
 
-from env.states.gen1.my_pokemon_state_gen_1 import MyPokemonStateGen1
+from env.states.my_pokemon_state_gen_1 import MyPokemonStateGen1
 from poke_env.battle.status import Status
 from poke_env.battle.effect import Effect
 from env.states.state_utils import (

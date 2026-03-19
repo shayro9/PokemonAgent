@@ -21,8 +21,8 @@ from poke_env.battle.pokemon_type import PokemonType
 
 from env.states.battle_state import BattleState
 from env.states.arena_state import ArenaState
-from env.states.gen1.my_pokemon_state_gen_1 import MyPokemonStateGen1
-from env.states.gen1.opponent_pokemon_state_gen_1 import OpponentPokemonStateGen1
+from env.states.my_pokemon_state_gen_1 import MyPokemonStateGen1
+from env.states.opponent_pokemon_state_gen_1 import OpponentPokemonStateGen1
 from env.states.move_state import MoveState
 from env.states.team_state import TeamState
 from env.states.state_utils import (

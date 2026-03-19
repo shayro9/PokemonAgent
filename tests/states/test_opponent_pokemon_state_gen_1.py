@@ -31,7 +31,7 @@ import numpy as np
 from poke_env.battle.pokemon_type import PokemonType
 from poke_env.battle.status import Status
 
-from env.states.gen1.opponent_pokemon_state_gen_1 import OpponentPokemonStateGen1
+from env.states.opponent_pokemon_state_gen_1 import OpponentPokemonStateGen1
 from env.states.pokemon_state import PokemonState
 from env.states.state_utils import (
     ALL_STATUSES,

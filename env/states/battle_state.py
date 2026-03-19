@@ -4,14 +4,14 @@ import numpy as np
 from poke_env.battle import Battle, Move, Pokemon
 
 from env.states.arena_state import ArenaState
-from env.states.gen1.my_pokemon_state_gen_1 import MyPokemonStateGen1
-from env.states.gen1.opponent_pokemon_state_gen_1 import OpponentPokemonStateGen1
+from env.states.my_pokemon_state_gen_1 import MyPokemonStateGen1
+from env.states.opponent_pokemon_state_gen_1 import OpponentPokemonStateGen1
 from env.states.move_state import MoveState
 from env.states.team_state import TeamState
 from env.states.state_utils import MAX_TEAM_SIZE, MAX_MOVES
 
 
-class BattleStateGen1:
+class BattleState:
     """
     Full snapshot of a single battle turn, ready for embedding.
 
