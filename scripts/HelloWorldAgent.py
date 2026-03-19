@@ -1,6 +1,6 @@
 import asyncio
 
-from agents.BasicAgents import DebugRLPlayer
+from agents.random_agent import RandomAgent
 from env.singles_env_wrapper import PokemonRLWrapper
 from teams.single_teams import *
 from teams.team_generators import single_simple_team_generator
