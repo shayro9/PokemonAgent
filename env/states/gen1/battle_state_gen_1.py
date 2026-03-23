@@ -113,7 +113,7 @@ class BattleStateGen1:
 
     def describe(self) -> str:
         move_lines = "\n".join(
-            f"  Move {i}: {ms}" for i, ms in enumerate(self.my_moves_state)
+            f"  Move {i}: {ms.id} {ms}" for i, ms in enumerate(self.my_moves_state)
         )
         sections = [
             "=== BattleState ===",
