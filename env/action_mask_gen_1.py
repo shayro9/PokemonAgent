@@ -26,7 +26,7 @@ class ActionMaskGen1:
 
         available_moves = getattr(battle, "available_moves", [])
         all_moves = getattr(battle.active_pokemon, "moves", []).values()
-        self._set_mask_range(available_moves, all_moves, self.ACTION_MOVE_RANGE)
+        self._set_mask_range(available_moves, all_moves, self.ACTION_MOVE_RANGE, move_action=True)
 
     def reset(self):
         self.mask = np.zeros(self.ACTION_SPACE, dtype=bool)

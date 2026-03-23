@@ -6,9 +6,9 @@ const fs = require('fs');
 const { Teams, FORMAT, DEDUPE_EXACT_SETS, setKey, canDamage, hasMirrorMove, pickOneMon, normalizeMon, isValidTeam } = require('./common');
 
 // ─── CONFIG ────────────────────────────────────────────────────────────────
-const OUTPUT_FILE     = '../data/matchups_try_6v6_gen1ou_db.json';
+const OUTPUT_FILE     = '../data/matchups_1v1_gen1ou_db.json';
 const NUM_TO_GENERATE = 10000;  // number of matchups to collect
-const FULL_TEAMS      = true;  // true = 6-mon teams on each side, false = 1v1
+const FULL_TEAMS      = false;  // true = 6-mon teams on each side, false = 1v1
 // ───────────────────────────────────────────────────────────────────────────
 
 function generateMatchupsPool() {
