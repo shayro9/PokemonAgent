@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from poke_env.battle import Move
 
 from combat.combat_utils import clip_probability
-from env.embed import MAX_MOVES
+from env.states.state_utils import MAX_MOVES
 
 
 @dataclass(frozen=True)

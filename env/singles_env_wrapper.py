@@ -9,13 +9,11 @@ from combat.event_parser import (
     detect_opponent_move_from_events,
     did_no_damage_from_events,
 )
-from combat.protect_belief import estimate_protect_attempt_prior, build_protect_belief
-from combat.stats_belief import build_stat_belief
-from combat.stat_belief_updates import update_stat_belief
+from combat.beliefs.protect_belief import estimate_protect_attempt_prior, build_protect_belief
+from combat.beliefs.stats_belief import build_stat_belief
+from combat.beliefs.stat_belief_updates import update_stat_belief
 from env.battle_tracker import BattleTracker
 from env.reward import calc_reward
-from debug.logs import log_fallback
-
 
 def print_state(battle, *, prefix="[PokemonRLWrapper]") -> str:
     """Render and print a human-readable battle state snapshot.
@@ -90,7 +88,6 @@ class PokemonRLWrapper(SinglesEnv):
         try:
             return super().action_to_order(canonical_action, battle, fake, strict)
         except ValueError:
-            log_fallback(battle)
             return super().action_to_order(canonical_action, battle, fake, strict=False)
 
     def action_masks(self) -> np.ndarray:

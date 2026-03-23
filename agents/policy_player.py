@@ -2,7 +2,7 @@
 from poke_env.player import Player
 from sb3_contrib import MaskablePPO
 
-from env.action_masking import get_valid_action_mask
+from env.action_mask_gen_1 import ActionMaskGen1
 from env.singles_env_wrapper import PokemonRLWrapper
 from env.states.gen1.battle_state_gen_1 import BattleStateGen1
 
@@ -45,12 +45,13 @@ class PolicyPlayer(Player):
             print(BattleStateGen1(battle).describe())
 
         obs = self._wrapper.embed_battle(battle)
-        mask = get_valid_action_mask(battle)
+        mask = ActionMaskGen1()
+        mask.set_mask(battle)
 
         action, _ = self.model.predict(
             obs,
             deterministic=self._deterministic,
-            action_masks=mask,
+            action_masks=mask.get_mask(),
         )
 
         order = self._wrapper.action_to_order(action, battle, strict=False)

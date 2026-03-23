@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from poke_env.battle import MoveCategory
 
-from combat.stats_belief import StatBelief, DEF_IDX, SPD_IDX, level_factor, HP_IDX
+from combat.beliefs.stats_belief import StatBelief, DEF_IDX, SPD_IDX, level_factor, HP_IDX
 from combat.combat_utils import calc_modifier, boost_multiplier
 
 

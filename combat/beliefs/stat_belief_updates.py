@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from poke_env.battle import MoveCategory
 
-from combat.stats_belief import StatBelief, build_stat_belief, level_factor
+from combat.beliefs.stats_belief import StatBelief, build_stat_belief, level_factor
 from combat.combat_utils import calc_modifier, boost_multiplier
 from combat.event_parser import we_moved_first_from_events
 
