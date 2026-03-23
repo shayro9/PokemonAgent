@@ -45,8 +45,8 @@ class Tracker:
 
     def commit(self, battle: AbstractBattle):
         snapshot = BattleSnapshot(
-            my_hp=battle.active_pokemon.current_hp,
-            opp_hp=battle.opponent_active_pokemon.current_hp,
+            my_hp=battle.active_pokemon.current_hp_fraction,
+            opp_hp=battle.opponent_active_pokemon.current_hp_fraction,
             my_status=battle.active_pokemon.status,
             opp_status=battle.opponent_active_pokemon.status,
             my_move=detect_my_move_from_events(battle),
