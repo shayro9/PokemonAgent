@@ -101,8 +101,8 @@ class TestMatchupGenerator(unittest.TestCase):
     def test_generator_returns_agent_and_opponent_showdown_teams(self):
         pool = [
             {
-                "agent": BULBASAUR,
-                "opponent": SQUIRTLE,
+                "agent": [BULBASAUR],
+                "opponent": [SQUIRTLE],
             }
         ]
         generator = matchup_generator(pool=pool, shuffle_each_epoch=False)
