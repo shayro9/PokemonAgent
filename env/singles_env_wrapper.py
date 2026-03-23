@@ -2,7 +2,6 @@ import numpy as np
 import gymnasium as gym
 from poke_env.environment import SinglesEnv
 
-from env.action_masking import get_valid_action_mask, ACTION_DEFAULT
 from env.states.gen1.battle_state_gen_1 import BattleStateGen1
 from env.action_mask_gen_1 import ActionMaskGen1
 from combat.combat_utils import snapshot_opponent_pp, tracker_key
@@ -78,13 +77,13 @@ class PokemonRLWrapper(SinglesEnv):
         if not (0 <= canonical_action < len(mask)):
             if strict:
                 raise ValueError(f"Action {canonical_action} out of bounds ({len(mask)}).")
-            canonical_action = ACTION_DEFAULT
+            canonical_action = self.action_mask.ACTION_DEFAULT
         elif not mask[canonical_action]:
             if strict:
                 raise ValueError(
                     f"Invalid action {canonical_action}. Valid: {np.flatnonzero(mask).tolist()}"
                 )
-            canonical_action = ACTION_DEFAULT
+            canonical_action = self.action_mask.ACTION_DEFAULT
 
         self._update_last_move(battle, canonical_action)
 
