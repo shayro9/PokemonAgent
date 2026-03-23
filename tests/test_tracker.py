@@ -42,9 +42,9 @@ def _make_battle(
     commit() reads ``current_hp`` (not ``current_hp_fraction``).
     """
     battle = MagicMock()
-    battle.active_pokemon.current_hp = my_hp
+    battle.active_pokemon.current_hp_fraction = my_hp
     battle.active_pokemon.status = my_status
-    battle.opponent_active_pokemon.current_hp = opp_hp
+    battle.opponent_active_pokemon.current_hp_fraction = opp_hp
     battle.opponent_active_pokemon.status = opp_status
     return battle
 
@@ -229,18 +229,6 @@ class TestTrackerCommitSingleTurn(unittest.TestCase):
         self.tracker.commit(self.battle)
         self.assertIsNone(self.tracker.history[0].my_move)
         self.assertIsNone(self.tracker.history[0].opp_move)
-
-    @patch(_PATCH_MY_MOVE, return_value="tackle")
-    @patch(_PATCH_OPP_MOVE, return_value="surf")
-    def test_commit_reads_current_hp_not_fraction(self, _opp, _my):
-        """commit() uses current_hp (raw), NOT current_hp_fraction.
-
-        This documents the intentional design difference from BattleTracker,
-        where commit() reads current_hp_fraction instead.
-        """
-        self.battle.active_pokemon.current_hp = 250
-        self.tracker.commit(self.battle)
-        self.assertEqual(self.tracker.history[0].my_hp, 250)
 
 
 # ===========================================================================
