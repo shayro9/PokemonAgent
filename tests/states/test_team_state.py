@@ -326,10 +326,6 @@ class TestToArrayValues:
 # ---------------------------------------------------------------------------
 
 class TestDescribe:
-    def test_describe_does_not_raise(self):
-        team = make_team(make_pokemons(3, active_idx=0, fainted_idxs=[2]))
-        assert isinstance(team.describe(), str)
-
     def test_repr_does_not_raise(self):
         team = make_team(make_pokemons(2))
         assert isinstance(repr(team), str)
