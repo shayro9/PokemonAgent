@@ -4,15 +4,8 @@ from poke_env.environment import SinglesEnv
 
 from env.states.gen1.battle_state_gen_1 import BattleStateGen1
 from env.action_mask_gen_1 import ActionMaskGen1
-from combat.combat_utils import snapshot_opponent_pp, tracker_key
-from combat.event_parser import (
-    detect_opponent_move_from_events,
-    did_no_damage_from_events,
-)
-from combat.beliefs.protect_belief import estimate_protect_attempt_prior, build_protect_belief
-from combat.beliefs.stats_belief import build_stat_belief
-from combat.beliefs.stat_belief_updates import update_stat_belief
-from env.battle_tracker import BattleTracker
+from combat.combat_utils import tracker_key
+from env.tracker import Tracker
 from env.reward import calc_reward
 
 def print_state(battle, *, prefix="[PokemonRLWrapper]") -> str:
@@ -55,7 +48,7 @@ class PokemonRLWrapper(SinglesEnv):
             for agent in self.possible_agents
         }
 
-        self._trackers: dict[str, BattleTracker] = {}
+        self._trackers: dict[str, Tracker] = {}
         self.action_mask = ActionMaskGen1()
 
         self.rounds_played: int = 0
@@ -83,8 +76,6 @@ class PokemonRLWrapper(SinglesEnv):
                 )
             canonical_action = self.action_mask.ACTION_DEFAULT
 
-        self._update_last_move(battle, canonical_action)
-
         try:
             return super().action_to_order(canonical_action, battle, fake, strict)
         except ValueError:
@@ -100,10 +91,7 @@ class PokemonRLWrapper(SinglesEnv):
     def embed_battle(self, battle) -> np.ndarray:
         if self._is_player_turn(battle):
             self.action_mask.set_mask(battle)
-            self._update_battle_state(battle)
 
-        # tracker = self._get_tracker(battle)
-        # stat_vec = tracker.stat_belief.to_array() if tracker.stat_belief is not None else None
         return BattleStateGen1(battle).to_array()
 
     # ------------------------------------------------------------------
@@ -157,51 +145,11 @@ class PokemonRLWrapper(SinglesEnv):
     def _is_player_turn(self, battle) -> bool:
         return getattr(battle, "player_username", None) == self.agent1.username
 
-    def _get_tracker(self, battle) -> BattleTracker:
+    def _get_tracker(self, battle) -> Tracker:
         tag = tracker_key(battle)
         if tag not in self._trackers:
-            self._trackers[tag] = BattleTracker()
+            self._trackers[tag] = Tracker()
         return self._trackers[tag]
-
-    def _update_battle_state(self, battle) -> None:
-        """Update per-turn bookkeeping. Call once per step before embed_battle."""
-        tracker = self._get_tracker(battle)
-        opp = battle.opponent_active_pokemon
-
-        # ── detect opponent move and no-damage via events ────────────────
-        opp_last_move = detect_opponent_move_from_events(battle)
-        no_damage = did_no_damage_from_events(battle, tracker.my_last_move)
-
-        # ── protect belief ───────────────────────────────────────────────
-        protected = opp_last_move.is_protect_move if opp_last_move else (None if no_damage else False)
-        prior = estimate_protect_attempt_prior(battle)
-
-        # Keep pp snapshot for any callers that may still need it
-        tracker.last_opp_pp = snapshot_opponent_pp(battle)
-
-        if tracker.my_last_move is not None:
-            belief = build_protect_belief(tracker.my_last_move, tracker.last_protect_chance, protected, prior)
-            tracker.last_protect_chance = belief.expected_next_protect_chance()
-            tracker.protect_belief = belief.expected_next_protect_belief()
-        else:
-            tracker.protect_belief = prior
-
-        # ── stat belief ───────────────────────────────────────────────────
-        if tracker.stat_belief is None:
-            tracker.stat_belief = build_stat_belief(opp, battle.gen)
-            return
-
-        tracker.stat_belief = update_stat_belief(
-            tracker.stat_belief, battle, tracker, opp_last_move
-        )
-
-    def _update_last_move(self, battle, canonical_action) -> None:
-        tracker = self._get_tracker(battle)
-        if 6 <= canonical_action <= 25:
-            idx = (canonical_action - 6) % 4
-            tracker.my_last_move = battle.available_moves[idx] if idx < len(battle.available_moves) else None
-        else:
-            tracker.my_last_move = None
 
     def get_last_battle(self):
         return self._last_finished_battle

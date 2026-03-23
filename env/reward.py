@@ -1,7 +1,7 @@
 import numpy as np
 
 from combat.combat_utils import tracker_key
-from env.battle_tracker import BattleTracker
+from env.tracker import Tracker
 from poke_env.battle import Status
 
 DAMAGE_CLIP = 1.0
@@ -13,7 +13,7 @@ LOSS_PENALTY = -10.0
 
 def calc_reward(
         battle,
-        tracker: BattleTracker,
+        tracker: Tracker,
         *,
         is_agent_battle: bool,
 ) -> tuple[float, bool]:

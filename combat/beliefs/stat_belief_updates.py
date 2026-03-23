@@ -17,7 +17,7 @@ from poke_env.battle import MoveCategory
 
 from combat.beliefs.stats_belief import StatBelief, build_stat_belief, level_factor
 from combat.combat_utils import calc_modifier, boost_multiplier
-from combat.event_parser import we_moved_first_from_events
+from combat.event_parser import moved_first
 
 
 # ---------------------------------------------------------------------------
@@ -191,7 +191,7 @@ def _update_from_speed_order(
     our_spe_boost = boost_multiplier(battle.active_pokemon.boosts.get("spe", 0))
     our_spe_eff   = our_spe_base * our_spe_boost
 
-    we_moved_first = we_moved_first_from_events(battle)
+    we_moved_first = moved_first(battle)
     if we_moved_first is None:
         return belief
 
