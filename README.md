@@ -167,7 +167,6 @@ cd ..
 The agent can train against randomly generated Pokémon from the Gen 9 Random Battle format. First generate a dataset:
 
 ```bash
-node scripts/generate_db.js
 ```
 
 This produces `data/matchups_gen9randombattle_db.json` (or `data/gen9randombattle_db.json` depending on `MODE`). You can configure the script at the top:
