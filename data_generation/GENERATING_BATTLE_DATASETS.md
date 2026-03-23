@@ -1,4 +1,4 @@
-# Data Generation
+# Generating Battle Datasets
 
 Scripts for generating Pokémon datasets used to train and evaluate the agent.
 
