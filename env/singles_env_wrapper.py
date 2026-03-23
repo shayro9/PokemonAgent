@@ -4,6 +4,7 @@ from poke_env.environment import SinglesEnv
 
 from env.action_masking import get_valid_action_mask, ACTION_DEFAULT
 from env.states.gen1.battle_state_gen_1 import BattleStateGen1
+from env.action_mask_gen_1 import ActionMaskGen1
 from combat.combat_utils import snapshot_opponent_pp, tracker_key
 from combat.event_parser import (
     detect_opponent_move_from_events,
@@ -48,7 +49,6 @@ class PokemonRLWrapper(SinglesEnv):
         self.agent_team_generator = agent_team_generator
         self.opponent_team_generator = opponent_team_generator
         self._last_team_update_round = None
-        self._latest_battle = None
         self._last_finished_battle = None
 
         self._action_space = gym.spaces.Discrete(26)
@@ -59,6 +59,7 @@ class PokemonRLWrapper(SinglesEnv):
         }
 
         self._trackers: dict[str, BattleTracker] = {}
+        self.action_mask = ActionMaskGen1()
 
         self.rounds_played: int = 0
         self.rounds_per_opponents = rounds_per_opponents
@@ -72,15 +73,7 @@ class PokemonRLWrapper(SinglesEnv):
             return super().action_to_order(action, battle, fake, strict)
 
         canonical_action = action
-        mask = get_valid_action_mask(
-            battle=battle,
-            allow_switches=False,
-            allow_moves=True,
-            allow_mega=False,
-            allow_zmove=False,
-            allow_dynamax=False,
-            allow_terastallize=False,
-        )
+        mask = self.action_mask.get_mask()
 
         if not (0 <= canonical_action < len(mask)):
             if strict:
@@ -102,9 +95,7 @@ class PokemonRLWrapper(SinglesEnv):
             return super().action_to_order(canonical_action, battle, fake, strict=False)
 
     def action_masks(self) -> np.ndarray:
-        if self._latest_battle is None:
-            return np.ones(self._action_space.n, dtype=bool)
-        return get_valid_action_mask(self._latest_battle)
+        return self.action_mask.get_mask()
 
     # ------------------------------------------------------------------
     # Observation
@@ -112,7 +103,7 @@ class PokemonRLWrapper(SinglesEnv):
 
     def embed_battle(self, battle) -> np.ndarray:
         if self._is_player_turn(battle):
-            self._latest_battle = battle
+            self.action_mask.set_mask(battle)
             self._update_battle_state(battle)
 
         # tracker = self._get_tracker(battle)
@@ -142,8 +133,7 @@ class PokemonRLWrapper(SinglesEnv):
 
     def reset(self, *args, **kwargs):
         self._trackers = {}
-        self._latest_battle = None
-
+        self.action_mask.reset()
         if (
                 self.rounds_played % self.rounds_per_opponents == 0
                 and self._last_team_update_round != self.rounds_played
