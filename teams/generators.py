@@ -36,8 +36,8 @@ def matchup_generator(data_path=None, pool=None, **kwargs):
 
     def transform_matchup(entry):
         return (
-            team_from_dict([entry["agent"]]).to_showdown(),
-            team_from_dict([entry["opponent"]]).to_showdown(),
+            team_from_dict(entry["agent"]).to_showdown(),
+            team_from_dict(entry["opponent"]).to_showdown(),
         )
 
     return _infinite_pool_generator(pool, transform_fn=transform_matchup, **kwargs)
