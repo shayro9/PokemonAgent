@@ -11,7 +11,6 @@ A deep reinforcement learning agent that learns to play Pokémon 1v1 battles usi
 - [Project Structure](#project-structure)
 - [Requirements](#requirements)
 - [Setup](#setup)
-- [Generating a Training Dataset](#generating-a-training-dataset)
 - [Training](#training)
 - [Evaluation](#evaluation)
 - [Key Concepts](#key-concepts)
@@ -162,23 +161,6 @@ cd ..
 
 ---
 
-## Generating a Training Dataset
-
-The agent can train against randomly generated Pokémon from the Gen 9 Random Battle format. First generate a dataset:
-
-```bash
-```
-
-This produces `data/matchups_gen9randombattle_db.json` (or `data/gen9randombattle_db.json` depending on `MODE`). You can configure the script at the top:
-
-| Variable | Description | Default |
-|---|---|---|
-| `FORMAT` | Showdown format to generate from | `gen9randombattle` |
-| `MODE` | `'teams'` (one mon per entry) or `'matchups'` (paired 1v1) | `matchups` |
-| `NUM_TO_GENERATE` | Number of matchups/teams to collect | `10000` |
-| `DEDUPE_EXACT_SETS` | Skip duplicate sets | `true` |
-
----
 
 ## Training
 
