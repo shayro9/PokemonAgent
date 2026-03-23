@@ -133,7 +133,6 @@ def evaluate_model(
             opponent_pool = []
             battle_team_generator.reset()
         else:
-            opponent_generator.reset() if opponent_generator is not None else None
             opponent_pool = _generate_eval_pool(eval_episodes, opponent_generator)
     else:
         if eval_episodes > 0:
