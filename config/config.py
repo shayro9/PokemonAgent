@@ -2,7 +2,7 @@ from typing import Iterable, Optional
 from dataclasses import dataclass
 
 from teams.single_teams import ALL_SOLO_TEAMS
-from teams.generators import team_generator, matchup_generator
+from teams.generators import team_generator, matchup_generator, InfinitePoolGenerator
 from data.prossesing import load_pool, split_pool
 
 
@@ -71,12 +71,12 @@ def _resolve_generated_pools(
 class OpponentsResolved:
     train_names: list[str]
     eval_names: list[str]
-    train_gen: Optional[Iterable]
-    eval_gen: Optional[Iterable]
-    train_agent_gen: Optional[Iterable]
-    eval_agent_gen: Optional[Iterable]
-    train_battle_team_generator: Optional[Iterable] = None
-    eval_battle_team_generator: Optional[Iterable] = None
+    train_gen: Optional[InfinitePoolGenerator]
+    eval_gen: Optional[InfinitePoolGenerator]
+    train_agent_gen: Optional[InfinitePoolGenerator]
+    eval_agent_gen: Optional[InfinitePoolGenerator]
+    train_battle_team_generator: Optional[InfinitePoolGenerator] = None
+    eval_battle_team_generator: Optional[InfinitePoolGenerator] = None
 
 
 def _resolve_train_eval_pools(
