@@ -3,8 +3,6 @@ import asyncio
 from agents.random_agent import RandomAgent
 from env.singles_env_wrapper import PokemonRLWrapper
 from teams.single_teams import *
-from teams.team_generators import single_simple_team_generator
-
 
 async def main():
     """Create a debug player and send a single challenge.

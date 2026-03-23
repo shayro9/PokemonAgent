@@ -34,7 +34,8 @@ from poke_env import (
 from config.config import TEAM_BY_NAME
 from env.singles_env_wrapper import PokemonRLWrapper
 from agents.policy_player import PolicyPlayer
-from teams.team_generators import load_pokemon_pool, matchup_generator
+from teams.generators import matchup_generator
+from data.prossesing import load_pool
 
 AGENT_CHOICES = ["policy", "random", "max-power"]
 DEFAULT_FORMAT = "gen1ou"
@@ -50,7 +51,7 @@ def _resolve_team(team_arg, pool, side, team_size):
     Named string -> look up in TEAM_BY_NAME (single Pokemon, team_size ignored).
     """
     if team_arg is None or team_arg == "random":
-        team = next(matchup_generator(matchup_pool=pool))[0 if side == "agent" else 1]
+        team = next(matchup_generator(pool=pool))[0 if side == "agent" else 1]
         return team
     return TEAM_BY_NAME[team_arg]
 
@@ -150,7 +151,7 @@ async def main():
     verbose = not args.no_verbose
 
     needs_pool = args.ai_team == "random" or args.my_team == "random"
-    pool = load_pokemon_pool(args.data_path) if needs_pool else []
+    pool = load_pool(args.data_path) if needs_pool else []
 
     ai_team = _resolve_team(args.ai_team, pool, side="agent",    team_size=args.team_size)
     my_team = _resolve_team(args.my_team, pool, side="opponent", team_size=args.team_size)
