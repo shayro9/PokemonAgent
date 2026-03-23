@@ -7,7 +7,7 @@ from data.prossesing import load_pool, split_pool
 
 
 TEAM_BY_NAME = {name: team for name, team in ALL_SOLO_TEAMS}
-DEFAULT_DATA_PATH = "data/gen9randombattle_db.json"
+DEFAULT_DATA_PATH = "data/matchups_gen1ou_db.json"
 
 
 def parse_pool(raw_pool: str | None, pool_all: bool) -> list[str]:
