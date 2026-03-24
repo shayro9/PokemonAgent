@@ -10,6 +10,7 @@ from sb3_contrib.common.maskable.utils import get_action_masks
 from config.config import TEAM_BY_NAME
 from env.env_builder import build_env
 from env.singles_env_wrapper import PokemonRLWrapper
+from teams.generators import InfinitePoolGenerator
 
 
 @dataclass
@@ -61,7 +62,7 @@ def _play_episode(eval_env: SingleAgentWrapper, model: RecurrentPPO, max_steps: 
 
 def build_fixed_eval_pool(
         opponent_names: list[str],
-        opponent_generator,
+        opponent_generator: InfinitePoolGenerator,
         eval_episodes: int,
 ) -> list[str]:
     """Build a fixed evaluation pool once, to be reused across all evaluations.
@@ -82,7 +83,7 @@ def build_fixed_eval_pool(
         raise ValueError("Must provide either opponent_names or opponent_generator to build eval pool.")
 
 
-def _generate_eval_pool(pool_size: int, opponent_generator) -> list[str]:
+def _generate_eval_pool(pool_size: int, opponent_generator: InfinitePoolGenerator) -> list[str]:
     """Build an evaluation opponent pool from a generator.
 
     :param pool_size: Number of teams to sample.
@@ -100,11 +101,11 @@ def evaluate_model(
         train_team: str,
         battle_format: str,
         opponent_names: list[str],
-        opponent_generator,
+        opponent_generator: InfinitePoolGenerator | None,
         eval_episodes: int,
         max_steps: int,
-        agent_team_generator=None,
-        battle_team_generator=None,
+        agent_team_generator: InfinitePoolGenerator | None=None,
+        battle_team_generator: InfinitePoolGenerator | None=None,
         fixed_eval_pool: list[str] | None = None,
 ) -> list[EvalResult]:
     """Evaluate a trained model against a selected opponent pool.
@@ -134,6 +135,7 @@ def evaluate_model(
     elif not opponent_names:
         if battle_team_generator:
             opponent_pool = []
+            battle_team_generator.reset()
         else:
             opponent_pool = _generate_eval_pool(eval_episodes, opponent_generator)
     else:

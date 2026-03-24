@@ -1,0 +1,36 @@
+{
+  "_comment": "Gen 1 OU Starmie — opponent fixture. Water/Psychic, paralysed, full HP, no boosts.",
+  "_note_stat_belief": "Belief mean ≈ actual stats / STAT_NORM (512). Std reflects moderate uncertainty before scouting. 6th slot (index 5) is zero: gen 1 has no separate spd stat.",
+  "_note_boosts": "poke-env always uses spa/spd boost keys even for gen 1.",
+  "species": "starmie",
+  "gen": 1,
+  "level": 100,
+  "types": ["WATER", "PSYCHIC"],
+  "stats": {
+    "hp":  323,
+    "atk": 226,
+    "def": 226,
+    "spc": 284,
+    "spe": 295
+  },
+  "boosts": {
+    "accuracy": 0,
+    "atk": 0,
+    "def": 0,
+    "evasion": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+  },
+  "status": "PAR",
+  "effects": {},
+  "current_hp_fraction": 1.0,
+  "stab_multiplier": 1.5,
+  "preparing": false,
+  "protect_belief": 0.0,
+  "stat_belief": {
+    "_note": "mean[i] = estimated stat / 512, std[i] = uncertainty. Slot 5 (spd) is 0 for gen 1.",
+    "mean": [0.631, 0.441, 0.441, 0.555, 0.576, 0.0],
+    "std":  [0.050, 0.040, 0.040, 0.045, 0.040, 0.0]
+  }
+}

@@ -1,6 +1,6 @@
 import time
 
-from poke_env import RandomPlayer, LocalhostServerConfiguration, AccountConfiguration, MaxBasePowerPlayer
+from poke_env import RandomPlayer, LocalhostServerConfiguration, AccountConfiguration, MaxBasePowerPlayer, SimpleHeuristicsPlayer
 from poke_env.environment import SingleAgentWrapper
 
 from sb3_contrib.common.wrappers import ActionMasker
@@ -62,7 +62,7 @@ def build_env(
 
     unique_id = int(time.time() * 1000) % 100000
 
-    opponent_policy = RandomPlayer(
+    opponent_policy = SimpleHeuristicsPlayer(
         battle_format=battle_format,
         server_configuration=LocalhostServerConfiguration,
     )

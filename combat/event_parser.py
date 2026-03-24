@@ -44,6 +44,22 @@ def _get_prev_turn_events(battle) -> list[list[str]]:
     return getattr(obs, "events", [])
 
 
+def _detect_last_move_from_events(
+    battle,
+    actor_prefix: str,
+    pokemon_getter
+) -> Move | None:
+    events = _get_prev_turn_events(battle)
+
+    for event in events:
+        if len(event) >= 4 and event[1] == "move" and event[2].startswith(actor_prefix):
+            move_id = _to_move_id(event[3])
+            pokemon = pokemon_getter(battle)
+            return (pokemon.moves or {}).get(move_id)
+
+    return None
+
+
 def _my_prefix(battle) -> str:
     """Return our player slot prefix, e.g. ``'p1a'``.
 
@@ -79,24 +95,19 @@ def _to_move_id(name: str) -> str:
 # ---------------------------------------------------------------------------
 
 def detect_opponent_move_from_events(battle) -> Move | None:
-    """Detect the move the opponent used last turn from the event log.
+    return _detect_last_move_from_events(
+        battle,
+        actor_prefix=_opp_prefix(battle),
+        pokemon_getter=lambda b: b.opponent_active_pokemon,
+    )
 
-    Looks for the first ``move`` event where the actor belongs to the
-    opponent's slot, then resolves the move name against the opponent's
-    already-revealed move dict.
 
-    :param battle: poke-env battle object.
-    :returns: The opponent's ``Move`` object, or ``None`` if not found.
-    """
-    events = _get_prev_turn_events(battle)
-    opp_pfx = _opp_prefix(battle)
-
-    for event in events:
-        if len(event) >= 4 and event[1] == "move" and event[2].startswith(opp_pfx):
-            move_id = _to_move_id(event[3])
-            return (battle.opponent_active_pokemon.moves or {}).get(move_id)
-
-    return None
+def detect_my_move_from_events(battle) -> Move | None:
+    return _detect_last_move_from_events(
+        battle,
+        actor_prefix=_my_prefix(battle),
+        pokemon_getter=lambda b: b.active_pokemon,
+    )
 
 
 def did_no_damage_from_events(battle, my_last_move: Move | None) -> bool:
@@ -148,7 +159,7 @@ def did_no_damage_from_events(battle, my_last_move: Move | None) -> bool:
     return True
 
 
-def we_moved_first_from_events(battle) -> bool | None:
+def moved_first(battle) -> bool | None:
     """Determine turn order by checking which ``move`` event appeared first.
 
     :param battle: poke-env battle object.
