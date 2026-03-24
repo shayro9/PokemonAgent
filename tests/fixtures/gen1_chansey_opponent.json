@@ -1,0 +1,36 @@
+{
+  "_comment": "Gen 1 OU Chansey — opponent fixture. Normal type, burned, half HP, +3 def. High protect belief (softboiled pattern).",
+  "_note_boosts": "In Gen 1 Special is one stat (spc), so spa and spd boosts are always equal.",
+  "_note_stat_belief": "HP stat (703) exceeds STAT_NORM (512) so mean is capped at 1.0. Low atk std: Chansey's attack is famously low and predictable.",
+  "species": "chansey",
+  "gen": 1,
+  "level": 100,
+  "types": ["NORMAL"],
+  "stats": {
+    "hp":  703,
+    "atk": 35,
+    "def": 105,
+    "spc": 195,
+    "spe": 188
+  },
+  "boosts": {
+    "accuracy": 0,
+    "atk": 0,
+    "def": 3,
+    "evasion": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0
+  },
+  "status": "BRN",
+  "effects": {},
+  "current_hp_fraction": 0.5,
+  "stab_multiplier": 1.5,
+  "preparing": false,
+  "protect_belief": 0.75,
+  "stat_belief": {
+    "_note": "mean[0] capped to 1.0 (703/512 > 1). Slot 5 (spd) is 0 for gen 1.",
+    "mean": [1.000, 0.068, 0.205, 0.381, 0.367, 0.0],
+    "std":  [0.030, 0.015, 0.030, 0.040, 0.030, 0.0]
+  }
+}

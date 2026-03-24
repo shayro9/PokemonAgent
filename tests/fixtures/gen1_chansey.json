@@ -1,0 +1,28 @@
+{
+  "_comment": "Gen 1 OU Chansey fixture. Normal type, burned, half HP, +3 def boost.",
+  "_note_boosts": "In Gen 1 Special is one stat (spc), so spa and spd boosts are always equal.",
+  "species": "chansey",
+  "gen": 1,
+  "level": 100,
+  "types": ["NORMAL"],
+  "stats": {
+    "hp": 703,
+    "atk": 35,
+    "def": 105,
+    "spc": 195,
+    "spe": 188
+  },
+  "boosts": {
+    "atk": 0,
+    "def": 3,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0,
+    "accuracy": 0,
+    "evasion": 0
+  },
+  "status": "BRN",
+  "effects": [],
+  "current_hp_fraction": 0.5,
+  "stab_multiplier": 1.5
+}

@@ -2,11 +2,12 @@ from typing import Iterable, Optional
 from dataclasses import dataclass
 
 from teams.single_teams import ALL_SOLO_TEAMS
-from teams.team_generators import single_simple_team_generator, load_pokemon_pool, split_pokemon_pool, matchup_generator
+from teams.generators import team_generator, matchup_generator, InfinitePoolGenerator
+from data.prossesing import load_pool, split_pool
 
 
 TEAM_BY_NAME = {name: team for name, team in ALL_SOLO_TEAMS}
-DEFAULT_DATA_PATH = "data/gen9randombattle_db.json"
+DEFAULT_DATA_PATH = "data/matchups_gen1ou_db.json"
 
 
 def parse_pool(raw_pool: str | None, pool_all: bool) -> list[str]:
@@ -51,11 +52,11 @@ def _resolve_generated_pools(
     :param train_split: Fraction of examples used for training.
     :param split_seed: Random seed used for deterministic splitting.
     :returns: A tuple of ``(train_pool, eval_pool)`` lists."""
-    pokemon_pool = load_pokemon_pool(data_path)
+    pokemon_pool = load_pool(data_path)
 
-    train_pool, eval_pool = split_pokemon_pool(
-        pokemon_pool=pokemon_pool,
-        train_fraction=train_split,
+    train_pool, eval_pool = split_pool(
+        pool=pokemon_pool,
+        fraction=train_split,
         seed=split_seed,
     )
 
@@ -70,12 +71,12 @@ def _resolve_generated_pools(
 class OpponentsResolved:
     train_names: list[str]
     eval_names: list[str]
-    train_gen: Optional[Iterable]
-    eval_gen: Optional[Iterable]
-    train_agent_gen: Optional[Iterable]
-    eval_agent_gen: Optional[Iterable]
-    train_battle_team_generator: Optional[Iterable] = None
-    eval_battle_team_generator: Optional[Iterable] = None
+    train_gen: Optional[InfinitePoolGenerator]
+    eval_gen: Optional[InfinitePoolGenerator]
+    train_agent_gen: Optional[InfinitePoolGenerator]
+    eval_agent_gen: Optional[InfinitePoolGenerator]
+    train_battle_team_generator: Optional[InfinitePoolGenerator] = None
+    eval_battle_team_generator: Optional[InfinitePoolGenerator] = None
 
 
 def _resolve_train_eval_pools(
@@ -92,7 +93,7 @@ def _resolve_train_eval_pools(
             train_split=train_split,
             split_seed=split_seed,
         )
-    pool = load_pokemon_pool(data_path)
+    pool = load_pool(data_path)
     return pool, pool
 
 
@@ -106,12 +107,12 @@ def resolve_opponents(args) -> OpponentsResolved:
     eval_agent_gen = None
 
     if getattr(args, 'matchup_data_path', None):
-        matchup_pool = load_pokemon_pool(args.matchup_data_path)
+        matchup_pool = load_pool(args.matchup_data_path)
 
         if args.split_generated_pool:
-            train_pool, eval_pool = split_pokemon_pool(
-                pokemon_pool=matchup_pool,
-                train_fraction=args.train_split,
+            train_pool, eval_pool = split_pool(
+                pool=matchup_pool,
+                fraction=args.train_split,
                 seed=args.split_seed,
             )
             print(
@@ -128,8 +129,8 @@ def resolve_opponents(args) -> OpponentsResolved:
             eval_gen=None,
             train_agent_gen=None,
             eval_agent_gen=None,
-            train_battle_team_generator=matchup_generator(matchup_pool=train_pool, seed=args.seed),
-            eval_battle_team_generator=matchup_generator(matchup_pool=eval_pool, seed=args.seed),
+            train_battle_team_generator=matchup_generator(pool=train_pool, seed=args.seed),
+            eval_battle_team_generator=matchup_generator(pool=eval_pool, seed=args.seed),
         )
 
     if not args.random_generated:
@@ -187,8 +188,8 @@ def resolve_opponents(args) -> OpponentsResolved:
         )
 
     # Opponent generators always exist in generated mode
-    train_gen = single_simple_team_generator(pokemon_pool=train_opp_pool, seed=train_seed)
-    eval_gen = single_simple_team_generator(pokemon_pool=eval_opp_pool, seed=eval_seed)
+    train_gen = team_generator(pool=train_opp_pool, seed=train_seed)
+    eval_gen = team_generator(pool=eval_opp_pool, seed=eval_seed)
 
     # Agent generators only when you did NOT provide an explicit --train-team
     if args.train_team is None:
@@ -196,8 +197,8 @@ def resolve_opponents(args) -> OpponentsResolved:
             train_agent_gen = train_gen
             eval_agent_gen = eval_gen
         else:
-            train_agent_gen = single_simple_team_generator(pokemon_pool=train_agent_pool, seed=train_seed)
-            eval_agent_gen = single_simple_team_generator(pokemon_pool=eval_agent_pool, seed=eval_seed)
+            train_agent_gen = team_generator(pool=train_agent_pool, seed=train_seed)
+            eval_agent_gen = team_generator(pool=eval_agent_pool, seed=eval_seed)
 
     # Names are irrelevant in generated mode, but keep them consistent/empty
     if args.eval_pool is not None or args.eval_pool_all:

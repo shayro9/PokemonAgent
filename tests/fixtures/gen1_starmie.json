@@ -1,0 +1,28 @@
+{
+  "_comment": "Gen 1 OU Starmie fixture for unit testing PokemonStats. Built from Pokemon(gen=1, species='starmie').",
+  "_note_boosts": "poke-env always uses modern boost keys (spa/spd) even for gen=1. GEN1_BOOST_KEYS updated to use 'spa' to match.",
+  "species": "starmie",
+  "gen": 1,
+  "level": 100,
+  "types": ["WATER", "PSYCHIC"],
+  "stats": {
+    "hp": 323,
+    "atk": 226,
+    "def": 226,
+    "spc": 284,
+    "spe": 295
+  },
+  "boosts": {
+    "atk": 0,
+    "def": 0,
+    "spa": 0,
+    "spd": 0,
+    "spe": 0,
+    "accuracy": 0,
+    "evasion": 0
+  },
+  "status": "PAR",
+  "effects": [],
+  "current_hp_fraction": 1.0,
+  "stab_multiplier": 1.5
+}
