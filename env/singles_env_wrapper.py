@@ -1,12 +1,13 @@
+from weakref import WeakKeyDictionary
+
 import numpy as np
 import gymnasium as gym
+from poke_env.battle import AbstractBattle
 from poke_env.environment import SinglesEnv
 
 from env.states.gen1.battle_state_gen_1 import BattleStateGen1
 from env.action_mask_gen_1 import ActionMaskGen1
-from combat.combat_utils import tracker_key
-from env.tracker import Tracker
-from env.reward import calc_reward
+from env.reward import get_state_value
 
 def print_state(battle, *, prefix="[PokemonRLWrapper]") -> str:
     """Render and print a human-readable battle state snapshot.
@@ -48,7 +49,9 @@ class PokemonRLWrapper(SinglesEnv):
             for agent in self.possible_agents
         }
 
-        self._trackers: dict[str, Tracker] = {}
+        self._reward_buffer: WeakKeyDictionary[AbstractBattle, float] = (
+            WeakKeyDictionary()
+        )
         self.action_mask = ActionMaskGen1()
 
         self.rounds_played: int = 0
@@ -99,16 +102,17 @@ class PokemonRLWrapper(SinglesEnv):
     # ------------------------------------------------------------------
 
     def calc_reward(self, battle) -> float:
-        tracker = self._get_tracker(battle)
-        reward, done = calc_reward(
-            battle,
-            tracker,
-            is_agent_battle=self._is_player_turn(battle),
-        )
-        tracker.commit(battle)
-        if done and self._is_player_turn(battle):
+        if battle not in self._reward_buffer:
+            self._reward_buffer[battle] = 0.0
+
+        value = get_state_value(battle)
+        reward = value - self._reward_buffer[battle]
+        self._reward_buffer[battle] = value
+
+        if battle.finished and self._is_player_turn(battle):
             self.rounds_played += 1
             self._last_finished_battle = battle
+
         return reward
 
     # ------------------------------------------------------------------
@@ -116,7 +120,6 @@ class PokemonRLWrapper(SinglesEnv):
     # ------------------------------------------------------------------
 
     def reset(self, *args, **kwargs):
-        self._trackers = {}
         self.action_mask.reset()
         if (
                 self.rounds_played % self.rounds_per_opponents == 0
@@ -144,12 +147,6 @@ class PokemonRLWrapper(SinglesEnv):
 
     def _is_player_turn(self, battle) -> bool:
         return getattr(battle, "player_username", None) == self.agent1.username
-
-    def _get_tracker(self, battle) -> Tracker:
-        tag = tracker_key(battle)
-        if tag not in self._trackers:
-            self._trackers[tag] = Tracker()
-        return self._trackers[tag]
 
     def get_last_battle(self):
         return self._last_finished_battle
