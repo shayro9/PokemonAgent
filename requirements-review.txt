@@ -1,0 +1,7 @@
+# Minimal dependencies for code review script only
+# Used by: scripts/code_review.py
+# Install: pip install -r requirements-review.txt
+
+pylint>=3.0.0
+mypy>=1.0.0
+bandit>=1.7.0
