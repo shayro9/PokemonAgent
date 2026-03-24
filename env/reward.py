@@ -56,6 +56,13 @@ def calc_reward(
     return reward, battle.finished
 
 def get_state_value(battle: AbstractBattle) -> float:
+    """ Calculate the state value for the battle. 
+
+    In order to calc reward just need to calculate the delta of values between states.
+
+    :param battle: poke-env battle object.
+    :return:value for the battle.
+    """
     current_value = 0.0
 
     for mon in battle.team.values():
