@@ -1,7 +1,3 @@
-import numpy as np
-
-from combat.combat_utils import tracker_key
-from env.tracker import Tracker
 from poke_env.battle import Status, AbstractBattle
 
 from env.states.gen1.battle_state_gen_1 import MAX_TEAM_SIZE
@@ -14,49 +10,8 @@ WIN_BONUS = 15.0
 LOSS_PENALTY = -10.0
 
 
-def calc_reward(
-        battle,
-        tracker: Tracker,
-        *,
-        is_agent_battle: bool,
-) -> tuple[float, bool]:
-    """Stateless reward function for a single battle step.
-
-    :param battle: poke-env battle object.
-    :param tracker: values history
-    :param is_agent_battle: ``True`` when this battle belongs to the learning agent.
-    :returns: ``(reward, done)`` where ``done`` is ``True`` once the battle has finished.
-    """
-    if not is_agent_battle:
-        return 0.0, battle.finished
-
-    my_hp = battle.active_pokemon.current_hp_fraction
-    opp_hp = battle.opponent_active_pokemon.current_hp_fraction
-
-    # HP delta
-    damage_to_opp = (tracker.last_opp_hp - opp_hp) * HP_VALUE
-    damage_to_me = (tracker.last_my_hp - my_hp) * HP_VALUE
-
-    # Status: reward only on the TURN it's applied (None → status transition)
-    my_status = battle.active_pokemon.status
-    opp_status = battle.opponent_active_pokemon.status
-
-    newly_opp_status = (opp_hp > 0) and (opp_status is not None) and (tracker.last_opp_status is None)
-    newly_me_status = (my_status is not None) and (tracker.last_my_status is None)
-
-    newly_opp_status_value = _STATUS_WEIGHTS.get(opp_status, 0.2)
-    newly_me_status_value = _STATUS_WEIGHTS.get(my_status, 0.2)
-
-    reward = (damage_to_opp + newly_opp_status_value * newly_opp_status
-              - damage_to_me - newly_me_status_value * newly_me_status)
-
-    if battle.finished:
-        reward += WIN_BONUS if battle.won else (LOSS_PENALTY if battle.lost else 0.0)
-
-    return reward, battle.finished
-
 def get_state_value(battle: AbstractBattle) -> float:
-    """ Calculate the state value for the battle. 
+    """ Calculate the state value for the battle.
 
     In order to calc reward just need to calculate the delta of values between states.
 
