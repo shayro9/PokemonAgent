@@ -4,8 +4,6 @@ from functools import lru_cache
 from poke_env.battle import MoveCategory, Move, Weather, PokemonType, SideCondition, Status, Pokemon, Battle
 from poke_env.data import GenData
 
-from env.battle_tracker import BattleTracker
-
 
 @lru_cache(maxsize=None)
 def type_chart_for_gen(gen: int):
@@ -15,40 +13,11 @@ def type_chart_for_gen(gen: int):
 
 def tracker_key(battle) -> str:
     """Build a stable tracker-history key scoped to battle and opponent species."""
-    species = getattr(getattr(battle, "opponent_active_pokemon", None), "species", None) or "unknown"
-    return f"{battle.battle_tag}|{species}"
-
-
-def did_no_damage(battle, tracker: BattleTracker, my_last_move, eps=1e-6) -> bool:
-    """Returns True if our last action did no damage to the opponent."""
-    if my_last_move is None:
-        return False
-    if my_last_move.category == MoveCategory.STATUS:
-        return False
-    current_hp = battle.opponent_active_pokemon.current_hp_fraction
-    previous_hp = tracker.last_opp_hp
-    return current_hp >= previous_hp - eps
+    return f"{battle.battle_tag}"
 
 
 def clip_probability(value: float) -> float:
     return max(0.0, min(1.0, value))
-
-
-def detect_opponent_move(battle, last_pp: dict) -> Move | None:
-    """Detect which move the opponent used by comparing PP to last turn's snapshot."""
-    moves = (battle.opponent_active_pokemon.moves or {}).values()
-    for move in moves:
-        if last_pp.get(move.id, move.current_pp) > move.current_pp or move.id not in last_pp.keys():
-            return move
-    return None
-
-
-def snapshot_opponent_pp(battle) -> dict:
-    """Snapshot the opponent's current PP for all revealed moves."""
-    return {
-        move.id: move.current_pp
-        for move in (battle.opponent_active_pokemon.moves or {}).values()
-    }
 
 
 def boost_multiplier(stage: int) -> float:

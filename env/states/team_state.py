@@ -86,7 +86,8 @@ class TeamState:
 
     def describe(self) -> str:
         lines = [f"Team  ({self.alive_count()} alive / {self.max_size} slots):",
-                 f"Alive vector: {self.alive_vector} Active: ({self.active.species if self.active else "None"})",]
+                 f"Alive vector: {self.alive_vector}",
+                 self.active.describe() if self.active else "",]
         for i, member in enumerate(self.members):
             tag = "(empty)" if member.species == "none" else ""
             lines.append(
