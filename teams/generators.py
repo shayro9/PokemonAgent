@@ -32,6 +32,16 @@ class InfinitePoolGenerator:
         """Restart the sequence from the beginning using the original seed."""
         self._gen = self._make_generator()
 
+    @property
+    def team_size(self) -> int:
+        """Return the number of Pokémon in a team."""
+        if not self._pool:
+            return 0
+        entry = self._pool[0]
+        if isinstance(entry, dict) and "agent" in entry:
+            return len(entry["agent"])
+        return len(entry)
+
     def __next__(self):
         return next(self._gen)
 
