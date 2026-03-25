@@ -17,6 +17,13 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v44
+        with:
+          files: |
+            **/*.py
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -31,8 +38,12 @@ jobs:
         id: review
         continue-on-error: true
         run: |
-          python scripts/code_review.py --output-format markdown > /tmp/review_output.txt 2>&1
-          cat /tmp/review_output.txt
+          if [ -z "${{ steps.changed-files.outputs.all_changed_files }}" ]; then
+            echo "No Python files changed."
+          else
+            python scripts/code_review.py --files ${{ steps.changed-files.outputs.all_changed_files }} --output-format markdown > /tmp/review_output.txt 2>&1
+            cat /tmp/review_output.txt
+          fi
 
       - name: Post review comment
         if: github.event_name == 'pull_request'
