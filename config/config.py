@@ -109,17 +109,6 @@ def resolve_opponents(args) -> OpponentsResolved:
             eval_battle_team_generator=matchup_generator(pool=eval_pool, seed=args.seed),
         )
 
-    if not args.random_generated:
-        # Generators must be None in name-based mode
-        return OpponentsResolved(
-            train_names=train_names,
-            eval_names=eval_names,
-            train_gen=None,
-            eval_gen=None,
-            train_agent_gen=None,
-            eval_agent_gen=None,
-        )
-
     # ---- GENERATED MODE ----
     train_seed = resolve_seed(args.train_generator_seed, args.seed)
     eval_seed = resolve_seed(args.eval_generator_seed, args.seed)
@@ -158,14 +147,12 @@ def resolve_opponents(args) -> OpponentsResolved:
     train_gen = team_generator(pool=train_opp_pool, seed=train_seed)
     eval_gen = team_generator(pool=eval_opp_pool, seed=eval_seed)
 
-    # Agent generators only when you did NOT provide an explicit --train-team
-    if args.train_team is None:
-        if agent_data_path == opponent_data_path:
-            train_agent_gen = train_gen
-            eval_agent_gen = eval_gen
-        else:
-            train_agent_gen = team_generator(pool=train_agent_pool, seed=train_seed)
-            eval_agent_gen = team_generator(pool=eval_agent_pool, seed=eval_seed)
+    if agent_data_path == opponent_data_path:
+        train_agent_gen = train_gen
+        eval_agent_gen = eval_gen
+    else:
+        train_agent_gen = team_generator(pool=train_agent_pool, seed=train_seed)
+        eval_agent_gen = team_generator(pool=eval_agent_pool, seed=eval_seed)
 
     eval_names = train_names  # usually empty
 
