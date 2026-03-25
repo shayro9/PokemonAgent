@@ -1,5 +1,6 @@
 from weakref import WeakKeyDictionary
 
+import logging
 import numpy as np
 import gymnasium as gym
 from poke_env.battle import AbstractBattle
@@ -79,7 +80,10 @@ class PokemonRLWrapper(SinglesEnv):
 
         try:
             return super().action_to_order(canonical_action, battle, fake, strict)
-        except ValueError:
+        except ValueError as e:
+            print(BattleStateGen1(battle).describe())
+            print(mask)
+            print(f"Error converting action {canonical_action} to order: {e}")
             return super().action_to_order(canonical_action, battle, fake, strict=False)
 
     def action_masks(self) -> np.ndarray:
