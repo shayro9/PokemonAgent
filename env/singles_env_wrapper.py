@@ -65,24 +65,26 @@ class PokemonRLWrapper(SinglesEnv):
         if not self._is_player_turn(battle=battle):
             return super().action_to_order(action, battle, fake, strict)
 
-        canonical_action = action
         mask = self.action_mask.get_mask()
 
-        if not (0 <= canonical_action < len(mask)):
+        if not (0 <= action < len(mask)):
             if strict:
-                raise ValueError(f"Action {canonical_action} out of bounds ({len(mask)}).")
-            canonical_action = self.action_mask.ACTION_DEFAULT
-        elif not mask[canonical_action]:
+                raise ValueError(f"Action {action} out of bounds [0, {len(mask)})")
+            action = np.clip(action, 0, len(mask) - 1)
+
+        # Validate action is legal
+        if not mask[action]:
             if strict:
-                raise ValueError(
-                    f"Invalid action {canonical_action}. Valid: {np.flatnonzero(mask).tolist()}"
-                )
-            canonical_action = self.action_mask.ACTION_DEFAULT
+                raise ValueError(f"Action {action} masked (illegal in current state)")
+            legal_actions = np.where(mask)[0]
+            if len(legal_actions) == 0:
+                raise RuntimeError("No legal actions available (this should never happen)")
+            action = legal_actions[0]
 
         try:
-            return super().action_to_order(canonical_action, battle, fake, strict)
+            return super().action_to_order(action, battle, fake, strict)
         except ValueError:
-            return super().action_to_order(canonical_action, battle, fake, strict=False)
+            return super().action_to_order(action, battle, fake, strict=False)
 
     def action_masks(self) -> np.ndarray:
         return self.action_mask.get_mask()

@@ -1,3 +1,5 @@
+from typing import Any, Callable, T
+
 import numpy as np
 from poke_env.battle.status import Status
 from poke_env.battle.effect import Effect
@@ -18,7 +20,7 @@ GEN1_STAT_KEYS      = ["hp", "atk", "def", "spc", "spe"]
 MODERN_STAT_KEYS    = ["hp", "atk", "def", "spa", "spd", "spe"]
 MODERN_BOOST_KEYS   = ["atk", "def", "spa", "spd", "spe", "accuracy", "evasion"]
 
-MAX_TEAM_SIZE = 1
+MAX_TEAM_SIZE = 1 # 1v1 for now
 MAX_MOVES = 4
 
 def normalize(x: float, max_x: float = 1.0, symmetric: bool = False) -> float:
@@ -81,12 +83,21 @@ def encode_dicts(_dict: dict, _keys: list[str]) -> np.ndarray:
         dtype=np.float32,
     )
 
-def pull_attribute(obj, key, default_value, type_value):
-    try:
-        if obj is None or key is None:
-            return type_value(default_value)
-        val = getattr(obj, key, default_value)
-        return type_value(val) if val is not None else default_value
-    except Exception as e:
-        # print(e)
+def pull_attribute(obj: object | None, key: str, default_value: Any, type_value: Callable[[Any], T]) -> T:
+    if obj is None or key is None:
         return type_value(default_value)
+
+    try:
+        val = getattr(obj, key, default_value)
+        if val is None:
+            return type_value(default_value)
+        return type_value(val)
+
+    except TypeError as e:
+        # Ignore only this specific case
+        if "'NoneType' object is not subscriptable" in str(e):
+            return type_value(default_value)
+        raise  # everything else is a real bug
+
+    except Exception:
+        raise
