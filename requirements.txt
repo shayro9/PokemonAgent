@@ -1,8 +1,9 @@
+pytest>=8.0.0
+pytest-cov>=4.0.0
+
 poke_env>=0.11.0
 numpy>=2.4.1
 gymnasium>=1.2.3
-stable-baselines3>=2.0.0
-sb3-contrib>=2.0.0
 
 wandb>=0.25.0
 sb3_contrib>=2.7.1
