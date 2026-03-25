@@ -45,8 +45,6 @@ def _resolve_generated_pools(
 
 @dataclass(frozen=True)
 class OpponentsResolved:
-    train_names: list[str]
-    eval_names: list[str]
     train_gen: Optional[InfinitePoolGenerator]
     eval_gen: Optional[InfinitePoolGenerator]
     train_agent_gen: Optional[InfinitePoolGenerator]
@@ -75,13 +73,6 @@ def _resolve_train_eval_pools(
 
 def resolve_opponents(args) -> OpponentsResolved:
     """Resolve train/eval opponent names and generators from CLI args."""
-    train_names: list[str] = []
-    eval_names: list[str] = []
-    train_gen = None
-    eval_gen = None
-    train_agent_gen = None
-    eval_agent_gen = None
-
     if getattr(args, 'matchup_data_path', None):
         matchup_pool = load_pool(args.matchup_data_path)
 
@@ -99,8 +90,6 @@ def resolve_opponents(args) -> OpponentsResolved:
             train_pool = eval_pool = matchup_pool
 
         return OpponentsResolved(
-            train_names=[],
-            eval_names=[],
             train_gen=None,
             eval_gen=None,
             train_agent_gen=None,
@@ -154,11 +143,7 @@ def resolve_opponents(args) -> OpponentsResolved:
         train_agent_gen = team_generator(pool=train_agent_pool, seed=train_seed)
         eval_agent_gen = team_generator(pool=eval_agent_pool, seed=eval_seed)
 
-    eval_names = train_names  # usually empty
-
     return OpponentsResolved(
-        train_names=train_names,
-        eval_names=eval_names,
         train_gen=train_gen,
         eval_gen=eval_gen,
         train_agent_gen=train_agent_gen,
