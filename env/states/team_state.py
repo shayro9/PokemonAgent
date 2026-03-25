@@ -34,7 +34,7 @@ class TeamState:
         :param max_size:  Maximum number of slots (default 6).
         """
         self.max_size = max_size
-        pokemons.sort()
+        pokemons.sort(key=lambda p: p.species)
         self.members: list[PokemonState] = ([state_cls(p) for p in pokemons[:max_size]]
                                           + [state_cls(None) for _ in range(max_size - len(pokemons[:max_size]))])
         self.alive_vector = self.encode_active_and_faint()
