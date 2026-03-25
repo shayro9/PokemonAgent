@@ -31,7 +31,6 @@ from poke_env import (
     MaxBasePowerPlayer,
 )
 
-from config.config import TEAM_BY_NAME
 from env.singles_env_wrapper import PokemonRLWrapper
 from agents.policy_player import PolicyPlayer
 from teams.generators import matchup_generator
@@ -50,10 +49,8 @@ def _resolve_team(team_arg, pool, side, team_size):
     'random' -> sample team_size Pokemon from pool using the given side key.
     Named string -> look up in TEAM_BY_NAME (single Pokemon, team_size ignored).
     """
-    if team_arg is None or team_arg == "random":
-        team = next(matchup_generator(pool=pool))[0 if side == "agent" else 1]
-        return team
-    return TEAM_BY_NAME[team_arg]
+    team = next(matchup_generator(pool=pool))[0 if side == "agent" else 1]
+    return team
 
 
 def _print_packed_team(label, packed):
@@ -110,8 +107,7 @@ def _print_packed_team(label, packed):
 # ------------------------------------------------------------------------------
 
 def build_arg_parser():
-    named_teams = sorted(TEAM_BY_NAME)
-    team_choices = ["random"] + named_teams
+    team_choices = ["random"]
 
     p = argparse.ArgumentParser(description="Challenge a human with a chosen AI agent.")
 

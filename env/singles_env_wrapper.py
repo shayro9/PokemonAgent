@@ -25,17 +25,14 @@ class PokemonRLWrapper(SinglesEnv):
     def __init__(
             self,
             *,
-            team=None,
-            opponent_teams: list[str] | None = None,
             rounds_per_opponents: int = 2_000,
             battle_team_generator=None,
             agent_team_generator=None,
             opponent_team_generator=None,
             **kwargs,
     ):
-        super().__init__(team=team, **kwargs)
+        super().__init__(**kwargs)
 
-        self.opponent_teams = opponent_teams or []
         self.battle_team_generator = battle_team_generator
         self.agent_team_generator = agent_team_generator
         self.opponent_team_generator = opponent_team_generator
@@ -134,9 +131,6 @@ class PokemonRLWrapper(SinglesEnv):
                     self.agent1.update_team(next(self.agent_team_generator))
                 if self.opponent_team_generator is not None:
                     self.agent2.update_team(next(self.opponent_team_generator))
-                elif self.opponent_teams:
-                    i = (self.rounds_played // self.rounds_per_opponents) % len(self.opponent_teams)
-                    self.agent2.update_team(self.opponent_teams[i])
             self._last_team_update_round = self.rounds_played
 
         return super().reset(*args, **kwargs)

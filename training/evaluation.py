@@ -1,4 +1,3 @@
-import random
 from dataclasses import dataclass
 
 from poke_env.environment import SingleAgentWrapper
@@ -6,7 +5,6 @@ from poke_env.environment import SingleAgentWrapper
 from sb3_contrib import MaskablePPO
 from sb3_contrib.common.maskable.utils import get_action_masks
 
-from config.config import TEAM_BY_NAME
 from env.env_builder import build_env
 from env.singles_env_wrapper import PokemonRLWrapper
 from teams.generators import InfinitePoolGenerator
@@ -57,7 +55,6 @@ def _play_episode(eval_env: SingleAgentWrapper, model: MaskablePPO, max_steps: i
 
 
 def build_fixed_eval_pool(
-        opponent_names: list[str],
         opponent_generator: InfinitePoolGenerator,
         eval_episodes: int,
 ) -> list[str]:
@@ -66,14 +63,10 @@ def build_fixed_eval_pool(
     Resolves teams from named opponents or a generator and locks them in so
     every evaluation checkpoint sees the exact same set of opponents.
 
-    :param opponent_names: Optional predefined opponent names to sample from.
     :param opponent_generator: Optional generator for opponent teams.
     :param eval_episodes: Number of episodes (determines pool size).
     :returns: A fixed list of packed opponent team strings."""
-    if opponent_names:
-        sampled_names = random.sample(opponent_names, k=min(eval_episodes, len(opponent_names)))
-        return [TEAM_BY_NAME[name] for name in sampled_names]
-    elif opponent_generator is not None:
+    if opponent_generator is not None:
         return _generate_eval_pool(eval_episodes, opponent_generator)
     else:
         raise ValueError("Must provide either opponent_names or opponent_generator to build eval pool.")
@@ -94,31 +87,23 @@ def _generate_eval_pool(pool_size: int, opponent_generator: InfinitePoolGenerato
 def evaluate_model(
         model: MaskablePPO,
         timestep: int,
-        train_team: str,
         battle_format: str,
-        opponent_names: list[str],
         opponent_generator: InfinitePoolGenerator | None,
         eval_episodes: int,
         max_steps: int,
         agent_team_generator: InfinitePoolGenerator | None=None,
         battle_team_generator: InfinitePoolGenerator | None=None,
-        fixed_eval_pool: list[str] | None = None,
 ) -> list[EvalResult]:
     """Evaluate a trained model against a selected opponent pool.
 
     :param battle_team_generator: full battle generator
     :param model: Trained model to evaluate.
     :param timestep: Training timestep associated with this evaluation.
-    :param train_team: Agent team used for evaluation.
     :param battle_format: Showdown format used for evaluation battles.
-    :param opponent_names: Optional predefined opponent names.
     :param opponent_generator: Optional generator for opponent teams.
     :param eval_episodes: Number of episodes to evaluate.
     :param max_steps: Maximum steps per episode.
     :param agent_team_generator: Optional generator for agent team rotation.
-    :param fixed_eval_pool: Pre-built pool of opponent teams to reuse across
-        evaluations. When provided, ``opponent_names`` and
-        ``opponent_generator`` are ignored for pool construction.
     :returns: A list containing one ``EvalResult`` summary."""
     results: list[EvalResult] = []
 
@@ -126,31 +111,13 @@ def evaluate_model(
     algo = "maskable_ppo"
     use_action_masking = (algo == "maskable_ppo")
 
-    if fixed_eval_pool is not None:
-        opponent_pool = fixed_eval_pool
-    elif not opponent_names:
-        if battle_team_generator:
-            opponent_pool = []
-            battle_team_generator.reset()
-        else:
-            opponent_pool = _generate_eval_pool(eval_episodes, opponent_generator)
-    else:
-        if eval_episodes > 0:
-            sampled_names = random.sample(opponent_names, k=min(eval_episodes, len(opponent_names)))
-        else:
-            sampled_names = opponent_names
-        opponent_pool = [
-            TEAM_BY_NAME[opponent_name]
-            for opponent_name in sampled_names
-        ]
+    if battle_team_generator:
+        battle_team_generator.reset()
 
     eval_env = build_env(
-        agent_team=train_team,
         battle_format=battle_format,
-        opponent_names=[],
-        opponent_generator=None,
+        opponent_generator=opponent_generator,
         rounds_per_opponent=1,
-        opponent_pool=opponent_pool,
         agent_team_generator=agent_team_generator,
         use_action_masking=use_action_masking,
         battle_team_generator=battle_team_generator,

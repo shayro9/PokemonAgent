@@ -26,8 +26,6 @@ LOG_FREQ = 500
 def train_model(
         model_path: str,
         battle_format: str,
-        train_team: str,
-        opponent_names: list[str],
         opponent_generator,
         timesteps: int,
         rounds_per_opponent: int,
@@ -41,8 +39,6 @@ def train_model(
 
     :param model_path: Output path for the saved model.
     :param battle_format: Showdown format used for battles.
-    :param train_team: Packed team string used by the agent.
-    :param opponent_names: Predefined opponent team names.
     :param opponent_generator: Optional generator of opponent teams.
     :param timesteps: Total training timesteps.
     :param rounds_per_opponent: Battles played before rotating opponents.
@@ -78,9 +74,7 @@ def train_model(
     use_action_masking = (algo == "maskable_ppo")
 
     train_env = build_env(
-        train_team,
         battle_format,
-        opponent_names,
         opponent_generator,
         rounds_per_opponent,
         agent_team_generator=agent_team_generator,
@@ -114,15 +108,7 @@ def train_model(
         n_epochs=5,
     )
 
-    team_label = (
-        next(name for name, team in TEAM_BY_NAME.items() if team == train_team)
-        if train_team is not None
-        else "generated"
-    )
-    print(
-        f"Starting training: team={team_label} | pool={opponent_names} | "
-        f"rounds_per_opponent={rounds_per_opponent}"
-    )
+    print(f"rounds_per_opponent={rounds_per_opponent}")
     if eval_every_timesteps > 0 and eval_kwargs:
         trained_steps = 0
         eval_results = []
@@ -165,22 +151,11 @@ def main():
     args = build_arg_parser().parse_args()
 
     battle_format = args.format
-    train_team = TEAM_BY_NAME.get(args.train_team) if args.train_team else None
-
     opp = resolve_opponents(args)
-
-    fixed_eval_pool = build_fixed_eval_pool(
-        opponent_names=opp.eval_names,
-        opponent_generator=opp.eval_gen,
-        eval_episodes=args.eval_episodes,
-    ) if (opp.eval_names or opp.eval_gen) else None
 
     eval_kwargs = {
         "battle_format": battle_format,
-        "train_team": train_team,
-        "opponent_names": [],
         "opponent_generator": opp.eval_gen,
-        "fixed_eval_pool": fixed_eval_pool,
         "eval_episodes": args.eval_episodes,
         "max_steps": args.eval_max_steps,
         "agent_team_generator": opp.eval_agent_gen,
@@ -190,8 +165,6 @@ def main():
     model = train_model(
         model_path=args.model_path,
         battle_format=battle_format,
-        train_team=train_team,
-        opponent_names=opp.train_names,
         opponent_generator=opp.train_gen,
         timesteps=args.timesteps,
         rounds_per_opponent=args.rounds_per_opponent,
