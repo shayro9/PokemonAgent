@@ -169,7 +169,6 @@ async def main():
         wrapper = PokemonRLWrapper(
             battle_format=args.format,
             team=ai_team,
-            opponent_teams=[],
             server_configuration=LocalhostServerConfiguration,
             account_configuration1=AccountConfiguration(f"{player_name}_env1", None),
             account_configuration2=AccountConfiguration(f"{player_name}_env2", None),
