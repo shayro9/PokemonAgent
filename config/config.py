@@ -1,35 +1,11 @@
 from typing import Iterable, Optional
 from dataclasses import dataclass
 
-from teams.single_teams import ALL_SOLO_TEAMS
 from teams.generators import team_generator, matchup_generator, InfinitePoolGenerator
 from data.prossesing import load_pool, split_pool
 
 
-TEAM_BY_NAME = {name: team for name, team in ALL_SOLO_TEAMS}
 DEFAULT_DATA_PATH = "data/matchups_gen1ou_db.json"
-
-
-def parse_pool(raw_pool: str | None, pool_all: bool) -> list[str]:
-    """Parse and validate a comma-separated pool of opponent names.
-    
-    :param raw_pool: Comma-separated opponent names.
-    :param pool_all: Whether all predefined solo teams should be used.
-    :returns: A list of validated opponent names."""
-    if pool_all:
-        return [name for name, _ in ALL_SOLO_TEAMS]
-
-    if not raw_pool:
-        return []
-
-    names = [name.strip() for name in raw_pool.split(",") if name.strip()]
-    unknown = [name for name in names if name not in TEAM_BY_NAME]
-    if unknown:
-        raise ValueError(
-            f"Unknown pokemon(s) in pool: {', '.join(unknown)}. "
-            f"Valid names: {', '.join(sorted(TEAM_BY_NAME))}"
-        )
-    return names
 
 
 def resolve_seed(explicit: Optional[int], fallback: int) -> int:
@@ -134,15 +110,6 @@ def resolve_opponents(args) -> OpponentsResolved:
         )
 
     if not args.random_generated:
-        # ---- NAME-BASED TRAIN opponents ----
-        train_names = parse_pool(args.pool, args.pool_all)
-
-        # ---- NAME-BASED EVAL opponents ----
-        if args.eval_pool is not None or args.eval_pool_all:
-            eval_names = parse_pool(args.eval_pool, args.eval_pool_all)
-        else:
-            eval_names = train_names
-
         # Generators must be None in name-based mode
         return OpponentsResolved(
             train_names=train_names,
@@ -200,12 +167,7 @@ def resolve_opponents(args) -> OpponentsResolved:
             train_agent_gen = team_generator(pool=train_agent_pool, seed=train_seed)
             eval_agent_gen = team_generator(pool=eval_agent_pool, seed=eval_seed)
 
-    # Names are irrelevant in generated mode, but keep them consistent/empty
-    if args.eval_pool is not None or args.eval_pool_all:
-        eval_names = parse_pool(args.eval_pool, args.eval_pool_all)
-        eval_gen = None
-    else:
-        eval_names = train_names  # usually empty
+    eval_names = train_names  # usually empty
 
     return OpponentsResolved(
         train_names=train_names,
