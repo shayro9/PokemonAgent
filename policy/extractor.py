@@ -3,10 +3,11 @@ AttentionPointerExtractor — observation → trunk features.
 
 Pipeline
 --------
-1. Slice observation into: context (excl moves) | my_moves | extract my_team (active+bench)
+1. Slice observation into: context (excl my_moves) | my_moves | extract my_team (active+bench)
 2. Encode context → ctx_h
 3. Encode my_moves (shared weights, equivariant) → move_h (B, 4, move_hidden)
-4. Encode my_team = [active] + [bench (5)] → team_h (B, 6, bench_hidden), using shared encoder
+4. Encode my_team = [active] + [bench (5)] where each member = pokemon_state + 4*move_state
+   → team_h (B, 6, team_hidden), using shared encoder
 5. Cross-attend: context → moves → attended_moves
 6. Cross-attend: context → team → attended_team  
 7. Trunk([ctx_h || attended_moves || attended_team]) → features
@@ -54,7 +55,7 @@ class AttentionPointerExtractor(nn.Module):
 
         self.context_encoder = build_mlp(CONTEXT_LEN, context_hidden, context_hidden)
         self.move_encoder = build_mlp(MOVE_LEN, move_hidden, move_hidden)
-        # Use the same encoder for all team members (active + bench) with shared weights
+        # Team encoder takes pokemon_state + 4*move_state as input
         self.team_encoder = build_mlp(MY_ACTIVE_LEN, team_hidden, team_hidden)
         
         self.attn_moves = CrossAttention(context_hidden, move_hidden, n_attention_heads)
@@ -93,21 +94,18 @@ class AttentionPointerExtractor(nn.Module):
         # Context: everything except my_moves
         battle_context  = obs[:, :CONTEXT_LEN]
         
-        # My moves come after context
+        # My moves come after context (active pokemon's available moves only)
         my_moves_flat   = obs[:, CONTEXT_LEN:CONTEXT_LEN + MAX_MOVES * MOVE_LEN]
         
         # Extract my_active and my_bench for team encoding
-        # my_active is at MY_ACTIVE_START:MY_ACTIVE_START+MY_ACTIVE_LEN in context
-        # For simplicity, we'll extract them from context directly
+        # my_active (pokemon + 4 moves) is at MY_ACTIVE_START:MY_ACTIVE_START+MY_ACTIVE_LEN in context
         my_active_in_context = obs[:, MY_ACTIVE_START:MY_ACTIVE_START + MY_ACTIVE_LEN]
         
-        # my_bench is at MY_BENCH_START but we need to skip the alive vector
-        # It's easier to extract from context by computing the offset
-        # Context = arena (5) + my_active (22) + opp_active (25) + my_bench (110) + opp_bench (130) + opp_moves (140)
-        # So my_bench starts at: 5 + 22 + 25 = 52 within context
+        # my_bench starts after arena + my_active + opp_active
+        # Each bench entry is MY_ACTIVE_LEN (pokemon + 4 moves) = 162
         my_bench_start_in_context = 5 + MY_ACTIVE_LEN + 25  # arena + my_active + opp_active
-        my_bench_pokemon_len = MY_ACTIVE_LEN * 5  # 110
-        my_bench_flat = battle_context[:, my_bench_start_in_context:my_bench_start_in_context + my_bench_pokemon_len]
+        my_bench_len = MY_ACTIVE_LEN * 5  # 5 bench slots
+        my_bench_flat = battle_context[:, my_bench_start_in_context:my_bench_start_in_context + my_bench_len]
         
         # 2. Encode context ─────────────────────────────────────────────
         context_hidden = self.context_encoder(battle_context)  # (B, context_hidden)
@@ -122,7 +120,7 @@ class AttentionPointerExtractor(nn.Module):
         is_padding_moves = (my_moves.abs().sum(dim=-1) == 0)   # (B, 4)
 
         # 4. Encode team: active (1) + bench (5) = 6 total ─────────────
-        # Stack active and bench together
+        # Each team slot is pokemon_state + 4*move_state = MY_ACTIVE_LEN
         team_flat = torch.cat([my_active_in_context, my_bench_flat], dim=1)  # (B, 6*MY_ACTIVE_LEN)
         n_team_slots = 6
         team = team_flat.reshape(batch_size, n_team_slots, MY_ACTIVE_LEN)
@@ -151,4 +149,3 @@ class AttentionPointerExtractor(nn.Module):
             torch.cat([context_hidden, attended_moves, attended_team], dim=-1)
         )  # (B, trunk_hidden)
         return features
-
