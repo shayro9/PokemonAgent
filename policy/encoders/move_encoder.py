@@ -9,7 +9,7 @@ Shape: (MOVE_STATE_LEN,) → (move_hidden,)
 
 import torch
 
-from env.encoders.base_encoder import BaseEncoder
+from policy.encoders.base_encoder import BaseEncoder
 from policy.mlp import build_mlp
 
 

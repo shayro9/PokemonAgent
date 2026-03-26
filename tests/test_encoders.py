@@ -7,14 +7,12 @@ and permutation equivariance properties.
 
 import pytest
 import torch
-import numpy as np
 
-from env.encoders.pokemon_encoder import PokemonEncoder
-from env.encoders.move_encoder import MoveEncoder
-from env.encoders.bench_encoder import BenchEncoder
-from env.encoders.field_encoder import FieldEncoder
+from policy.encoders.pokemon_encoder import PokemonEncoder
+from policy.encoders.move_encoder import MoveEncoder
+from policy.encoders.bench_encoder import BenchEncoder
+from policy.encoders.field_encoder import FieldEncoder
 from env.states.move_state import MoveState
-from env.states.pokemon_state import PokemonState
 
 
 # ============================================================================

@@ -9,7 +9,7 @@ Shape: (POKEMON_STATE_LEN,) → (pokemon_hidden,)
 
 import torch
 
-from env.encoders.base_encoder import BaseEncoder
+from policy.encoders.base_encoder import BaseEncoder
 from policy.mlp import build_mlp
 
 

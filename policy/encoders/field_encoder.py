@@ -10,9 +10,8 @@ Shape: (ctx_components,) → (field_hidden,)
 """
 
 import torch
-import torch.nn as nn
 
-from env.encoders.base_encoder import BaseEncoder
+from policy.encoders.base_encoder import BaseEncoder
 from policy.mlp import build_mlp
 
 

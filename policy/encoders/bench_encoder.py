@@ -12,7 +12,7 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from env.encoders.base_encoder import BaseEncoder
+from policy.encoders.base_encoder import BaseEncoder
 
 
 class BenchEncoder(BaseEncoder):
