@@ -48,19 +48,16 @@ class BattleStateGen1:
         opp_active_species = battle.opponent_active_pokemon.species
 
         self.my_bench: list[Pokemon] = list(battle.team.values())
-        self.opp_bench: list[Pokemon] = [p for p in battle.opponent_team.values()
-                         if p.species != opp_active_species]
+        self.opp_bench: list[Pokemon] = list(battle.opponent_team.values())
 
         self.my_available_moves: list[Move] = battle.available_moves
         self.opp_moves: list[Move] = list(battle.opponent_active_pokemon.moves.values())
 
         #-------- States --------
         self.arena_state    : ArenaStateGen1 = ArenaStateGen1(self.battle)
-        # Active Pokémon separately
-        self.opp_active_state   : OpponentPokemonStateGen1 = OpponentPokemonStateGen1(self.opp_active)
         # Bench: 5 slots (excluding active)
         self.my_bench_state  : TeamState = TeamState(self.my_bench , MyPokemonStateGen1      , self.MAX_TEAM_SIZE)
-        self.opp_bench_state : TeamState = TeamState(self.opp_bench, OpponentPokemonStateGen1, self.MAX_TEAM_SIZE - 1)
+        self.opp_bench_state : TeamState = TeamState(self.opp_bench, OpponentPokemonStateGen1, self.MAX_TEAM_SIZE)
         # Moves
         self.opp_moves_state: list[MoveState]  = self._encode_moves(self.opp_moves         , self.opp_active, self.my_active)
         self.my_moves_state : list[MoveState]  = self._encode_moves(self.my_available_moves, self.my_active , self.opp_active)
@@ -85,7 +82,6 @@ class BattleStateGen1:
 
         arr = np.concatenate([
             self.arena_state.to_array(),
-            self.opp_active_state.to_array(),
             np.concatenate([m.to_array() for m in self.opp_moves_state]),
             self.opp_bench_state.to_array(),
             self.my_bench_state.to_array(),
@@ -102,24 +98,20 @@ class BattleStateGen1:
         # Each my team member (active + 5 bench) includes their 4 moves
         return (
                 ArenaStateGen1.array_len()                                          # arena_state
-                + OpponentPokemonStateGen1.array_len()                              # opp_active (no moves)
                 + MoveState.array_len() * MAX_MOVES                                 # opp_moves
-                + TeamState.compute_array_len(OpponentPokemonStateGen1, 5) # opp_bench (5 slots, no moves)
-                + MyPokemonStateGen1.array_len()                                    # my_active + moves
-                + TeamState.compute_array_len(MyPokemonStateGen1, 5)       # my_bench (5 slots × pokemon+moves)
+                + TeamState.compute_array_len(OpponentPokemonStateGen1, 6) # opp_bench (5 slots, no moves)
+                + TeamState.compute_array_len(MyPokemonStateGen1, 6)       # my_bench (5 slots × pokemon+moves)
         )
 
 
     @classmethod
-    def battle_context_len(cls) -> int:
+    def battle_before_me_len(cls) -> int:
         """Length of context (everything except my_moves) for policy slicing."""
 
         return (
                 ArenaStateGen1.array_len()                                                  # arena
-                + OpponentPokemonStateGen1.array_len()                                      # opp_active (no moves)
                 + MoveState.array_len() * MAX_MOVES                                         # opp_moves
-                + TeamState.compute_array_len(OpponentPokemonStateGen1, MAX_TEAM_SIZE - 1)  # opp_bench (5 slots, no moves)
-                + MyPokemonStateGen1.array_len()                                            # my_active
+                + TeamState.compute_array_len(OpponentPokemonStateGen1, MAX_TEAM_SIZE)      # opp_bench (6 slots, no moves)
         )
 
     # ------------------------------------------------------------------

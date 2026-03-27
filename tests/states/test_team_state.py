@@ -178,15 +178,6 @@ class TestConstruction:
         assert len(team.members) == 1
         assert team.members[0].species == "pokemon_0"
 
-    def test_pokemons_are_sorted(self):
-        pokemons = [
-            FakePokemon("zebra"),
-            FakePokemon("arcanine"),
-            FakePokemon("magikarp"),
-        ]
-        team = make_team(pokemons)
-        filled_species = [m.species for m in team.members if m.species != "none"]
-        assert filled_species == sorted(filled_species)
 
 
 # ---------------------------------------------------------------------------

@@ -26,18 +26,13 @@ from env.states.gen1.opponent_pokemon_state_gen_1 import OpponentPokemonStateGen
 MOVE_LEN: int = MoveState.array_len()
 
 # Everything in the observation except my_moves
-CONTEXT_LEN: int = BattleStateGen1.battle_context_len()
+ARENA_OPPONENT_LEN: int = BattleStateGen1.battle_before_me_len()
 
 # Slicing constants for observation layout
-ARENA_LEN: int = 5
-MY_ACTIVE_LEN: int  = MyPokemonStateGen1.array_len() # 22 + 140 = 162
-OPP_ACTIVE_LEN: int = OpponentPokemonStateGen1.array_len()
-MY_BENCH_LEN: int   = MY_ACTIVE_LEN * 5  # 162 * 5 = 810 (5 bench slots × pokemon+moves)
-OPP_BENCH_LEN: int  = OPP_ACTIVE_LEN * 5 + 5  # 5 bench slots + alive_vector (no moves for opponent)
-
-MY_MOVES_START = CONTEXT_LEN - MOVE_LEN * MAX_MOVES
-MY_ACTIVE_START = CONTEXT_LEN - MY_ACTIVE_LEN
-
+MY_POKEMON_LEN: int  = MyPokemonStateGen1.array_len() # 22 + 140 = 162
+MY_BENCH_LEN: int   = MY_POKEMON_LEN * 6 + 6  # 162 * 5 = 810 (5 bench slots × pokemon+moves)
+CONTEXT_LEN: int = ARENA_OPPONENT_LEN + MY_POKEMON_LEN
+MY_MOVES_START = MY_POKEMON_LEN - MOVE_LEN * MAX_MOVES
 # ── Action space ───────────────────────────────────────────────────────────
 MOVE_ACTION_START: int = 6
 N_MOVE_ACTIONS: int = MAX_MOVES

@@ -20,10 +20,12 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
+from env.states.gen1.battle_state_gen_1 import BattleStateGen1
+from env.states.state_utils import MAX_TEAM_SIZE
 from .attention import CrossAttention
 from .constants import (
-    CONTEXT_LEN, MOVE_LEN, MAX_MOVES, MY_ACTIVE_LEN,
-    MY_ACTIVE_START, MY_MOVES_START, N_SWITCH_ACTIONS
+    CONTEXT_LEN, MOVE_LEN, MAX_MOVES, MY_POKEMON_LEN, ARENA_OPPONENT_LEN, MY_MOVES_START,
+    N_SWITCH_ACTIONS,
 )
 from .mlp import build_mlp
 
@@ -55,7 +57,7 @@ class AttentionPointerExtractor(nn.Module):
 
         self.context_encoder    = build_mlp(CONTEXT_LEN, context_hidden, context_hidden)
         self.move_encoder       = build_mlp(MOVE_LEN, move_hidden, move_hidden)
-        self.team_encoder       = build_mlp(MY_ACTIVE_LEN, team_hidden, team_hidden)
+        self.team_encoder       = build_mlp(MY_POKEMON_LEN, team_hidden, team_hidden)
         
         self.attn_moves = CrossAttention(context_hidden, move_hidden, n_attention_heads)
         self.attn_team  = CrossAttention(context_hidden, team_hidden, n_attention_heads)
@@ -84,6 +86,46 @@ class AttentionPointerExtractor(nn.Module):
     def forward_critic(self, features: torch.Tensor) -> torch.Tensor:
         return features
 
+    def _slice_observation(self, obs: torch.Tensor):
+        arena_opponent_vector = obs[:, :ARENA_OPPONENT_LEN]
+        my_pokemon_vector = obs[:, ARENA_OPPONENT_LEN:-MAX_TEAM_SIZE]
+        alive_vector = obs[:, -MAX_TEAM_SIZE:]
+
+        sections = torch.split(my_pokemon_vector, MY_POKEMON_LEN, dim=1)
+        assert len(sections) == MAX_TEAM_SIZE, (
+            f"Expected {MAX_TEAM_SIZE} team slots, got {len(sections)}"
+        )
+
+        B = obs.shape[0]
+
+        my_team_slots = []
+        battle_context = torch.zeros(B, CONTEXT_LEN, device=obs.device, dtype=obs.dtype)
+
+        moves_len = sections[0].shape[1] - MY_MOVES_START
+        my_moves_flat = torch.zeros(B, moves_len, device=obs.device, dtype=obs.dtype)
+
+        for slot in range(MAX_TEAM_SIZE):
+            slot_alive = alive_vector[:, slot]  # (B,)
+            section = sections[slot]
+
+            is_active = slot_alive == 1
+            is_fainted = slot_alive == -1
+
+            if is_active.any():
+                battle_context[is_active] = torch.cat(
+                    [arena_opponent_vector[is_active], section[is_active]], dim=1
+                )
+                my_moves_flat[is_active] = section[is_active, MY_MOVES_START:]
+
+            slot_tensor = section.clone()
+            slot_tensor[is_fainted] = 0  # zero-out fainted
+
+            my_team_slots.append(slot_tensor)
+
+        my_team_flat = torch.stack(my_team_slots, dim=1)
+
+        return battle_context, my_moves_flat, my_team_flat
+
     def forward(self, obs: torch.Tensor) -> torch.Tensor:
         """
         obs     : (batch_size, OBS_SIZE)
@@ -91,14 +133,7 @@ class AttentionPointerExtractor(nn.Module):
         """
         # 1. Slice observation ──────────────────────────────────────────
         # Context: arena + all opp (excluding bench moves) + my active (including moves)
-        battle_context  = obs[:, :CONTEXT_LEN]
-        
-        # My moves come last in context
-        my_moves_flat   = obs[:, MY_MOVES_START:CONTEXT_LEN]
-
-        # my_bench starts after my active
-        # Each bench entry is MY_ACTIVE_LEN (pokemon + 4 moves) = 162
-        my_team_flat = obs[:, MY_ACTIVE_START:] # (B, 810) = 5 bench slots × 162 dims each
+        battle_context, my_moves_flat, my_team_flat = self._slice_observation(obs)
         
         # 2. Encode context ─────────────────────────────────────────────
         context_hidden = self.context_encoder(battle_context)  # (B, context_hidden)
@@ -113,10 +148,10 @@ class AttentionPointerExtractor(nn.Module):
         is_padding_moves = (my_moves.abs().sum(dim=-1) == 0)   # (B, 4)
 
         # 4. Encode team: active (1) + bench (5) = 6 total ─────────────
-        team = my_team_flat.reshape(batch_size, N_SWITCH_ACTIONS, MY_ACTIVE_LEN)
+        team = my_team_flat.reshape(batch_size, N_SWITCH_ACTIONS, MY_POKEMON_LEN)
         
         team_hidden = self.team_encoder(
-            team.reshape(batch_size * N_SWITCH_ACTIONS, MY_ACTIVE_LEN)
+            team.reshape(batch_size * N_SWITCH_ACTIONS, MY_POKEMON_LEN)
         ).reshape(batch_size, N_SWITCH_ACTIONS, -1)  # (B, 6, team_hidden)
 
         is_padding_team = (team.abs().sum(dim=-1) == 0)  # (B, 6)

@@ -58,11 +58,11 @@ class TeamState:
 
     def array_len(self) -> int:
         """Expected total flat vector length."""
-        return self._slot_len * self.max_size # + self.max_size
+        return self._slot_len * self.max_size  + self.max_size
 
     @classmethod
     def compute_array_len(cls, state_cls: type[PokemonState], max_size: int = MAX_TEAM_SIZE) -> int:
-        return state_cls.array_len() * max_size # + max_size
+        return state_cls.array_len() * max_size  + max_size
 
     # ------------------------------------------------------------------
     # Helpers

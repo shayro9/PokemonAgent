@@ -159,11 +159,9 @@ class TestBattleStateArrayLenFormula(unittest.TestCase):
     def test_equals_exact_sum_of_parts(self):
         expected = (
                 ArenaStateGen1.array_len()
-                + OpponentPokemonStateGen1.array_len()                               # opp_active (no moves)
                 + MoveState.array_len() * MAX_MOVES                                  # opp_moves
-                + TeamState.compute_array_len(OpponentPokemonStateGen1, 5)  # opp_bench (5 slots, no moves)
-                + MyPokemonStateGen1.array_len()                                     # my_active
-                + TeamState.compute_array_len(MyPokemonStateGen1, 5)        # my_bench (5 slots, no moves)
+                + TeamState.compute_array_len(OpponentPokemonStateGen1, 6)  # opp_bench (5 slots, no moves)
+                + TeamState.compute_array_len(MyPokemonStateGen1, 6)        # my_bench (5 slots, no moves)
         )
         self.assertEqual(BattleStateGen1.array_len(), expected)
 
@@ -213,28 +211,12 @@ class TestBattleStateBench(unittest.TestCase):
         )
         self.bs = BattleStateGen1(self.battle)
 
-    def test_my_active_not_in_my_bench(self):
-        active_species = self.battle.active_pokemon.species
-        bench_species  = {p.species for p in self.bs.my_bench}
-        self.assertNotIn(active_species, bench_species)
-
-    def test_opp_active_not_in_opp_bench(self):
-        opp_active_species = self.battle.opponent_active_pokemon.species
-        bench_species      = {p.species for p in self.bs.opp_bench}
-        self.assertNotIn(opp_active_species, bench_species)
-
     def test_my_bench_size(self):
-        # 3-member team, 1 active → 2 on bench
-        self.assertEqual(len(self.bs.my_bench), 2)
+        self.assertEqual(len(self.bs.my_bench), 3)
 
     def test_opp_bench_size(self):
-        # 2-member opp team, 1 active → 1 on bench
-        self.assertEqual(len(self.bs.opp_bench), 1)
+        self.assertEqual(len(self.bs.opp_bench), 2)
 
-    def test_opp_bench_empty_when_solo_pokemon(self):
-        battle = make_battle_mock(opp_team_species=["blastoise"])
-        bs = BattleStateGen1(battle)
-        self.assertEqual(len(bs.opp_bench), 0)
 
 
 # ---------------------------------------------------------------------------
