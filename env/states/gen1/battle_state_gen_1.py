@@ -34,7 +34,7 @@ class BattleStateGen1:
         self.my_active : Pokemon = battle.active_pokemon
         self.opp_active: Pokemon = battle.opponent_active_pokemon
 
-        # --- Bench (excluding active) ---
+        # --- Bench (including active) ---
         active_species = battle.active_pokemon.species
         opp_active_species = battle.opponent_active_pokemon.species
 
