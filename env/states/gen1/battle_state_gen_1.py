@@ -18,18 +18,9 @@ class BattleStateGen1:
     Layout of ``to_array()``
     ------------------------
         arena_state        (ArenaState.array_len)
-        my_active          (MyPokemonState.array_len + 4×MoveState.array_len — active + its moves)
-        opp_active         (OpponentPokemonState.array_len)
-        my_bench_encoded   (5 × (MyPokemonState.array_len + 4×MoveState.array_len) — benched Pokémon + moves)
-        opp_bench_encoded  (5 × OpponentPokemonState.array_len — benched Pokémon only)
         opp_moves          (MAX_MOVES × MoveState.array_len)
-        my_moves           (MAX_MOVES × MoveState.array_len — active pokemon's available moves)
-
-    Encoding note:
-    - my_active includes the active Pokémon's 4 moves (known to the agent)
-    - my_bench_encoded includes each benched Pokémon paired with their 4 moves
-    - Bench order follows action mask correspondence (sorted by species for determinism)
-    - Empty slots are zero-padded
+        opp_bench_encoded  (5 × OpponentPokemonState.array_len — benched Pokémon only)
+        my_bench_encoded   (5 × (MyPokemonState.array_len + 4×MoveState.array_len) — benched Pokémon + moves)
     """
 
     GEN: int = 1
