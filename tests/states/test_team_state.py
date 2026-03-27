@@ -468,14 +468,6 @@ class TestOpponentPokemonStateGen1Integration:
         for member in team.members:
             assert member.array_len() == expected
 
-    def test_opponent_has_larger_slot_than_agent(self):
-        """Opponent encodes extra fields (preparing, recharge, protect)."""
-        if _skip_if_unavailable():
-            return
-        my_team  = make_team(make_pokemons(1), MyPokemonStateGen1,       max_size=1)
-        opp_team = make_team(make_pokemons(1), OpponentPokemonStateGen1, max_size=1)
-        assert opp_team._slot_len > my_team._slot_len
-
     def test_partial_team_padded_correctly(self):
         if _skip_if_unavailable():
             return

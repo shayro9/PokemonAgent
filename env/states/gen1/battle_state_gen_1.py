@@ -52,10 +52,6 @@ class BattleStateGen1:
         self.opp_bench: list[Pokemon] = [p for p in battle.opponent_team.values()
                          if p.species != opp_active_species]
 
-        # Sort bench for deterministic ordering (required for action correspondence)
-        self.my_bench.sort(key=lambda p: p.species)
-        self.opp_bench.sort(key=lambda p: p.species)
-
         self.my_available_moves: list[Move] = battle.available_moves
         self.opp_moves: list[Move] = list(battle.opponent_active_pokemon.moves.values())
 
@@ -65,8 +61,8 @@ class BattleStateGen1:
         self.my_active_state    : MyPokemonStateGen1      = MyPokemonStateGen1(self.my_active)
         self.opp_active_state   : OpponentPokemonStateGen1 = OpponentPokemonStateGen1(self.opp_active)
         # Bench: 5 slots (excluding active)
-        self.my_bench_state  : TeamState = TeamState(self.my_bench , MyPokemonStateGen1      , 5)
-        self.opp_bench_state : TeamState = TeamState(self.opp_bench, OpponentPokemonStateGen1, 5)
+        self.my_bench_state  : TeamState = TeamState(self.my_bench , MyPokemonStateGen1      , self.MAX_TEAM_SIZE - 1)
+        self.opp_bench_state : TeamState = TeamState(self.opp_bench, OpponentPokemonStateGen1, self.MAX_TEAM_SIZE - 1)
         # Moves
         self.opp_moves_state: list[MoveState]  = self._encode_moves(self.opp_moves         , self.opp_active, self.my_active)
         self.my_moves_state : list[MoveState]  = self._encode_moves(self.my_available_moves, self.my_active , self.opp_active)
@@ -87,37 +83,16 @@ class BattleStateGen1:
 
     def to_array(self) -> np.ndarray:
         """Return the full flat float32 feature vector for this turn."""
-        # Active pokemon + its moves
-        my_active_with_moves = np.concatenate([
-            self.my_active_state.to_array(),
-            np.concatenate([m.to_array() for m in self.my_moves_state]),
-        ])
-        
-        # Bench pokemon: each with their 4 moves (zero-padded for empty slots)
-        my_bench_with_moves_list = []
-        for pokemon in self.my_bench:
-            pokemon_moves = [MoveState(m, self.opp_active.types, pokemon.types, self.GEN) if m else None 
-                           for m in list(pokemon.moves.values()) + [None] * MAX_MOVES]
-            pokemon_moves = pokemon_moves[:MAX_MOVES]
-            my_bench_with_moves_list.append(np.concatenate([
-                MyPokemonStateGen1(pokemon).to_array(),
-                np.concatenate([m.to_array() for m in pokemon_moves]),
-            ]))
-        
-        # Pad bench to 5 slots if needed
-        while len(my_bench_with_moves_list) < 5:
-            my_bench_with_moves_list.append(
-                np.zeros(MyPokemonStateGen1.array_len() + MAX_MOVES * MoveState.array_len(), dtype=np.float32)
-            )
-        
+        self.my_bench_state.encode_moves(self.opp_active, gen=self.GEN)
+        self.my_active_state.encode_moves(self.opp_active, gen=self.GEN, available_moves=self.my_available_moves)
+
         arr = np.concatenate([
             self.arena_state.to_array(),
-            my_active_with_moves,
             self.opp_active_state.to_array(),
-            np.concatenate(my_bench_with_moves_list),
-            self.opp_bench_state.to_array(),
             np.concatenate([m.to_array() for m in self.opp_moves_state]),
-            np.concatenate([m.to_array() for m in self.my_moves_state]),
+            self.opp_bench_state.to_array(),
+            self.my_active_state.to_array(),
+            self.my_bench_state.to_array(),
         ]).astype(np.float32)
 
         assert len(arr) == self.array_len(), (
@@ -128,38 +103,27 @@ class BattleStateGen1:
     @classmethod
     def array_len(cls) -> int:
         """Expected flat vector length (static after construction)."""
-        from env.states.gen1.my_pokemon_state_gen_1 import MyPokemonStateGen1
-        from env.states.gen1.opponent_pokemon_state_gen_1 import OpponentPokemonStateGen1
-        
         # Each my team member (active + 5 bench) includes their 4 moves
-        my_team_member_len = MyPokemonStateGen1.array_len() + MAX_MOVES * MoveState.array_len()
-        
         return (
-                ArenaStateGen1.array_len()
-                + my_team_member_len                # my_active + its 4 moves
-                + OpponentPokemonStateGen1.array_len()       # opp_active (no moves)
-                + my_team_member_len * 5            # my_bench (5 slots × pokemon+moves)
-                + TeamState.compute_array_len(OpponentPokemonStateGen1, 5)  # opp_bench (5 slots, no moves)
-                + MoveState.array_len() * MAX_MOVES          # opp_moves
-                + MoveState.array_len() * MAX_MOVES          # my_moves (active pokemon's available moves)
+                ArenaStateGen1.array_len()                                          # arena_state
+                + OpponentPokemonStateGen1.array_len()                              # opp_active (no moves)
+                + MoveState.array_len() * MAX_MOVES                                 # opp_moves
+                + TeamState.compute_array_len(OpponentPokemonStateGen1, 5) # opp_bench (5 slots, no moves)
+                + MyPokemonStateGen1.array_len()                                    # my_active + moves
+                + TeamState.compute_array_len(MyPokemonStateGen1, 5)       # my_bench (5 slots × pokemon+moves)
         )
+
 
     @classmethod
     def battle_context_len(cls) -> int:
         """Length of context (everything except my_moves) for policy slicing."""
-        from env.states.gen1.my_pokemon_state_gen_1 import MyPokemonStateGen1
-        from env.states.gen1.opponent_pokemon_state_gen_1 import OpponentPokemonStateGen1
-        
-        # Each my team member (active + 5 bench) includes their 4 moves
-        my_team_member_len = MyPokemonStateGen1.array_len() + MAX_MOVES * MoveState.array_len()
-        
+
         return (
-                ArenaStateGen1.array_len()
-                + my_team_member_len                # my_active + its 4 moves
-                + OpponentPokemonStateGen1.array_len()       # opp_active (no moves)
-                + my_team_member_len * 5            # my_bench (5 slots × pokemon+moves)
-                + TeamState.compute_array_len(OpponentPokemonStateGen1, 5)  # opp_bench (5 slots, no moves)
-                + MoveState.array_len() * MAX_MOVES          # opp_moves
+                ArenaStateGen1.array_len()                                                  # arena
+                + OpponentPokemonStateGen1.array_len()                                      # opp_active (no moves)
+                + MoveState.array_len() * MAX_MOVES                                         # opp_moves
+                + TeamState.compute_array_len(OpponentPokemonStateGen1, MAX_TEAM_SIZE - 1)  # opp_bench (5 slots, no moves)
+                + MyPokemonStateGen1.array_len()                                            # my_active
         )
 
     # ------------------------------------------------------------------
@@ -174,9 +138,9 @@ class BattleStateGen1:
             "=== BattleState ===",
             self.arena_state.describe(),
             "--- My Bench ---",
-            self.my_team_state.describe(),
+            self.my_bench_state.describe(),
             "--- Opp Bench ---",
-            self.opp_team_state.describe(),
+            self.opp_bench_state.describe(),
             "--- Moves ---",
             move_lines,
             f"Total array length : {self.array_len()}",

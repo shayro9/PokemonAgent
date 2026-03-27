@@ -81,6 +81,10 @@ class TeamState:
         vec[:len(self.members)] = [status(p) for p in self.members]
         return vec
 
+    def encode_moves(self, defending_pokemon: Pokemon, gen:int = 1):
+        for m in self.members:
+            m.encode_moves(defending_pokemon, gen)
+
     def get_active(self):
         return next((m for m in self.members if m.active), None)
 
