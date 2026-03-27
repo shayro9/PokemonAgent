@@ -3,11 +3,11 @@ AttentionPointerExtractor — observation → trunk features.
 
 Pipeline
 --------
-1. Slice observation into: context (excl my_moves) | my_moves | extract my_team (active+bench)
+1. Slice observation into: context  | my_moves | my_team
 2. Encode context → ctx_h
 3. Encode my_moves (shared weights, equivariant) → move_h (B, 4, move_hidden)
-4. Encode my_team = [active] + [bench (5)] where each member = pokemon_state + 4*move_state
-   → team_h (B, 6, team_hidden), using shared encoder
+4. Encode my_team = where each member = pokemon_state + 4*move_state
+   → team_h (B, 6, team_hidden)
 5. Cross-attend: context → moves → attended_moves
 6. Cross-attend: context → team → attended_team  
 7. Trunk([ctx_h || attended_moves || attended_team]) → features
