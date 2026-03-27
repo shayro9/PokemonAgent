@@ -1,6 +1,5 @@
 from weakref import WeakKeyDictionary
 
-import logging
 import numpy as np
 import gymnasium as gym
 from poke_env.battle import AbstractBattle
