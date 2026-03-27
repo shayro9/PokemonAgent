@@ -30,19 +30,13 @@ CONTEXT_LEN: int = BattleStateGen1.battle_context_len()
 
 # Slicing constants for observation layout
 ARENA_LEN: int = 5
-ARENA_START: int = 0
-
-MY_ACTIVE_LEN: int = MyPokemonStateGen1.array_len() + MAX_MOVES * MOVE_LEN  # 22 + 140 = 162
-MY_ACTIVE_START: int = ARENA_START + ARENA_LEN
-
+MY_ACTIVE_LEN: int  = MyPokemonStateGen1.array_len() # 22 + 140 = 162
 OPP_ACTIVE_LEN: int = OpponentPokemonStateGen1.array_len()
-OPP_ACTIVE_START: int = MY_ACTIVE_START + MY_ACTIVE_LEN
+MY_BENCH_LEN: int   = MY_ACTIVE_LEN * 5  # 162 * 5 = 810 (5 bench slots × pokemon+moves)
+OPP_BENCH_LEN: int  = OPP_ACTIVE_LEN * 5 + 5  # 5 bench slots + alive_vector (no moves for opponent)
 
-MY_BENCH_LEN: int = MY_ACTIVE_LEN * 5  # 162 * 5 = 810 (5 bench slots × pokemon+moves)
-MY_BENCH_START: int = OPP_ACTIVE_START + OPP_ACTIVE_LEN
-
-OPP_BENCH_LEN: int = OPP_ACTIVE_LEN * 5 + 5  # 5 bench slots + alive_vector (no moves for opponent)
-OPP_BENCH_START: int = MY_BENCH_START + MY_BENCH_LEN
+MY_MOVES_START = CONTEXT_LEN - MOVE_LEN * MAX_MOVES
+MY_ACTIVE_START = CONTEXT_LEN - MY_ACTIVE_LEN
 
 # ── Action space ───────────────────────────────────────────────────────────
 MOVE_ACTION_START: int = 6

@@ -22,8 +22,8 @@ import torch.nn as nn
 
 from .attention import CrossAttention
 from .constants import (
-    CONTEXT_LEN, MOVE_LEN, MAX_MOVES,
-    MY_ACTIVE_LEN, MY_ACTIVE_START
+    CONTEXT_LEN, MOVE_LEN, MAX_MOVES, MY_ACTIVE_LEN,
+    MY_ACTIVE_START, MY_MOVES_START, N_SWITCH_ACTIONS
 )
 from .mlp import build_mlp
 
@@ -53,13 +53,12 @@ class AttentionPointerExtractor(nn.Module):
     ) -> None:
         super().__init__()
 
-        self.context_encoder = build_mlp(CONTEXT_LEN, context_hidden, context_hidden)
-        self.move_encoder = build_mlp(MOVE_LEN, move_hidden, move_hidden)
-        # Team encoder takes pokemon_state + 4*move_state as input
-        self.team_encoder = build_mlp(MY_ACTIVE_LEN, team_hidden, team_hidden)
+        self.context_encoder    = build_mlp(CONTEXT_LEN, context_hidden, context_hidden)
+        self.move_encoder       = build_mlp(MOVE_LEN, move_hidden, move_hidden)
+        self.team_encoder       = build_mlp(MY_ACTIVE_LEN, team_hidden, team_hidden)
         
         self.attn_moves = CrossAttention(context_hidden, move_hidden, n_attention_heads)
-        self.attn_team = CrossAttention(context_hidden, team_hidden, n_attention_heads)
+        self.attn_team  = CrossAttention(context_hidden, team_hidden, n_attention_heads)
         
         self.trunk = build_mlp(
             context_hidden + move_hidden + team_hidden,
@@ -74,7 +73,7 @@ class AttentionPointerExtractor(nn.Module):
         self.attn_scores_team: Optional[torch.Tensor] = None  # (B, n_heads, 6)
 
         # Required by SB3's MaskableActorCriticPolicy._build()
-        self.features_dim = trunk_hidden
+        self.features_dim  = trunk_hidden
         self.latent_dim_pi = trunk_hidden
         self.latent_dim_vf = trunk_hidden
 
@@ -91,21 +90,15 @@ class AttentionPointerExtractor(nn.Module):
         returns : (batch_size, trunk_hidden)
         """
         # 1. Slice observation ──────────────────────────────────────────
-        # Context: everything except my_moves
+        # Context: arena + all opp (excluding bench moves) + my active (including moves)
         battle_context  = obs[:, :CONTEXT_LEN]
         
-        # My moves come after context (active pokemon's available moves only)
-        my_moves_flat   = obs[:, CONTEXT_LEN:CONTEXT_LEN + MAX_MOVES * MOVE_LEN]
-        
-        # Extract my_active and my_bench for team encoding
-        # my_active (pokemon + 4 moves) is at MY_ACTIVE_START:MY_ACTIVE_START+MY_ACTIVE_LEN in context
-        my_active_in_context = obs[:, MY_ACTIVE_START:MY_ACTIVE_START + MY_ACTIVE_LEN]
-        
-        # my_bench starts after arena + my_active + opp_active
+        # My moves come last in context
+        my_moves_flat   = obs[:, MY_MOVES_START:CONTEXT_LEN]
+
+        # my_bench starts after my active
         # Each bench entry is MY_ACTIVE_LEN (pokemon + 4 moves) = 162
-        my_bench_start_in_context = 5 + MY_ACTIVE_LEN + 25  # arena + my_active + opp_active
-        my_bench_len = MY_ACTIVE_LEN * 5  # 5 bench slots
-        my_bench_flat = battle_context[:, my_bench_start_in_context:my_bench_start_in_context + my_bench_len]
+        my_team_flat = obs[:, MY_ACTIVE_START:] # (B, 810) = 5 bench slots × 162 dims each
         
         # 2. Encode context ─────────────────────────────────────────────
         context_hidden = self.context_encoder(battle_context)  # (B, context_hidden)
@@ -120,14 +113,11 @@ class AttentionPointerExtractor(nn.Module):
         is_padding_moves = (my_moves.abs().sum(dim=-1) == 0)   # (B, 4)
 
         # 4. Encode team: active (1) + bench (5) = 6 total ─────────────
-        # Each team slot is pokemon_state + 4*move_state = MY_ACTIVE_LEN
-        team_flat = torch.cat([my_active_in_context, my_bench_flat], dim=1)  # (B, 6*MY_ACTIVE_LEN)
-        n_team_slots = 6
-        team = team_flat.reshape(batch_size, n_team_slots, MY_ACTIVE_LEN)
+        team = my_team_flat.reshape(batch_size, N_SWITCH_ACTIONS, MY_ACTIVE_LEN)
         
         team_hidden = self.team_encoder(
-            team.reshape(batch_size * n_team_slots, MY_ACTIVE_LEN)
-        ).reshape(batch_size, n_team_slots, -1)  # (B, 6, team_hidden)
+            team.reshape(batch_size * N_SWITCH_ACTIONS, MY_ACTIVE_LEN)
+        ).reshape(batch_size, N_SWITCH_ACTIONS, -1)  # (B, 6, team_hidden)
 
         is_padding_team = (team.abs().sum(dim=-1) == 0)  # (B, 6)
 
