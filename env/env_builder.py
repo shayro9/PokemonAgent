@@ -53,7 +53,7 @@ def build_env(
 
     unique_id = int(time.time() * 1000) % 100000
 
-    opponent_policy = SimpleHeuristicsPlayer(
+    opponent_policy = MaxBasePowerPlayer(
         battle_format=battle_format,
         server_configuration=LocalhostServerConfiguration,
     )

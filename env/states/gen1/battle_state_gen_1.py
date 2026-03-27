@@ -47,8 +47,7 @@ class BattleStateGen1:
         active_species = battle.active_pokemon.species
         opp_active_species = battle.opponent_active_pokemon.species
 
-        self.my_bench: list[Pokemon] = [p for p in battle.team.values()
-                        if p.species != active_species]
+        self.my_bench: list[Pokemon] = list(battle.team.values())
         self.opp_bench: list[Pokemon] = [p for p in battle.opponent_team.values()
                          if p.species != opp_active_species]
 
@@ -58,10 +57,9 @@ class BattleStateGen1:
         #-------- States --------
         self.arena_state    : ArenaStateGen1 = ArenaStateGen1(self.battle)
         # Active Pokémon separately
-        self.my_active_state    : MyPokemonStateGen1      = MyPokemonStateGen1(self.my_active)
         self.opp_active_state   : OpponentPokemonStateGen1 = OpponentPokemonStateGen1(self.opp_active)
         # Bench: 5 slots (excluding active)
-        self.my_bench_state  : TeamState = TeamState(self.my_bench , MyPokemonStateGen1      , self.MAX_TEAM_SIZE - 1)
+        self.my_bench_state  : TeamState = TeamState(self.my_bench , MyPokemonStateGen1      , self.MAX_TEAM_SIZE)
         self.opp_bench_state : TeamState = TeamState(self.opp_bench, OpponentPokemonStateGen1, self.MAX_TEAM_SIZE - 1)
         # Moves
         self.opp_moves_state: list[MoveState]  = self._encode_moves(self.opp_moves         , self.opp_active, self.my_active)
@@ -83,15 +81,13 @@ class BattleStateGen1:
 
     def to_array(self) -> np.ndarray:
         """Return the full flat float32 feature vector for this turn."""
-        self.my_bench_state.encode_moves(self.opp_active, gen=self.GEN)
-        self.my_active_state.encode_moves(self.opp_active, gen=self.GEN, available_moves=self.my_available_moves)
+        self.my_bench_state.encode_moves(self.opp_active, gen=self.GEN, available_moves=self.my_available_moves)
 
         arr = np.concatenate([
             self.arena_state.to_array(),
             self.opp_active_state.to_array(),
             np.concatenate([m.to_array() for m in self.opp_moves_state]),
             self.opp_bench_state.to_array(),
-            self.my_active_state.to_array(),
             self.my_bench_state.to_array(),
         ]).astype(np.float32)
 

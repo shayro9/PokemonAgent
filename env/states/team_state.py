@@ -34,7 +34,6 @@ class TeamState:
         :param max_size:  Maximum number of slots (default 6).
         """
         self.max_size = max_size
-        pokemons.sort(key=lambda p: p.species)
         self.members: list[PokemonState] = ([state_cls(p) for p in pokemons[:max_size]]
                                           + [state_cls(None) for _ in range(max_size - len(pokemons[:max_size]))])
         self.alive_vector = self.encode_active_and_faint()
@@ -59,11 +58,11 @@ class TeamState:
 
     def array_len(self) -> int:
         """Expected total flat vector length."""
-        return self._slot_len * self.max_size + self.max_size
+        return self._slot_len * self.max_size # + self.max_size
 
     @classmethod
     def compute_array_len(cls, state_cls: type[PokemonState], max_size: int = MAX_TEAM_SIZE) -> int:
-        return state_cls.array_len() * max_size + max_size
+        return state_cls.array_len() * max_size # + max_size
 
     # ------------------------------------------------------------------
     # Helpers
@@ -81,9 +80,9 @@ class TeamState:
         vec[:len(self.members)] = [status(p) for p in self.members]
         return vec
 
-    def encode_moves(self, defending_pokemon: Pokemon, gen:int = 1):
+    def encode_moves(self, defending_pokemon: Pokemon, gen:int = 1, available_moves: list = None):
         for m in self.members:
-            m.encode_moves(defending_pokemon, gen)
+            m.encode_moves(defending_pokemon, gen, available_moves if m.active else None)
 
     def get_active(self):
         return next((m for m in self.members if m.active), None)
