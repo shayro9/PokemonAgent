@@ -22,7 +22,6 @@ class MoveState:
         opp_types,
         my_types,
         gen: int,
-        # damage_fraction: float = 0.0,
     ):
         # Multi-hit bounds — 0 when no move, 1 as fallback for unknown n_hit on a real move
         if move is None:

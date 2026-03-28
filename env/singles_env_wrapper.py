@@ -8,6 +8,7 @@ from poke_env.environment import SinglesEnv
 from env.states.gen1.battle_state_gen_1 import BattleStateGen1
 from env.action_mask_gen_1 import ActionMaskGen1
 from env.reward import get_state_value
+from teams.generators import InfinitePoolGenerator
 
 def print_state(battle, *, prefix="[PokemonRLWrapper]") -> str:
     """Render and print a human-readable battle state snapshot.
@@ -26,9 +27,9 @@ class PokemonRLWrapper(SinglesEnv):
             self,
             *,
             rounds_per_opponents: int = 2_000,
-            battle_team_generator=None,
-            agent_team_generator=None,
-            opponent_team_generator=None,
+            battle_team_generator: InfinitePoolGenerator | None = None,
+            agent_team_generator: InfinitePoolGenerator | None = None,
+            opponent_team_generator: InfinitePoolGenerator | None = None,
             **kwargs,
     ):
         super().__init__(**kwargs)
@@ -78,7 +79,10 @@ class PokemonRLWrapper(SinglesEnv):
 
         try:
             return super().action_to_order(canonical_action, battle, fake, strict)
-        except ValueError:
+        except ValueError as e:
+            print(BattleStateGen1(battle).describe())
+            print(mask)
+            print(f"Error converting action {canonical_action} to order: {e}")
             return super().action_to_order(canonical_action, battle, fake, strict=False)
 
     def action_masks(self) -> np.ndarray:

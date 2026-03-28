@@ -28,7 +28,7 @@ from poke_env import (
     LocalhostServerConfiguration,
     AccountConfiguration,
     RandomPlayer,
-    MaxBasePowerPlayer,
+    MaxBasePowerPlayer, SimpleHeuristicsPlayer,
 )
 
 from env.singles_env_wrapper import PokemonRLWrapper
@@ -36,7 +36,7 @@ from agents.policy_player import PolicyPlayer
 from teams.generators import matchup_generator
 from data.prossesing import load_pool
 
-AGENT_CHOICES = ["policy", "random", "max-power"]
+AGENT_CHOICES = ["policy", "random", "max-power", "heuristic"]
 DEFAULT_FORMAT = "gen1ou"
 DEFAULT_DATA_PATH = "data/matchups_gen1ou_db.json"
 
@@ -169,7 +169,6 @@ async def main():
         wrapper = PokemonRLWrapper(
             battle_format=args.format,
             team=ai_team,
-            opponent_teams=[],
             server_configuration=LocalhostServerConfiguration,
             account_configuration1=AccountConfiguration(f"{player_name}_env1", None),
             account_configuration2=AccountConfiguration(f"{player_name}_env2", None),
@@ -181,6 +180,8 @@ async def main():
             verbose=verbose,
             **shared,
         )
+    elif args.agent == "heuristic":
+        player = SimpleHeuristicsPlayer(**shared)
     elif args.agent == "random":
         player = RandomPlayer(**shared)
     elif args.agent == "max-power":

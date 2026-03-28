@@ -3,14 +3,16 @@ AttentionPointerExtractor — observation → trunk features.
 
 Pipeline
 --------
-1. Slice flat obs  →  context  +  my_moves (4 x MOVE_EMBED_LEN)
-2. context MLP     →  ctx_h
-3. move MLP (shared weights, permutation-equivariant)  →  move_h  (B, 4, move_hidden)
-4. CrossAttention(ctx_h, move_h)  →  attended
-5. trunk MLP([ctx_h || attended])  →  features  (B, trunk_hidden)
+1. Slice observation into: context  | my_moves | my_team
+2. Encode context → ctx_h
+3. Encode my_moves (shared weights, equivariant) → move_h (B, 4, move_hidden)
+4. Encode my_team = where each member = pokemon_state + 4*move_state
+   → team_h (B, 6, team_hidden)
+5. Cross-attend: context → moves → attended_moves
+6. Cross-attend: context → team → attended_team  
+7. Trunk([ctx_h || attended_moves || attended_team]) → features
 
-`move_hidden` and `attn_scores` are saved as instance attributes so the
-actor head can build pointer logits without a second forward pass.
+Saves move_hidden, team_hidden, attn_scores for policy's _build_logits to consume.
 """
 
 from typing import Optional
@@ -18,21 +20,26 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
+from env.states.gen1.battle_state_gen_1 import BattleStateGen1
+from env.states.state_utils import MAX_TEAM_SIZE
 from .attention import CrossAttention
-from .constants import CONTEXT_LEN, MOVE_LEN, MAX_MOVES
+from .constants import (
+    CONTEXT_LEN, MOVE_LEN, MAX_MOVES, MY_POKEMON_LEN, ARENA_OPPONENT_LEN, MY_MOVES_START,
+    N_SWITCH_ACTIONS,
+)
 from .mlp import build_mlp
 
 
 class AttentionPointerExtractor(nn.Module):
     """
-    Feature extractor with a permutation-equivariant move encoder.
+    Feature extractor with permutation-equivariant move and team (switch) encoders.
 
     Parameters
     ----------
     obs_dim           : total size of the flat observation vector
     context_hidden    : hidden/output size of the context encoder MLP
     move_hidden       : hidden/output size of the move encoder MLP
-                        (also the kv_dim for CrossAttention)
+    team_hidden       : hidden/output size of the team/switch encoder MLP
     trunk_hidden      : output size of the trunk MLP  (= features_dim for SB3)
     n_attention_heads : number of heads in CrossAttention
     """
@@ -42,22 +49,33 @@ class AttentionPointerExtractor(nn.Module):
         obs_dim: int,
         context_hidden: int = 128,
         move_hidden: int = 64,
+        team_hidden: int = 64,
         trunk_hidden: int = 128,
         n_attention_heads: int = 4,
     ) -> None:
         super().__init__()
 
-        self.context_encoder = build_mlp(CONTEXT_LEN, context_hidden, context_hidden)
-        self.move_encoder = build_mlp(MOVE_LEN, move_hidden, move_hidden)
-        self.attn = CrossAttention(context_hidden, move_hidden, n_attention_heads)
-        self.trunk = build_mlp(context_hidden + move_hidden, trunk_hidden, trunk_hidden)
+        self.context_encoder    = build_mlp(CONTEXT_LEN, context_hidden, context_hidden)
+        self.move_encoder       = build_mlp(MOVE_LEN, move_hidden, move_hidden)
+        self.team_encoder       = build_mlp(MY_POKEMON_LEN, team_hidden, team_hidden)
+        
+        self.attn_moves = CrossAttention(context_hidden, move_hidden, n_attention_heads)
+        self.attn_team  = CrossAttention(context_hidden, team_hidden, n_attention_heads)
+        
+        self.trunk = build_mlp(
+            context_hidden + move_hidden + team_hidden,
+            trunk_hidden,
+            trunk_hidden
+        )
 
         # Written during forward(); consumed by AttentionPointerPolicy._build_logits()
-        self.move_hidden: Optional[torch.Tensor] = None   # (B, 4, move_hidden)
-        self.attn_scores: Optional[torch.Tensor] = None   # (B, n_heads, 4)
+        self.move_hidden: Optional[torch.Tensor] = None       # (B, 4, move_hidden)
+        self.team_hidden: Optional[torch.Tensor] = None       # (B, 6, team_hidden)
+        self.attn_scores_moves: Optional[torch.Tensor] = None # (B, n_heads, 4)
+        self.attn_scores_team: Optional[torch.Tensor] = None  # (B, n_heads, 6)
 
         # Required by SB3's MaskableActorCriticPolicy._build()
-        self.features_dim = trunk_hidden
+        self.features_dim  = trunk_hidden
         self.latent_dim_pi = trunk_hidden
         self.latent_dim_vf = trunk_hidden
 
@@ -68,34 +86,91 @@ class AttentionPointerExtractor(nn.Module):
     def forward_critic(self, features: torch.Tensor) -> torch.Tensor:
         return features
 
+    def _slice_observation(self, obs: torch.Tensor):
+        arena_opponent_vector = obs[:, :ARENA_OPPONENT_LEN]
+        my_pokemon_vector = obs[:, ARENA_OPPONENT_LEN:-MAX_TEAM_SIZE]
+        alive_vector = obs[:, -MAX_TEAM_SIZE:]
+
+        sections = torch.split(my_pokemon_vector, MY_POKEMON_LEN, dim=1)
+        assert len(sections) == MAX_TEAM_SIZE, (
+            f"Expected {MAX_TEAM_SIZE} team slots, got {len(sections)}"
+        )
+
+        B = obs.shape[0]
+
+        my_team_slots = []
+        battle_context = torch.zeros(B, CONTEXT_LEN, device=obs.device, dtype=obs.dtype)
+
+        moves_len = sections[0].shape[1] - MY_MOVES_START
+        my_moves_flat = torch.zeros(B, moves_len, device=obs.device, dtype=obs.dtype)
+
+        for slot in range(MAX_TEAM_SIZE):
+            slot_alive = alive_vector[:, slot]  # (B,)
+            section = sections[slot]
+
+            is_active = slot_alive == 1
+            is_fainted = slot_alive == -1
+
+            if is_active.any():
+                battle_context[is_active] = torch.cat(
+                    [arena_opponent_vector[is_active], section[is_active]], dim=1
+                )
+                my_moves_flat[is_active] = section[is_active, MY_MOVES_START:]
+
+            slot_tensor = section.clone()
+            slot_tensor[is_fainted] = 0  # zero-out fainted
+
+            my_team_slots.append(slot_tensor)
+
+        my_team_flat = torch.stack(my_team_slots, dim=1)
+
+        return battle_context, my_moves_flat, my_team_flat
+
     def forward(self, obs: torch.Tensor) -> torch.Tensor:
         """
         obs     : (batch_size, OBS_SIZE)
         returns : (batch_size, trunk_hidden)
         """
-        # 1. Slice ──────────────────────────────────────────────────────
-        battle_context    = obs[:, :CONTEXT_LEN]
-        my_moves_flat = obs[:, CONTEXT_LEN:]
-
+        # 1. Slice observation ──────────────────────────────────────────
+        # Context: arena + all opp (excluding bench moves) + my active (including moves)
+        battle_context, my_moves_flat, my_team_flat = self._slice_observation(obs)
+        
         # 2. Encode context ─────────────────────────────────────────────
-        context_hidden = self.context_encoder(battle_context)                    # (batch_size, context_hidden)
+        context_hidden = self.context_encoder(battle_context)  # (B, context_hidden)
 
         # 3. Encode moves (shared weights → permutation equivariant) ────
         batch_size = my_moves_flat.shape[0]
         my_moves = my_moves_flat.reshape(batch_size, MAX_MOVES, MOVE_LEN)
         move_hidden = self.move_encoder(
             my_moves.reshape(batch_size * MAX_MOVES, MOVE_LEN)
-        ).reshape(batch_size, MAX_MOVES, -1)                              # (batch_size, 4, move_hidden)
+        ).reshape(batch_size, MAX_MOVES, -1)  # (B, 4, move_hidden)
 
-        is_padding = (my_moves.abs().sum(dim=-1) == 0)           # (batch_size, 4)  True = empty slot
+        is_padding_moves = (my_moves.abs().sum(dim=-1) == 0)   # (B, 4)
 
-        # 4. Cross-attention ─────────────────────────────────────────────
-        attended, attn_scores = self.attn(context_hidden, move_hidden, key_padding_mask=is_padding)
+        # 4. Encode team: active (1) + bench (5) = 6 total ─────────────
+        team = my_team_flat.reshape(batch_size, N_SWITCH_ACTIONS, MY_POKEMON_LEN)
+        
+        team_hidden = self.team_encoder(
+            team.reshape(batch_size * N_SWITCH_ACTIONS, MY_POKEMON_LEN)
+        ).reshape(batch_size, N_SWITCH_ACTIONS, -1)  # (B, 6, team_hidden)
 
-        self.move_hidden = move_hidden      # (batch_size, 4, move_hidden)
-        self.attn_scores = attn_scores      # (batch_size, n_heads, 4)
+        is_padding_team = (team.abs().sum(dim=-1) == 0)  # (B, 6)
 
-        # 5. Trunk ───────────────────────────────────────────────────────
-        features = self.trunk(torch.cat([context_hidden, attended], dim=-1))  # (batch_size, trunk_hidden)
+        # 5. Cross-attention ────────────────────────────────────────────
+        attended_moves, attn_scores_moves = self.attn_moves(
+            context_hidden, move_hidden, key_padding_mask=is_padding_moves
+        )
+        attended_team, attn_scores_team = self.attn_team(
+            context_hidden, team_hidden, key_padding_mask=is_padding_team
+        )
+
+        self.move_hidden = move_hidden              # (B, 4, move_hidden)
+        self.team_hidden = team_hidden              # (B, 6, team_hidden)
+        self.attn_scores_moves = attn_scores_moves  # (B, n_heads, 4)
+        self.attn_scores_team = attn_scores_team    # (B, n_heads, 6)
+
+        # 6. Trunk ──────────────────────────────────────────────────────
+        features = self.trunk(
+            torch.cat([context_hidden, attended_moves, attended_team], dim=-1)
+        )  # (B, trunk_hidden)
         return features
-

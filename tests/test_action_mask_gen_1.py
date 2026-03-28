@@ -29,7 +29,9 @@ class MockPokemon:
 def _make_battle_mock(pokemon, available_ids, switch_ids=None, all_team_ids=None):
     battle = MagicMock()
     battle.active_pokemon.moves = pokemon.moves
-    battle.available_moves = pokemon.available(*available_ids)
+
+    # Create available moves independently (important!)
+    battle.available_moves = [_make_move_mock(mid) for mid in available_ids]
 
     # Setup Team/Switches
     all_team_ids = all_team_ids or []
@@ -48,7 +50,7 @@ def _make_battle_mock(pokemon, available_ids, switch_ids=None, all_team_ids=None
 class TestActionMaskGen1(unittest.TestCase):
 
     def setUp(self):
-        self.mask_gen = ActionMaskGen1(allow_switches=True)
+        self.mask_gen = ActionMaskGen1()
 
     def test_constants(self):
         """Verify ranges match the Gen 1 implementation."""
@@ -56,17 +58,19 @@ class TestActionMaskGen1(unittest.TestCase):
         self.assertEqual(list(ActionMaskGen1.ACTION_SWITCH_RANGE), [0, 1, 2, 3, 4, 5])
 
     def test_struggle_fallback(self):
-        """Verify the move_action=True fallback for Struggle [1, 0, 0, 0]."""
-        pkmn = MockPokemon(["tackle"])
-        battle = _make_battle_mock(pkmn, [])  # No moves available
+        """Struggle should appear even if it's not in the moveset."""
+        pkmn = MockPokemon(["tackle", "surf"])  # Real moveset
 
-        # We need to manually ensure _set_mask_range is called with move_action=True
-        # set_mask calls it this way for moves.
+        # But only struggle is available
+        battle = _make_battle_mock(pkmn, ["struggle"])
+
         self.mask_gen.set_mask(battle)
         mask = self.mask_gen.get_mask()
 
-        self.assertTrue(mask[6], "Struggle fallback should enable the first move slot (action 6)")
-        self.assertFalse(mask[7], "Other move slots should remain False")
+        self.assertTrue(mask[6], "Struggle should map to first move slot (action 6)")
+        self.assertFalse(mask[7])
+        self.assertFalse(mask[8])
+        self.assertFalse(mask[9])
 
     def test_switch_masking(self):
         """Verify that switches map to actions 0-5 correctly."""

@@ -1,11 +1,14 @@
 """
-AttentionPointerPolicy — MaskablePPO policy with a pointer head for moves.
+AttentionPointerPolicy — MaskablePPO policy with dual pointer heads for moves and switches.
 
 Move actions (indices 6-9) are scored via:
-    logit_i = dot( pointer_proj(trunk_features), move_hidden_i )
+    logit_i = dot( move_ptr_proj(trunk_features), move_hidden_i )
 
-Non-move actions (indices 0-5, 10-25) are scored by a standard linear head.
-This makes move selection fully order-invariant over the 4 move slots.
+Switch actions (indices 0-5) are scored via:
+    logit_j = dot( switch_ptr_proj(trunk_features), bench_hidden_j )
+
+Other actions (indices 10-25) are scored by a standard linear head.
+This makes move and switch selection fully order-invariant over their respective slots.
 """
 
 from __future__ import annotations
@@ -23,7 +26,7 @@ from sb3_contrib.common.maskable.distributions import (
 from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
 from stable_baselines3.common.type_aliases import PyTorchObs, Schedule
 
-from .constants import MOVE_ACTION_START, N_MOVE_ACTIONS, TOTAL_ACTIONS
+from .constants import MOVE_ACTION_START, N_MOVE_ACTIONS, N_SWITCH_ACTIONS, TOTAL_ACTIONS
 from .extractor import AttentionPointerExtractor
 
 
@@ -44,6 +47,7 @@ class AttentionPointerPolicy(MaskableActorCriticPolicy):
         lr_schedule: Schedule,
         context_hidden: int = 128,
         move_hidden: int = 64,
+        team_hidden: int = 64,
         trunk_hidden: int = 128,
         n_attention_heads: int = 4,
         **kwargs,
@@ -51,6 +55,7 @@ class AttentionPointerPolicy(MaskableActorCriticPolicy):
         self._attn_kwargs = dict(
             context_hidden=context_hidden,
             move_hidden=move_hidden,
+            team_hidden=team_hidden,
             trunk_hidden=trunk_hidden,
             n_attention_heads=n_attention_heads,
         )
@@ -71,12 +76,14 @@ class AttentionPointerPolicy(MaskableActorCriticPolicy):
 
         trunk_hidden = self._attn_kwargs["trunk_hidden"]
         move_hidden  = self._attn_kwargs["move_hidden"]
-        n_non_move   = TOTAL_ACTIONS - N_MOVE_ACTIONS    # 22
+        team_hidden  = self._attn_kwargs["team_hidden"]
+        n_other_action = TOTAL_ACTIONS - N_MOVE_ACTIONS - N_SWITCH_ACTIONS  # 16 (10-25)
 
-        # Pointer projection: trunk → move_hidden space (dot product with move_hidden_i)
-        self.pointer_proj  = nn.Linear(trunk_hidden, move_hidden, bias=False)
-        self.non_move_head = nn.Linear(trunk_hidden, n_non_move)
-        self.value_head    = nn.Linear(trunk_hidden, 1)
+        # Pointer projections: trunk → action_hidden space (dot product with encoded_i)
+        self.move_ptr_proj  = nn.Linear(trunk_hidden, move_hidden, bias=False)
+        self.switch_ptr_proj = nn.Linear(trunk_hidden, team_hidden, bias=False)
+        self.other_action_head = nn.Linear(trunk_hidden, n_other_action)
+        self.value_head     = nn.Linear(trunk_hidden, 1)
 
         # Prevent SB3's default heads from interfering
         self.action_net = nn.Identity()
@@ -110,21 +117,29 @@ class AttentionPointerPolicy(MaskableActorCriticPolicy):
     # ── logit construction ─────────────────────────────────────────────────
 
     def _build_logits(self, features: torch.Tensor) -> torch.Tensor:
-        """Build the full (B, 26) logit vector."""
+        """Build the full (B, 26) logit vector.
+        
+        Action layout: [0-5 switches | 6-9 moves | 10-25 other]
+        """
         # Pointer logits for move slots 0-3
         move_h    = self.mlp_extractor.move_hidden          # (B, 4, move_hidden)
-        ptr_query = self.pointer_proj(features)              # (B, move_hidden)
-        move_logits = torch.einsum("bd,bnd->bn", ptr_query, move_h)  # (B, 4)
+        move_ptr_query = self.move_ptr_proj(features)        # (B, move_hidden)
+        move_logits = torch.einsum("bd,bnd->bn", move_ptr_query, move_h)  # (B, 4)
 
-        # Standard logits for all non-move actions
-        non_move_logits = self.non_move_head(features)       # (B, 22)
+        # Pointer logits for team slots 0-5 (team = active + bench)
+        team_h   = self.mlp_extractor.team_hidden          # (B, 6, team_hidden)
+        switch_ptr_query = self.switch_ptr_proj(features)   # (B, team_hidden)
+        switch_logits = torch.einsum("bd,bnd->bn", switch_ptr_query, team_h)  # (B, 6)
 
-        # Reassemble in action-space order: [0-5 | moves 6-9 | 10-25]
+        # Standard logits for all other actions (10-25, 16 actions)
+        other_action_logits = self.other_action_head(features)  # (B, 16)
+
+        # Reassemble in action-space order: [0-5 switches | 6-9 moves | 10-25 other]
         return torch.cat([
-            non_move_logits[:, :MOVE_ACTION_START],
-            move_logits,
-            non_move_logits[:, MOVE_ACTION_START:],
-        ], dim=-1)                                           # (B, 26)
+            switch_logits,           # 0-5 (6 logits)
+            move_logits,             # 6-9 (4 logits)
+            other_action_logits,     # 10-25 (16 logits)
+        ], dim=-1)                   # (B, 26)
 
     # ── distribution helpers ───────────────────────────────────────────────
 

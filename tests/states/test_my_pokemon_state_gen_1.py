@@ -41,7 +41,7 @@ _BOOSTS_S   = slice(1 + _N_STATS, 1 + _N_STATS + _N_BOOSTS)
 _STATUS_S   = slice(1 + _N_STATS + _N_BOOSTS, 1 + _N_STATS + _N_BOOSTS + _N_STATUSES)
 _EFFECTS_S  = slice(1 + _N_STATS + _N_BOOSTS + _N_STATUSES,
                     1 + _N_STATS + _N_BOOSTS + _N_STATUSES + _N_EFFECTS)
-_STAB_IDX   = -1
+_STAB_IDX   = 1 + _N_STATS + _N_BOOSTS + _N_STATUSES + _N_EFFECTS
 
 
 # ---------------------------------------------------------------------------

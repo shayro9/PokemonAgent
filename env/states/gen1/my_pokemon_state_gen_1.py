@@ -4,7 +4,8 @@ from typing import Optional
 import numpy as np
 from poke_env.battle.pokemon import Pokemon
 
-from env.states.state_utils import STAT_NORM, BOOST_NORM, STAB_NORM, ALL_STATUSES
+from env.states.move_state import MoveState
+from env.states.state_utils import STAT_NORM, BOOST_NORM, STAB_NORM, ALL_STATUSES, MAX_MOVES
 from env.states.pokemon_state import (
     PokemonState
 )
@@ -40,11 +41,12 @@ class MyPokemonStateGen1(PokemonState):
         """
         arr = np.concatenate([
             [self.hp],
-            self.normalize_vector(self.stats, STAT_NORM),  # (len(STAT_KEYS),)
-            self.normalize_vector(self.boosts, BOOST_NORM, symmetric=True),# (len(BOOST_KEYS),)
-            self.status,                              # (len(ALL_STATUSES),)
-            self.effects,                             # (len(TRACKED_EFFECTS),)
-            [self.normalize(self.stab, STAB_NORM)],        # scalar, normalised to match BattleState
+            self.normalize_vector(self.stats, STAT_NORM),                   # (len(STAT_KEYS),)
+            self.normalize_vector(self.boosts, BOOST_NORM, symmetric=True), # (len(BOOST_KEYS),)
+            self.status,                                                    # (len(ALL_STATUSES),)
+            self.effects,                                                   # (len(TRACKED_EFFECTS),)
+            [self.normalize(self.stab, STAB_NORM)],                         # scalar, normalised to match BattleState
+            np.concatenate([m.to_array() for m in self.moves_states]),      # (MAX_MOVES * MoveState.array_len(),)
         ]).astype(np.float32)
 
         assert len(arr) == self.array_len(), (
@@ -60,12 +62,13 @@ class MyPokemonStateGen1(PokemonState):
                     + len(TRACKED_EFFECTS) + 1
         """
         return (
-            1                            # hp
-            + len(cls.STAT_KEYS)        # stats
-            + len(cls.BOOST_KEYS)       # boosts
-            + len(ALL_STATUSES)          # status
-            + len(cls.TRACKED_EFFECTS)  # effects
-            + 1                          # stab
+            1                                   # hp
+            + len(cls.STAT_KEYS)                # stats
+            + len(cls.BOOST_KEYS)               # boosts
+            + len(ALL_STATUSES)                 # status
+            + len(cls.TRACKED_EFFECTS)          # effects
+            + 1                                 # stab
+            + MAX_MOVES * MoveState.array_len() # moves
         )
 
     def describe(self) -> str:
@@ -89,6 +92,7 @@ class MyPokemonStateGen1(PokemonState):
             f"Effects       : {active_effects if active_effects else 'none'}",
             f"STAB          : {self.stab}",
             f"Array length  : {self.array_len()}",
+            f"Moves         : {self.moves.keys()}"
         ]
         return "\n".join(lines)
 

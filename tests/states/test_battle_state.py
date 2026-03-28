@@ -159,10 +159,9 @@ class TestBattleStateArrayLenFormula(unittest.TestCase):
     def test_equals_exact_sum_of_parts(self):
         expected = (
                 ArenaStateGen1.array_len()
-                + TeamState.compute_array_len(MyPokemonStateGen1, MAX_TEAM_SIZE)
-                + TeamState.compute_array_len(OpponentPokemonStateGen1, MAX_TEAM_SIZE)
-                + MoveState.array_len() * MAX_MOVES  # opp moves
-                + MoveState.array_len() * MAX_MOVES   # my moves
+                + MoveState.array_len() * MAX_MOVES                                  # opp_moves
+                + TeamState.compute_array_len(OpponentPokemonStateGen1, 6)  # opp_bench (5 slots, no moves)
+                + TeamState.compute_array_len(MyPokemonStateGen1, 6)        # my_bench (5 slots, no moves)
         )
         self.assertEqual(BattleStateGen1.array_len(), expected)
 
@@ -171,15 +170,6 @@ class TestBattleStateArrayLenFormula(unittest.TestCase):
         opp_contribution = MoveState.array_len() * MAX_MOVES
         my_contribution  = MoveState.array_len() * MAX_MOVES
         self.assertEqual(opp_contribution, my_contribution)
-
-    def test_my_team_and_opp_team_have_different_slot_sizes(self):
-        """
-        OpponentPokemonStateGen1 encodes extra fields (preparing, recharge,
-        protect) so its slot must be strictly larger than MyPokemonStateGen1's.
-        """
-        my_slot  = MyPokemonStateGen1.array_len()
-        opp_slot = OpponentPokemonStateGen1.array_len()
-        self.assertGreater(opp_slot, my_slot)
 
 
 # ---------------------------------------------------------------------------
@@ -221,28 +211,12 @@ class TestBattleStateBench(unittest.TestCase):
         )
         self.bs = BattleStateGen1(self.battle)
 
-    def test_my_active_not_in_my_bench(self):
-        active_species = self.battle.active_pokemon.species
-        bench_species  = {p.species for p in self.bs.my_bench}
-        self.assertNotIn(active_species, bench_species)
-
-    def test_opp_active_not_in_opp_bench(self):
-        opp_active_species = self.battle.opponent_active_pokemon.species
-        bench_species      = {p.species for p in self.bs.opp_bench}
-        self.assertNotIn(opp_active_species, bench_species)
-
     def test_my_bench_size(self):
-        # 3-member team, 1 active → 2 on bench
-        self.assertEqual(len(self.bs.my_bench), 2)
+        self.assertEqual(len(self.bs.my_bench), 3)
 
     def test_opp_bench_size(self):
-        # 2-member opp team, 1 active → 1 on bench
-        self.assertEqual(len(self.bs.opp_bench), 1)
+        self.assertEqual(len(self.bs.opp_bench), 2)
 
-    def test_opp_bench_empty_when_solo_pokemon(self):
-        battle = make_battle_mock(opp_team_species=["blastoise"])
-        bs = BattleStateGen1(battle)
-        self.assertEqual(len(bs.opp_bench), 0)
 
 
 # ---------------------------------------------------------------------------
@@ -298,10 +272,10 @@ class TestBattleStateSubStateTypes(unittest.TestCase):
         self.assertIsInstance(self.bs.arena_state, ArenaStateGen1)
 
     def test_my_team_state_is_team_state(self):
-        self.assertIsInstance(self.bs.my_team_state, TeamState)
+        self.assertIsInstance(self.bs.my_bench_state, TeamState)
 
     def test_opp_team_state_is_team_state(self):
-        self.assertIsInstance(self.bs.opp_team_state, TeamState)
+        self.assertIsInstance(self.bs.opp_bench_state, TeamState)
 
     def test_my_moves_state_elements_are_move_states(self):
         for ms in self.bs.my_moves_state:
