@@ -130,7 +130,7 @@ def benchmark_gradient_computation(policy, obs_space, device, batch_size=256, wa
     
     # Create observations and dummy actions
     obs = np.random.randn(batch_size, obs_space.shape[0]).astype(np.float32)
-    actions = torch.randint(0, 26, (batch_size,))
+    actions = torch.randint(0, 26, (batch_size,), device=device)
     
     optimizer = torch.optim.Adam(policy.parameters(), lr=3e-4)
     
@@ -185,7 +185,7 @@ def benchmark_memory(policy, device, batch_size=256):
         torch.cuda.reset_peak_memory_stats()
         
         # Forward pass
-        obs = np.random.randn(batch_size, 383).astype(np.float32)
+        obs = np.random.randn(batch_size, BattleStateGen1.array_len()).astype(np.float32)
         with torch.no_grad():
             policy.forward(obs)
         
