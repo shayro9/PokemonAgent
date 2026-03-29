@@ -1,4 +1,5 @@
 import numpy as np
+from sympy.codegen.abstract_nodes import List
 
 from env.states.state_utils import MAX_MOVES, MAX_TEAM_SIZE
 
@@ -6,7 +7,7 @@ from env.states.state_utils import MAX_MOVES, MAX_TEAM_SIZE
 class ActionMaskGen1:
 
     ACTION_DEFAULT = -2
-    ACTION_SPACE = 26
+    ACTION_SPACE = 10
     ACTION_MOVE_RANGE = range(6, 10)
     ACTION_SWITCH_RANGE = range(0, 6)
 
@@ -24,6 +25,9 @@ class ActionMaskGen1:
         available_moves = getattr(battle, "available_moves", [])
         all_moves = getattr(battle.active_pokemon, "moves", []).values()
         self._set_mask_range(available_moves, all_moves, self.ACTION_MOVE_RANGE, move_action=True)
+
+    def set(self, mask: list[int]):
+        self.mask = np.array(mask, dtype=bool)
 
     def reset(self):
         self.mask = np.zeros(self.ACTION_SPACE, dtype=bool)

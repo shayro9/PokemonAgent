@@ -2,7 +2,7 @@ from weakref import WeakKeyDictionary
 
 import numpy as np
 import gymnasium as gym
-from poke_env.battle import AbstractBattle
+from poke_env.battle import AbstractBattle, Battle
 from poke_env.environment import SinglesEnv
 
 from env.states.gen1.battle_state_gen_1 import BattleStateGen1
@@ -40,7 +40,7 @@ class PokemonRLWrapper(SinglesEnv):
         self._last_team_update_round = None
         self._last_finished_battle = None
 
-        self._action_space = gym.spaces.Discrete(26)
+        self._action_space = gym.spaces.Discrete(10)
         self.action_spaces = {agent: self._action_space for agent in self.possible_agents}
         self.observation_spaces = {
             agent: gym.spaces.Box(low=-1.0, high=1.0, shape=(BattleStateGen1.array_len(),), dtype=np.float32)
@@ -92,9 +92,10 @@ class PokemonRLWrapper(SinglesEnv):
     # Observation
     # ------------------------------------------------------------------
 
-    def embed_battle(self, battle) -> np.ndarray:
+    def embed_battle(self, battle: Battle) -> np.ndarray:
         if self._is_player_turn(battle):
-            self.action_mask.set_mask(battle)
+            mask = self.get_action_mask(battle)
+            self.action_mask.set(mask)
 
         return BattleStateGen1(battle).to_array()
 
