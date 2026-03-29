@@ -1,7 +1,7 @@
 pytest>=8.0.0
 pytest-cov>=4.0.0
 
-poke_env>=0.12.1
+git+https://github.com/hsahovic/poke-env.git@master
 numpy>=2.4.1
 gymnasium>=1.2.3
 
