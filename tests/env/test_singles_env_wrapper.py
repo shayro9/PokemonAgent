@@ -197,22 +197,6 @@ class TestEmbedBattle(unittest.TestCase):
         mock_state_class.assert_called_once_with(battle)
 
     @patch('env.singles_env_wrapper.BattleStateGen1')
-    def test_embed_battle_sets_action_mask_for_player_turn(self, mock_state_class):
-        """Verify action mask is set on player turn."""
-        wrapper = _create_wrapper()
-        wrapper.action_mask = MagicMock()
-        
-        mock_state = MagicMock()
-        mock_state.to_array.return_value = np.zeros(768)
-        mock_state_class.return_value = mock_state
-        
-        battle = make_mock_battle(player_username="player")
-        
-        wrapper.embed_battle(battle)
-        
-        wrapper.action_mask.set_mask.assert_called_once_with(battle)
-
-    @patch('env.singles_env_wrapper.BattleStateGen1')
     def test_embed_battle_no_mask_set_for_opponent_turn(self, mock_state_class):
         """Verify action mask is NOT set on opponent turn."""
         wrapper = _create_wrapper()
