@@ -40,7 +40,7 @@ class PokemonRLWrapper(SinglesEnv):
         self._last_team_update_round = None
         self._last_finished_battle = None
 
-        self._action_space = gym.spaces.Discrete(26)
+        self._action_space = gym.spaces.Discrete(10)
         self.action_spaces = {agent: self._action_space for agent in self.possible_agents}
         self.observation_spaces = {
             agent: gym.spaces.Box(low=-1.0, high=1.0, shape=(BattleStateGen1.array_len(),), dtype=np.float32)

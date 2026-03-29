@@ -65,7 +65,16 @@ class AttentionPointerPolicy(MaskableActorCriticPolicy):
     # ── extractor ──────────────────────────────────────────────────────────
 
     def _build_mlp_extractor(self) -> None:
-        obs_dim = int(np.prod(self.observation_space.shape))
+        # Handle both Box and Dict observation spaces
+        # Dict space occurs when ActionMasker wraps the environment
+        if isinstance(self.observation_space, spaces.Dict):
+            # Extract the actual observation space from the Dict
+            obs_space = self.observation_space.spaces['observation']
+            obs_dim = int(np.prod(obs_space.shape))
+        else:
+            # Direct Box observation space
+            obs_dim = int(np.prod(self.observation_space.shape))
+        
         self.mlp_extractor = AttentionPointerExtractor(obs_dim, **self._attn_kwargs)
 
     # ── heads ──────────────────────────────────────────────────────────────
@@ -200,7 +209,12 @@ class AttentionPointerPolicy(MaskableActorCriticPolicy):
         features_extractor: Optional[nn.Module] = None,
     ) -> torch.Tensor:
         """Accepts `features_extractor` only for SB3 signature compatibility."""
-        if not isinstance(obs, torch.Tensor):
-            obs = torch.as_tensor(obs, device=self.device)
-        return self.mlp_extractor(obs.float())
+        if isinstance(obs, dict):
+            obs_tensor = obs['observation']
+        else:
+            obs_tensor = obs
+
+        if not isinstance(obs_tensor, torch.Tensor):
+            obs_tensor = torch.as_tensor(obs_tensor, device=self.device)
+        return self.mlp_extractor(obs_tensor.float())
 
