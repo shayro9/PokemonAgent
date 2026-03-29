@@ -7,6 +7,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 from poke_env.environment import SingleAgentWrapper
 
 from env.singles_env_wrapper import PokemonRLWrapper
+from training.train import LOG_FREQ
 
 
 class BattleMetricsCallback(BaseCallback):
@@ -16,11 +17,19 @@ class BattleMetricsCallback(BaseCallback):
         self.log_freq = log_freq
         self._episode_rewards = []
         self._episode_lengths = []
-        self._results = deque(maxlen=100)
+        self._results = deque(maxlen=LOG_FREQ)
+        self._switch_actions = deque(maxlen=LOG_FREQ)
 
     def _on_step(self) -> bool:
         infos = self.locals.get("infos", [{}])
-        for info in infos:
+        actions = self.locals.get("actions", [])
+
+        for i, info in enumerate(infos):
+            # Track raw action values for distribution logging
+            if i < len(actions):
+                action = actions[i]
+                self._switch_actions.append(int(action))
+
             if "episode" in info:
                 self._episode_rewards.append(info["episode"]["r"])
                 self._episode_lengths.append(info["episode"]["l"])
@@ -35,10 +44,18 @@ class BattleMetricsCallback(BaseCallback):
                         self._results.append(0.5)
 
         if self.n_calls % self.log_freq == 0 and self._episode_rewards:
+            action_list = list(self._switch_actions)
+            switch_rate = (
+                sum(1 for a in action_list if 0 <= a <= 3) / len(action_list)
+                if action_list else 0.0
+            )
+
             wandb.log({
                 "win_rate": np.mean(self._results) if self._results else 0.0,
                 "mean_episode_reward": np.mean(self._episode_rewards[-50:]),
                 "mean_episode_length": np.mean(self._episode_lengths[-50:]),
+                "action_distribution": wandb.Histogram(action_list) if action_list else wandb.Histogram([0]),
+                "switch_action_rate": switch_rate,
             }, step=self.num_timesteps)
 
         return True
