@@ -64,5 +64,14 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
     parser.add_argument("--train-generator-seed", type=int, default=None)
     parser.add_argument("--eval-generator-seed", type=int, default=None)
+    
+    # Device configuration
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="auto",
+        choices=["auto", "cuda", "cpu"],
+        help="Device to use: 'auto' (GPU if available, else CPU), 'cuda' (GPU only), 'cpu'"
+    )
 
     return parser

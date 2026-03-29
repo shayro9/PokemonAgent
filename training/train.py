@@ -1,5 +1,7 @@
 import random
 import time
+import numpy as np
+import wandb
 
 from sb3_contrib import MaskablePPO
 from stable_baselines3.common.utils import set_random_seed
@@ -7,6 +9,7 @@ from stable_baselines3.common.callbacks import CallbackList
 from wandb.integration.sb3 import WandbCallback
 
 from policy.policy import AttentionPointerPolicy
+from training.device_config import DeviceConfig
 from .parse import build_arg_parser
 from config.config import *
 from training.battle_metrics_log import *
@@ -34,6 +37,7 @@ def train_model(
         agent_team_generator=None,
         battle_team_generator=None,
         seed: int = 42,
+        device: str = "auto",
 ) -> MaskablePPO:
     """Train a MaskablePPO agent and optionally run periodic evaluation.
 
@@ -47,10 +51,15 @@ def train_model(
     :param agent_team_generator: Optional generator for agent team rotation.
     :param battle_team_generator: Optional generator yielding both battle teams.
     :param seed: Random seed.
+    :param device: "auto", "cuda", or "cpu"
     :returns: The trained ``MaskablePPO`` model."""
     random.seed(seed)
     np.random.seed(seed)
     set_random_seed(seed)
+    
+    # Setup device
+    device_config = DeviceConfig(device=device)
+    device_config.print_info()
 
     run = wandb.init(
         project="pokemon-rl",
@@ -64,6 +73,7 @@ def train_model(
             "batch_size": BATCH_SIZE,
             "gamma": GAMMA,
             "ent_coef": ENT_COEF,
+            "device": str(device_config),
         },
         sync_tensorboard=False,
         save_code=True,
@@ -106,6 +116,7 @@ def train_model(
         normalize_advantage=True,
         clip_range_vf=0.2,
         n_epochs=5,
+        device=str(device_config),
     )
 
     print(f"rounds_per_opponent={rounds_per_opponent}")
@@ -173,6 +184,7 @@ def main():
         agent_team_generator=opp.train_agent_gen,
         battle_team_generator=opp.train_battle_team_generator,
         seed=args.seed,
+        device=args.device,
     )
 
     if args.skip_eval:
