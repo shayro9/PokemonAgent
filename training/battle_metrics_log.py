@@ -7,7 +7,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 from poke_env.environment import SingleAgentWrapper
 
 from env.singles_env_wrapper import PokemonRLWrapper
-from training.train import LOG_FREQ
+from training.config import LOG_FREQ
 
 
 class BattleMetricsCallback(BaseCallback):

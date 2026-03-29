@@ -13,18 +13,10 @@ from training.device_config import DeviceConfig
 from .parse import build_arg_parser
 from config.config import *
 from training.battle_metrics_log import *
+from training.config import *
 
 from env.env_builder import build_env
 from .evaluation import evaluate_model, print_eval_summary, build_fixed_eval_pool
-
-LR = 3e-4
-LR_DECAY = 0.9
-N_STEPS = 4096
-BATCH_SIZE = 256
-GAMMA = 0.999
-ENT_COEF = 0.1
-LOG_FREQ = 500
-
 
 def train_model(
         model_path: str,
