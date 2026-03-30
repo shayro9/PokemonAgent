@@ -23,9 +23,9 @@ class MoveState:
         my_types,
         gen: int,
     ):
-        # Multi-hit bounds — 0 when no move, 1 as fallback for unknown n_hit on a real move
         if move is None:
             self.min_hits = self.max_hits = 0
+            self.type_multiplier = 1.0
             self.id              = None
             self.base_power      = 0.0
             self.accuracy        = 0.0
