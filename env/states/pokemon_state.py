@@ -101,8 +101,8 @@ class PokemonState(ABC):
         attacking_types, gen) so repeated reconstruction of PokemonState each
         turn hits the cache rather than rebuilding from scratch.
         """
-        defending_types = tuple(str(t) for t in defending_pokemon.types)
-        attacking_types = tuple(str(t) for t in self.types)
+        defending_types = tuple(str(t.name) for t in defending_pokemon.types)
+        attacking_types = tuple(str(t.name) for t in self.types)
         all_moves = list(self.moves.values()) + [None] * MAX_MOVES
         moves_list = (
             [m if m in available_moves else None for m in all_moves[:MAX_MOVES]]

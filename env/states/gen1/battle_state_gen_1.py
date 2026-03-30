@@ -55,8 +55,8 @@ class BattleStateGen1:
         """Build up to MAX_MOVES MoveState objects, zero-padded."""
         all_moves = list(attacking_pokemon.moves.values()) + [None] * MAX_MOVES
         moves_list = [m if m in available_moves else None for m in all_moves[:MAX_MOVES]]
-        attacking_types = tuple(str(t) for t in attacking_pokemon.types)
-        defending_types = tuple(str(t) for t in defending_pokemon.types)
+        attacking_types = tuple(str(t.name) for t in attacking_pokemon.types)
+        defending_types = tuple(str(t.name) for t in defending_pokemon.types)
 
         return [_get_cached_move_state(m, defending_types, attacking_types, self.GEN) for m in moves_list]
 
