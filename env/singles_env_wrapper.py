@@ -50,6 +50,9 @@ class PokemonRLWrapper(SinglesEnv):
         self._reward_buffer: WeakKeyDictionary[AbstractBattle, float] = (
             WeakKeyDictionary()
         )
+        self._obs_cache: WeakKeyDictionary[AbstractBattle, np.ndarray] = (
+            WeakKeyDictionary()
+        )
         self.action_mask = ActionMaskGen1()
 
         self.rounds_played: int = 0
@@ -93,11 +96,18 @@ class PokemonRLWrapper(SinglesEnv):
     # ------------------------------------------------------------------
 
     def embed_battle(self, battle: Battle) -> np.ndarray:
-        if self._is_player_turn(battle):
-            mask = self.get_action_mask(battle)
-            self.action_mask.set(mask)
+        if not self._is_player_turn(battle):
+            return self._obs_cache.get(
+                battle,
+                np.zeros(BattleStateGen1.array_len(), dtype=np.float32),
+            )
 
-        return BattleStateGen1(battle).to_array()
+        mask = self.get_action_mask(battle)
+        self.action_mask.set(mask)
+
+        obs = BattleStateGen1(battle).to_array()
+        self._obs_cache[battle] = obs
+        return obs
 
     # ------------------------------------------------------------------
     # Reward

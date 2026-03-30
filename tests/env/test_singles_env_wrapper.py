@@ -30,6 +30,7 @@ def _create_wrapper(**kwargs):
         wrapper.action_spaces = {}
         wrapper.observation_spaces = {}
         wrapper._reward_buffer = {}
+        wrapper._obs_cache = {}
         wrapper.action_mask = MagicMock()
         wrapper.rounds_played = 0
         return wrapper
