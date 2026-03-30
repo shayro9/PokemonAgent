@@ -1,5 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from functools import lru_cache
 from typing import Optional
 
 import numpy as np
@@ -15,6 +16,7 @@ from env.states.state_utils import normalize, normalize_vector, encode_enum, enc
 # Key: (move_id, defending_types_tuple, attacking_types_tuple, gen)
 _MOVE_STATE_CACHE: dict[tuple, MoveState] = {}
 
+@lru_cache(maxsize=10000)
 def _get_cached_move_state(move, defending_types: tuple, attacking_types: tuple, gen: int) -> MoveState:
     if move is None:
         key = (None,)
