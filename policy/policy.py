@@ -26,7 +26,7 @@ from sb3_contrib.common.maskable.distributions import (
 from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
 from stable_baselines3.common.type_aliases import PyTorchObs, Schedule
 
-from .constants import MOVE_ACTION_START, N_MOVE_ACTIONS, N_SWITCH_ACTIONS, TOTAL_ACTIONS
+from .constants import N_SWITCH_ACTIONS
 from .extractor import AttentionPointerExtractor
 
 
@@ -86,12 +86,10 @@ class AttentionPointerPolicy(MaskableActorCriticPolicy):
         trunk_hidden = self._attn_kwargs["trunk_hidden"]
         move_hidden  = self._attn_kwargs["move_hidden"]
         team_hidden  = self._attn_kwargs["team_hidden"]
-        n_other_action = TOTAL_ACTIONS - N_MOVE_ACTIONS - N_SWITCH_ACTIONS  # 16 (10-25)
 
         # Pointer projections: trunk → action_hidden space (dot product with encoded_i)
         self.move_ptr_proj  = nn.Linear(trunk_hidden, move_hidden, bias=False)
         self.switch_ptr_proj = nn.Linear(trunk_hidden, team_hidden, bias=False)
-        self.other_action_head = nn.Linear(trunk_hidden, n_other_action)
         self.value_head     = nn.Linear(trunk_hidden, 1)
 
         # Prevent SB3's default heads from interfering
@@ -140,14 +138,10 @@ class AttentionPointerPolicy(MaskableActorCriticPolicy):
         switch_ptr_query = self.switch_ptr_proj(features)   # (B, team_hidden)
         switch_logits = torch.einsum("bd,bnd->bn", switch_ptr_query, team_h)  # (B, 6)
 
-        # Standard logits for all other actions (10-25, 16 actions)
-        other_action_logits = self.other_action_head(features)  # (B, 16)
-
-        # Reassemble in action-space order: [0-5 switches | 6-9 moves | 10-25 other]
+        # Reassemble in action-space order: [0-5 switches | 6-9 moves ]
         return torch.cat([
             switch_logits,           # 0-5 (6 logits)
             move_logits,             # 6-9 (4 logits)
-            other_action_logits,     # 10-25 (16 logits)
         ], dim=-1)                   # (B, 26)
 
     # ── distribution helpers ───────────────────────────────────────────────

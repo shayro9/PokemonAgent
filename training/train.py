@@ -9,14 +9,14 @@ from stable_baselines3.common.callbacks import CallbackList
 from wandb.integration.sb3 import WandbCallback
 
 from policy.policy import AttentionPointerPolicy
-from training.device_config import DeviceConfig
-from .parse import build_arg_parser
-from config.config import *
-from training.battle_metrics_log import *
-from training.config import *
-
+from config.config import resolve_opponents
 from env.env_builder import build_env
-from .evaluation import evaluate_model, print_eval_summary, build_fixed_eval_pool
+from training.parse import build_arg_parser
+from training.device_config import DeviceConfig
+from training.battle_metrics_log import BattleMetricsCallback
+from training.config import LR, N_STEPS, BATCH_SIZE, GAMMA, ENT_COEF, LR_DECAY, LOG_FREQ
+from training.evaluation import evaluate_model, print_eval_summary
+
 
 def train_model(
         model_path: str,

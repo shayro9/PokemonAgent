@@ -20,7 +20,6 @@ from typing import Optional
 import torch
 import torch.nn as nn
 
-from env.states.gen1.battle_state_gen_1 import BattleStateGen1
 from env.states.state_utils import MAX_TEAM_SIZE
 from .attention import CrossAttention
 from .constants import (
@@ -54,6 +53,12 @@ class AttentionPointerExtractor(nn.Module):
         n_attention_heads: int = 4,
     ) -> None:
         super().__init__()
+
+        expected = ARENA_OPPONENT_LEN + MY_POKEMON_LEN * MAX_TEAM_SIZE + MAX_TEAM_SIZE
+        assert expected == obs_dim, (
+            f"Observation layout mismatch: extractor expects {expected}, got {obs_dim}. "
+            "Update slicing constants if TeamState layout changed."
+        )
 
         self.context_encoder    = build_mlp(CONTEXT_LEN, context_hidden, context_hidden)
         self.move_encoder       = build_mlp(MOVE_LEN, move_hidden, move_hidden)

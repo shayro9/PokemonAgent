@@ -1,7 +1,4 @@
 import numpy as np
-from sympy.codegen.abstract_nodes import List
-
-from env.states.state_utils import MAX_MOVES, MAX_TEAM_SIZE
 
 
 class ActionMaskGen1:
