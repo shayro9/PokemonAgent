@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
-from poke_env.battle import Move, MoveCategory, PokemonType
+from poke_env.battle import Move, MoveCategory
 
 from combat.combat_utils import type_chart_for_gen
 from env.states.state_utils import (
@@ -53,10 +53,8 @@ class MoveState:
                 self.min_hits = self.max_hits = 1
 
             type_it = iter(opp_types)
-            t1 = next(type_it, None)
-            t2 = next(type_it, None)
-            type1 = PokemonType.from_name(t1) if t1 is not None else None
-            type2 = PokemonType.from_name(t2) if t2 is not None else None
+            type1 = next(type_it, None)
+            type2 = next(type_it, None)
             self.type_multiplier = move.type.damage_multiplier(
                 type1, type2, type_chart=type_chart_for_gen(gen)
             )
