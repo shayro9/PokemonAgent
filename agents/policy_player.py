@@ -44,14 +44,14 @@ class PolicyPlayer(Player):
             print('='*60)
             print(BattleStateGen1(battle).describe())
 
-        obs = self._wrapper.embed_battle(battle)
-        mask = ActionMaskGen1()
-        mask.set_mask(battle)
-
+        observation = {
+                "observation": self._wrapper.embed_battle(battle),
+                "action_mask": self._wrapper.get_action_mask(battle),
+            }
         action, _ = self.model.predict(
-            obs,
+            observation,
             deterministic=self._deterministic,
-            action_masks=mask.get_mask(),
+            action_masks=observation["action_mask"],
         )
 
         order = self._wrapper.action_to_order(action, battle, strict=False)
