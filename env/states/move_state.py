@@ -26,8 +26,25 @@ class MoveState:
         # Multi-hit bounds — 0 when no move, 1 as fallback for unknown n_hit on a real move
         if move is None:
             self.min_hits = self.max_hits = 0
+            self.id              = None
+            self.base_power      = 0.0
+            self.accuracy        = 0.0
+            self.max_pp          = 0.0
+            self.priority        = 0
+            self.heal            = 0.0
+            self.crit_ratio      = 0.0
+            self.category        = None
+            self.is_protect_move = 0.0
+            self.breaks_protect  = 0.0
+            self.is_stab         = 0.0
+            self.status          = None
+            self.opp_boosts      = {}
+            self.self_boost      = {}
+            self.recoil          = 0.0
+            self.drain           = 0.0
         else:
-            n_hit = pull_attribute(move, "n_hit", 1, lambda x: x)
+            # Multi-hit bounds — 1 as fallback for unknown n_hit
+            n_hit = getattr(move, "n_hit", 1)
             if isinstance(n_hit, tuple):
                 self.min_hits, self.max_hits = n_hit
             elif isinstance(n_hit, int):
@@ -35,32 +52,28 @@ class MoveState:
             else:
                 self.min_hits = self.max_hits = 1
 
-        # Type multiplier
-        if move is not None:
             type1, type2 = (list(opp_types) + [None])[:2]
             self.type_multiplier = move.type.damage_multiplier(
                 type1, type2, type_chart=type_chart_for_gen(gen)
             )
-        else:
-            self.type_multiplier = 1.0
 
-        acc = pull_attribute(move, "accuracy", None, lambda x: x)
-        self.id              = pull_attribute(move, "id",              None,  lambda x: x)
-        self.base_power      = pull_attribute(move, "base_power",      0.0,   float)
-        self.accuracy        = 1.0 if acc is True else pull_attribute(move, "accuracy", 0.0, float)
-        self.max_pp          = pull_attribute(move, "max_pp",          0.0,   float)
-        self.priority        = pull_attribute(move, "priority",        0,     int)
-        self.heal            = pull_attribute(move, "heal",            0.0,   float)
-        self.crit_ratio      = pull_attribute(move, "crit_ratio",      0.0,   float)
-        self.category        = pull_attribute(move, "category",        None,  lambda x: x)
-        self.is_protect_move = pull_attribute(move, "is_protect_move", False, float)
-        self.breaks_protect  = pull_attribute(move, "breaks_protect",  False, float)
-        self.is_stab         = float(pull_attribute(move, "type",      None,  lambda x: x) in my_types)
-        self.status          = pull_attribute(move, "status",          None,  lambda x: x)
-        self.opp_boosts      = dict(pull_attribute(move, "boosts",     {},    lambda x: x) or {})
-        self.self_boost      = dict(pull_attribute(move, "self_boost", {},    lambda x: x) or {})
-        self.recoil          = pull_attribute(move, "recoil",          0.0,   float)
-        self.drain           = pull_attribute(move, "drain",           0.0,   float)
+            acc = getattr(move, "accuracy", None)
+            self.id              = getattr(move, "id", None)
+            self.base_power      = float(getattr(move, "base_power", 0.0) or 0.0)
+            self.accuracy        = 1.0 if acc is True else float(acc or 0.0)
+            self.max_pp          = float(getattr(move, "max_pp", 0.0) or 0.0)
+            self.priority        = pull_attribute(move, "priority", 0, int)
+            self.heal            = pull_attribute(move, "heal", 0.0, float)
+            self.crit_ratio      = float(getattr(move, "crit_ratio", 0.0) or 0.0)
+            self.category        = getattr(move, "category", None)
+            self.is_protect_move = float(getattr(move, "is_protect_move", False))
+            self.breaks_protect  = float(getattr(move, "breaks_protect", False))
+            self.is_stab         = float(getattr(move, "type", None) in my_types)
+            self.status          = getattr(move, "status", None)
+            self.opp_boosts      = dict(getattr(move, "boosts", {}) or {})
+            self.self_boost      = dict(getattr(move, "self_boost", {}) or {})
+            self.recoil          = float(getattr(move, "recoil", 0.0) or 0.0)
+            self.drain           = float(getattr(move, "drain", 0.0) or 0.0)
 
     def to_array(self) -> np.ndarray:
         """Return the fixed-length feature vector for this move."""
