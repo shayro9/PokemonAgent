@@ -9,6 +9,7 @@ from env.states.gen1.opponent_pokemon_state_gen_1 import OpponentPokemonStateGen
 from env.states.move_state import MoveState
 from env.states.team_state import TeamState
 from env.states.state_utils import MAX_TEAM_SIZE, MAX_MOVES
+from env.states.pokemon_state import _get_cached_move_state
 
 
 class BattleStateGen1:
@@ -54,11 +55,10 @@ class BattleStateGen1:
         """Build up to MAX_MOVES MoveState objects, zero-padded."""
         all_moves = list(attacking_pokemon.moves.values()) + [None] * MAX_MOVES
         moves_list = [m if m in available_moves else None for m in all_moves[:MAX_MOVES]]
-        attacking_types = attacking_pokemon.types
-        defending_types = defending_pokemon.types
+        attacking_types = tuple(str(t) for t in attacking_pokemon.types)
+        defending_types = tuple(str(t) for t in defending_pokemon.types)
 
-        states = [MoveState(m, defending_types, attacking_types, self.GEN) for m in moves_list]
-        return states
+        return [_get_cached_move_state(m, defending_types, attacking_types, self.GEN) for m in moves_list]
 
     # ------------------------------------------------------------------
     # Output

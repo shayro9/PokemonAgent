@@ -11,6 +11,21 @@ from env.states.move_state import MoveState
 from env.states.state_utils import GEN1_BOOST_KEYS, ALL_STATUSES, GEN1_TRACKED_EFFECTS, GEN1_STAT_KEYS, MAX_MOVES
 from env.states.state_utils import normalize, normalize_vector, encode_enum, encode_dicts, pull_attribute
 
+# Module-level cache: survives across BattleStateGen1 reconstructions each turn.
+# Key: (move_id, defending_types_tuple, attacking_types_tuple, gen)
+_MOVE_STATE_CACHE: dict[tuple, MoveState] = {}
+
+def _get_cached_move_state(move, defending_types: tuple, attacking_types: tuple, gen: int) -> MoveState:
+    if move is None:
+        key = (None,)
+    else:
+        key = (move.id, defending_types, attacking_types, gen)
+    cached = _MOVE_STATE_CACHE.get(key)
+    if cached is None:
+        cached = MoveState(move, defending_types, attacking_types, gen)
+        _MOVE_STATE_CACHE[key] = cached
+    return cached
+
 
 class PokemonState(ABC):
     """
@@ -80,13 +95,24 @@ class PokemonState(ABC):
         """
 
     def encode_moves(self, defending_pokemon: Pokemon, gen=1, available_moves=None):
-        """Build up to MAX_MOVES MoveState objects, zero-padded."""
-        all_moves = list(self.moves.values()) + [None] * MAX_MOVES
-        moves_list = [m if m in available_moves else None for m in all_moves[:MAX_MOVES]] if available_moves else all_moves[:MAX_MOVES]
-        attacking_types = self.types
-        defending_types = defending_pokemon.types
+        """Build up to MAX_MOVES MoveState objects, zero-padded.
 
-        self.moves_states = [MoveState(m, defending_types, attacking_types, gen) for m in moves_list]
+        MoveState objects are cached globally by (move_id, defending_types,
+        attacking_types, gen) so repeated reconstruction of PokemonState each
+        turn hits the cache rather than rebuilding from scratch.
+        """
+        defending_types = tuple(str(t) for t in defending_pokemon.types)
+        attacking_types = tuple(str(t) for t in self.types)
+        all_moves = list(self.moves.values()) + [None] * MAX_MOVES
+        moves_list = (
+            [m if m in available_moves else None for m in all_moves[:MAX_MOVES]]
+            if available_moves
+            else all_moves[:MAX_MOVES]
+        )
+        self.moves_states = [
+            _get_cached_move_state(m, defending_types, attacking_types, gen)
+            for m in moves_list
+        ]
 
     @abstractmethod
     def describe(self) -> str:
