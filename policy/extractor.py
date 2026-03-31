@@ -12,9 +12,11 @@ Pipeline
 6. Cross-attend: context → team → attended_team  
 7. Trunk([ctx_h || attended_moves || attended_team]) → features
 
-Saves move_hidden, team_hidden, attn_scores for policy's _build_logits to consume.
+Returns ExtractorOutput containing features, move_hidden, team_hidden,
+and attention scores — no mutable instance state is written during forward().
 """
 
+from dataclasses import dataclass
 from typing import Optional
 
 import torch
@@ -27,6 +29,16 @@ from .constants import (
     N_SWITCH_ACTIONS,
 )
 from .mlp import build_mlp
+
+
+@dataclass
+class ExtractorOutput:
+    """Return value of AttentionPointerExtractor.forward()."""
+    features: torch.Tensor         # (B, trunk_hidden)
+    move_hidden: torch.Tensor      # (B, 4, move_hidden)
+    team_hidden: torch.Tensor      # (B, 6, team_hidden)
+    attn_scores_moves: torch.Tensor  # (B, n_heads, 4)
+    attn_scores_team: torch.Tensor   # (B, n_heads, 6)
 
 
 class AttentionPointerExtractor(nn.Module):
@@ -73,12 +85,6 @@ class AttentionPointerExtractor(nn.Module):
             trunk_hidden
         )
 
-        # Written during forward(); consumed by AttentionPointerPolicy._build_logits()
-        self.move_hidden: Optional[torch.Tensor] = None       # (B, 4, move_hidden)
-        self.team_hidden: Optional[torch.Tensor] = None       # (B, 6, team_hidden)
-        self.attn_scores_moves: Optional[torch.Tensor] = None # (B, n_heads, 4)
-        self.attn_scores_team: Optional[torch.Tensor] = None  # (B, n_heads, 6)
-
         # Required by SB3's MaskableActorCriticPolicy._build()
         self.features_dim  = trunk_hidden
         self.latent_dim_pi = trunk_hidden
@@ -116,10 +122,10 @@ class AttentionPointerExtractor(nn.Module):
 
         return battle_context, my_moves_flat, my_team_flat
 
-    def forward(self, obs: torch.Tensor) -> torch.Tensor:
+    def forward(self, obs: torch.Tensor) -> ExtractorOutput:
         """
         obs     : (batch_size, OBS_SIZE)
-        returns : (batch_size, trunk_hidden)
+        returns : ExtractorOutput with features (B, trunk_hidden) and hidden states
         """
         # 1. Slice observation ──────────────────────────────────────────
         # Context: arena + all opp (excluding bench moves) + my active (including moves)
@@ -154,13 +160,14 @@ class AttentionPointerExtractor(nn.Module):
             context_hidden, team_hidden, key_padding_mask=is_padding_team
         )
 
-        self.move_hidden = move_hidden              # (B, 4, move_hidden)
-        self.team_hidden = team_hidden              # (B, 6, team_hidden)
-        self.attn_scores_moves = attn_scores_moves  # (B, n_heads, 4)
-        self.attn_scores_team = attn_scores_team    # (B, n_heads, 6)
-
         # 6. Trunk ──────────────────────────────────────────────────────
         features = self.trunk(
             torch.cat([context_hidden, attended_moves, attended_team], dim=-1)
         )  # (B, trunk_hidden)
-        return features
+        return ExtractorOutput(
+            features=features,
+            move_hidden=move_hidden,
+            team_hidden=team_hidden,
+            attn_scores_moves=attn_scores_moves,
+            attn_scores_team=attn_scores_team,
+        )

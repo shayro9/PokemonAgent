@@ -27,7 +27,7 @@ from sb3_contrib.common.maskable.policies import MaskableActorCriticPolicy
 from stable_baselines3.common.type_aliases import PyTorchObs, Schedule
 
 from .constants import N_SWITCH_ACTIONS
-from .extractor import AttentionPointerExtractor
+from .extractor import AttentionPointerExtractor, ExtractorOutput
 
 
 class AttentionPointerPolicy(MaskableActorCriticPolicy):
@@ -104,17 +104,17 @@ class AttentionPointerPolicy(MaskableActorCriticPolicy):
         deterministic: bool = False,
         action_masks: Optional[np.ndarray] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        features = self.extract_features(obs)
-        return self._forward_from_features(features, deterministic, action_masks)
+        out = self._run_extractor(obs)
+        return self._forward_from_features(out, deterministic, action_masks)
 
     def _forward_from_features(
         self,
-        features: torch.Tensor,
+        out: ExtractorOutput,
         deterministic: bool = False,
         action_masks: Optional[np.ndarray] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        logits = self._build_logits(features)       # (B, 26)
-        values = self.value_head(features)          # (B, 1)
+        logits = self._build_logits(out.features, out.move_hidden, out.team_hidden)
+        values = self.value_head(out.features)
 
         dist    = self._distribution(logits, action_masks)
         actions  = dist.get_actions(deterministic=deterministic)
@@ -123,20 +123,23 @@ class AttentionPointerPolicy(MaskableActorCriticPolicy):
 
     # ── logit construction ─────────────────────────────────────────────────
 
-    def _build_logits(self, features: torch.Tensor) -> torch.Tensor:
+    def _build_logits(
+        self,
+        features: torch.Tensor,
+        move_hidden: torch.Tensor,
+        team_hidden: torch.Tensor,
+    ) -> torch.Tensor:
         """Build the full (B, 26) logit vector.
         
         Action layout: [0-5 switches | 6-9 moves | 10-25 other]
         """
         # Pointer logits for move slots 0-3
-        move_h    = self.mlp_extractor.move_hidden          # (B, 4, move_hidden)
         move_ptr_query = self.move_ptr_proj(features)        # (B, move_hidden)
-        move_logits = torch.einsum("bd,bnd->bn", move_ptr_query, move_h)  # (B, 4)
+        move_logits = torch.einsum("bd,bnd->bn", move_ptr_query, move_hidden)  # (B, 4)
 
         # Pointer logits for team slots 0-5 (team = active + bench)
-        team_h   = self.mlp_extractor.team_hidden          # (B, 6, team_hidden)
         switch_ptr_query = self.switch_ptr_proj(features)   # (B, team_hidden)
-        switch_logits = torch.einsum("bd,bnd->bn", switch_ptr_query, team_h)  # (B, 6)
+        switch_logits = torch.einsum("bd,bnd->bn", switch_ptr_query, team_hidden)  # (B, 6)
 
         # Reassemble in action-space order: [0-5 switches | 6-9 moves ]
         return torch.cat([
@@ -166,9 +169,9 @@ class AttentionPointerPolicy(MaskableActorCriticPolicy):
         actions: torch.Tensor,
         action_masks: Optional[np.ndarray] = None,
     ) -> Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]:
-        features = self.extract_features(obs)
-        logits   = self._build_logits(features)
-        values   = self.value_head(features)
+        out      = self._run_extractor(obs)
+        logits   = self._build_logits(out.features, out.move_hidden, out.team_hidden)
+        values   = self.value_head(out.features)
 
         dist     = self._distribution(logits, action_masks)
         log_prob = dist.log_prob(actions)
@@ -180,8 +183,8 @@ class AttentionPointerPolicy(MaskableActorCriticPolicy):
         obs: PyTorchObs,
         action_masks: Optional[np.ndarray] = None,
     ) -> MaskableCategoricalDistribution:
-        features = self.extract_features(obs)
-        logits   = self._build_logits(features)
+        out    = self._run_extractor(obs)
+        logits = self._build_logits(out.features, out.move_hidden, out.team_hidden)
         return self._distribution(logits, action_masks)
 
     def _predict(
@@ -195,7 +198,7 @@ class AttentionPointerPolicy(MaskableActorCriticPolicy):
         )
 
     def predict_values(self, obs: PyTorchObs) -> torch.Tensor:
-        return self.value_head(self.extract_features(obs))
+        return self.value_head(self._run_extractor(obs).features)
 
     def extract_features(  # type: ignore[override]
         self,
@@ -203,6 +206,10 @@ class AttentionPointerPolicy(MaskableActorCriticPolicy):
         features_extractor: Optional[nn.Module] = None,
     ) -> torch.Tensor:
         """Accepts `features_extractor` only for SB3 signature compatibility."""
+        return self._run_extractor(obs).features
+
+    def _run_extractor(self, obs: PyTorchObs) -> ExtractorOutput:
+        """Run the extractor and return the full output including hidden states."""
         if isinstance(obs, dict):
             obs_tensor = obs['observation']
         else:
