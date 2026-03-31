@@ -45,7 +45,7 @@ class PolicyPlayer(Player):
             print(BattleStateGen1(battle).describe())
 
         observation = {
-                "observation": self._wrapper.embed_battle(battle),
+                "observation": BattleStateGen1(battle).to_array(),
                 "action_mask": self._wrapper.get_action_mask(battle),
             }
         action, _ = self.model.predict(

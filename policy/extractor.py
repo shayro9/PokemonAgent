@@ -100,9 +100,11 @@ class AttentionPointerExtractor(nn.Module):
         my_team_flat = my_team_flat.masked_fill(is_fainted, 0.0)
 
         # Locate active slot per batch item and gather its features
-        active_idx    = (alive_vector == 1).long().argmax(dim=1)                        # (B,)
-        idx_expanded  = active_idx.view(B, 1, 1).expand(B, 1, MY_POKEMON_LEN)
-        active_section = my_team_flat.gather(1, idx_expanded).squeeze(1)               # (B, MY_POKEMON_LEN)
+        active_idx    = (alive_vector == 1).long().argmax(dim=1)        # (B,)
+        has_active = (alive_vector == 1).any(dim=1)  # (B,)
+        idx_expanded = active_idx.view(B, 1, 1).expand(B, 1, MY_POKEMON_LEN)
+        active_section = my_team_flat.gather(1, idx_expanded).squeeze(1)  # (B, MY_POKEMON_LEN)
+        active_section = active_section * has_active.unsqueeze(1)          # (B, MY_POKEMON_LEN)
 
         battle_context = torch.cat([arena_opponent_vector, active_section], dim=1)     # (B, CONTEXT_LEN)
         my_moves_flat  = active_section[:, MY_MOVES_START:]                            # (B, moves_len)
