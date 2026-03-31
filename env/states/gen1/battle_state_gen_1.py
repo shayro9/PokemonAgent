@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 import numpy as np
 from poke_env.battle import AbstractBattle, Move, Pokemon
 
@@ -28,13 +29,16 @@ class BattleStateGen1:
     MAX_MOVES: int = MAX_MOVES
     MAX_TEAM_SIZE: int = MAX_TEAM_SIZE
 
-    # Lazy-initialised class-level write buffer and section offsets.
-    _buf: np.ndarray | None = None
+    # Lazy-initialised class-level offsets (constant after first call, never mutated).
+    _offsets_ready: bool = False
     _o_arena: int = 0
     _o_opp_moves: int = 0
     _o_opp_bench: int = 0
     _o_my_bench: int = 0
     _move_len: int = 0
+    _buf_len: int = 0
+    # Each thread gets its own scratch buffer — allocated once per thread, never per instance.
+    _thread_local: threading.local = threading.local()
 
     @classmethod
     def _init_buffer(cls) -> None:
@@ -48,7 +52,16 @@ class BattleStateGen1:
         cls._o_opp_bench = a + om
         cls._o_my_bench  = a + om + ob
         cls._move_len    = m
-        cls._buf         = np.zeros(a + om + ob + mb, dtype=np.float32)
+        cls._buf_len     = a + om + ob + mb
+        cls._offsets_ready = True
+
+    @classmethod
+    def _get_thread_buf(cls) -> np.ndarray:
+        """Return the calling thread's scratch buffer, allocating it on first use."""
+        tl = cls._thread_local
+        if not hasattr(tl, "buf"):
+            tl.buf = np.zeros(cls._buf_len, dtype=np.float32)
+        return tl.buf
 
     def __init__(self, battle: AbstractBattle) -> None:
         self.battle: AbstractBattle = battle
@@ -73,6 +86,9 @@ class BattleStateGen1:
         self.opp_moves_state: list[MoveState]  = self._encode_moves(self.opp_moves         , self.opp_active, self.my_active)
         self.my_moves_state : list[MoveState]  = self._encode_moves(self.my_available_moves, self.my_active , self.opp_active)
 
+        if not self.__class__._offsets_ready:
+            self.__class__._init_buffer()
+
     def _encode_moves(self, available_moves: list[Move], attacking_pokemon: Pokemon, defending_pokemon: Pokemon) -> list[MoveState]:
         """Build up to MAX_MOVES MoveState objects, zero-padded."""
         all_moves = list(attacking_pokemon.moves.values()) + [None] * MAX_MOVES
@@ -90,10 +106,7 @@ class BattleStateGen1:
         """Return the full flat float32 feature vector for this turn."""
         self.my_bench_state.encode_moves(self.opp_active, gen=self.GEN, available_moves=self.my_available_moves)
 
-        if self.__class__._buf is None:
-            self.__class__._init_buffer()
-
-        buf = self.__class__._buf
+        buf = self.__class__._get_thread_buf()
         m = self._move_len
 
         buf[self._o_arena    : self._o_opp_moves] = self.arena_state.to_array()
