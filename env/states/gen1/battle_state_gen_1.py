@@ -9,6 +9,7 @@ from env.states.gen1.opponent_pokemon_state_gen_1 import OpponentPokemonStateGen
 from env.states.move_state import MoveState
 from env.states.team_state import TeamState
 from env.states.state_utils import MAX_TEAM_SIZE, MAX_MOVES
+from env.states.pokemon_state import _get_cached_move_state
 
 
 class BattleStateGen1:
@@ -26,6 +27,28 @@ class BattleStateGen1:
     GEN: int = 1
     MAX_MOVES: int = MAX_MOVES
     MAX_TEAM_SIZE: int = MAX_TEAM_SIZE
+
+    # Lazy-initialised class-level write buffer and section offsets.
+    _buf: np.ndarray | None = None
+    _o_arena: int = 0
+    _o_opp_moves: int = 0
+    _o_opp_bench: int = 0
+    _o_my_bench: int = 0
+    _move_len: int = 0
+
+    @classmethod
+    def _init_buffer(cls) -> None:
+        a  = ArenaStateGen1.array_len()
+        m  = MoveState.array_len()
+        om = m * MAX_MOVES
+        ob = TeamState.compute_array_len(OpponentPokemonStateGen1, 6)
+        mb = TeamState.compute_array_len(MyPokemonStateGen1, 6)
+        cls._o_arena     = 0
+        cls._o_opp_moves = a
+        cls._o_opp_bench = a + om
+        cls._o_my_bench  = a + om + ob
+        cls._move_len    = m
+        cls._buf         = np.zeros(a + om + ob + mb, dtype=np.float32)
 
     def __init__(self, battle: AbstractBattle) -> None:
         self.battle: AbstractBattle = battle
@@ -54,11 +77,10 @@ class BattleStateGen1:
         """Build up to MAX_MOVES MoveState objects, zero-padded."""
         all_moves = list(attacking_pokemon.moves.values()) + [None] * MAX_MOVES
         moves_list = [m if m in available_moves else None for m in all_moves[:MAX_MOVES]]
-        attacking_types = attacking_pokemon.types
-        defending_types = defending_pokemon.types
+        attacking_types = tuple(attacking_pokemon.types)
+        defending_types = tuple(defending_pokemon.types)
 
-        states = [MoveState(m, defending_types, attacking_types, self.GEN) for m in moves_list]
-        return states
+        return [_get_cached_move_state(m, defending_types, attacking_types, self.GEN) for m in moves_list]
 
     # ------------------------------------------------------------------
     # Output
@@ -68,17 +90,21 @@ class BattleStateGen1:
         """Return the full flat float32 feature vector for this turn."""
         self.my_bench_state.encode_moves(self.opp_active, gen=self.GEN, available_moves=self.my_available_moves)
 
-        arr = np.concatenate([
-            self.arena_state.to_array(),
-            np.concatenate([m.to_array() for m in self.opp_moves_state]),
-            self.opp_bench_state.to_array(),
-            self.my_bench_state.to_array(),
-        ]).astype(np.float32)
+        if self.__class__._buf is None:
+            self.__class__._init_buffer()
 
-        assert len(arr) == self.array_len(), (
-            f"BattleState.to_array(): expected {self.array_len()}, got {len(arr)}"
-        )
-        return arr
+        buf = self.__class__._buf
+        m = self._move_len
+
+        buf[self._o_arena    : self._o_opp_moves] = self.arena_state.to_array()
+        off = self._o_opp_moves
+        for ms in self.opp_moves_state:
+            buf[off : off + m] = ms.to_array()
+            off += m
+        buf[self._o_opp_bench : self._o_my_bench] = self.opp_bench_state.to_array()
+        buf[self._o_my_bench  :                  ] = self.my_bench_state.to_array()
+
+        return buf.copy()
 
     @classmethod
     def array_len(cls) -> int:

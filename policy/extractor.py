@@ -92,42 +92,27 @@ class AttentionPointerExtractor(nn.Module):
         return features
 
     def _slice_observation(self, obs: torch.Tensor):
-        arena_opponent_vector = obs[:, :ARENA_OPPONENT_LEN]
-        my_pokemon_vector = obs[:, ARENA_OPPONENT_LEN:-MAX_TEAM_SIZE]
-        alive_vector = obs[:, -MAX_TEAM_SIZE:]
-
-        sections = torch.split(my_pokemon_vector, MY_POKEMON_LEN, dim=1)
-        assert len(sections) == MAX_TEAM_SIZE, (
-            f"Expected {MAX_TEAM_SIZE} team slots, got {len(sections)}"
-        )
-
         B = obs.shape[0]
+        arena_opponent_vector = obs[:, :ARENA_OPPONENT_LEN]                # (B, ARENA_OPP_LEN)
+        my_pokemon_vector     = obs[:, ARENA_OPPONENT_LEN:-MAX_TEAM_SIZE]  # (B, 6*MY_POKEMON_LEN)
+        alive_vector          = obs[:, -MAX_TEAM_SIZE:]                    # (B, 6)
 
-        my_team_slots = []
-        battle_context = torch.zeros(B, CONTEXT_LEN, device=obs.device, dtype=obs.dtype)
+        # Reshape into per-slot blocks — no loop needed
+        my_team_flat = my_pokemon_vector.reshape(B, MAX_TEAM_SIZE, MY_POKEMON_LEN)  # (B, 6, MY_POKEMON_LEN)
 
-        moves_len = sections[0].shape[1] - MY_MOVES_START
-        my_moves_flat = torch.zeros(B, moves_len, device=obs.device, dtype=obs.dtype)
+        # Zero fainted slots in one vectorised op
+        is_fainted = (alive_vector == -1).unsqueeze(-1)   # (B, 6, 1)
+        my_team_flat = my_team_flat.masked_fill(is_fainted, 0.0)
 
-        for slot in range(MAX_TEAM_SIZE):
-            slot_alive = alive_vector[:, slot]  # (B,)
-            section = sections[slot]
+        # Locate active slot per batch item and gather its features
+        active_idx    = (alive_vector == 1).long().argmax(dim=1)        # (B,)
+        has_active = (alive_vector == 1).any(dim=1)  # (B,)
+        idx_expanded = active_idx.view(B, 1, 1).expand(B, 1, MY_POKEMON_LEN)
+        active_section = my_team_flat.gather(1, idx_expanded).squeeze(1)  # (B, MY_POKEMON_LEN)
+        active_section = active_section * has_active.unsqueeze(1)          # (B, MY_POKEMON_LEN)
 
-            is_active = slot_alive == 1
-            is_fainted = slot_alive == -1
-
-            if is_active.any():
-                battle_context[is_active] = torch.cat(
-                    [arena_opponent_vector[is_active], section[is_active]], dim=1
-                )
-                my_moves_flat[is_active] = section[is_active, MY_MOVES_START:]
-
-            slot_tensor = section.clone()
-            slot_tensor[is_fainted] = 0  # zero-out fainted
-
-            my_team_slots.append(slot_tensor)
-
-        my_team_flat = torch.stack(my_team_slots, dim=1)
+        battle_context = torch.cat([arena_opponent_vector, active_section], dim=1)     # (B, CONTEXT_LEN)
+        my_moves_flat  = active_section[:, MY_MOVES_START:]                            # (B, moves_len)
 
         return battle_context, my_moves_flat, my_team_flat
 

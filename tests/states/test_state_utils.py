@@ -94,45 +94,45 @@ class TestNormalize(unittest.TestCase):
 class TestNormalizeVector(unittest.TestCase):
     def test_basic(self):
         vec = np.array([50.0, 100.0, 150.0])
-        result = normalize_vector(vec, np.array([100.0, 100.0, 100.0]))
+        result = normalize_vector(vec, 100.0)
         np.testing.assert_array_almost_equal(result, [0.5, 1.0, 1.0])
 
     def test_clamp_above(self):
-        result = normalize_vector(np.array([200.0]), np.array([100.0]))
+        result = normalize_vector(np.array([200.0]), 100.0)
         self.assertEqual(result[0], 1.0)
 
     def test_clamp_below_zero(self):
-        result = normalize_vector(np.array([-50.0]), np.array([100.0]))
+        result = normalize_vector(np.array([-50.0]), 100.0)
         self.assertEqual(result[0], 0.0)
 
     def test_symmetric(self):
         vec = np.array([-6.0, 0.0, 6.0])
-        result = normalize_vector(vec, np.array([6.0, 6.0, 6.0]), symmetric=True)
+        result = normalize_vector(vec, 6.0, symmetric=True)
         np.testing.assert_array_almost_equal(result, [-1.0, 0.0, 1.0])
 
     def test_symmetric_clamp_above(self):
-        result = normalize_vector(np.array([100.0]), np.array([6.0]), symmetric=True)
+        result = normalize_vector(np.array([100.0]), 6.0, symmetric=True)
         self.assertEqual(result[0], 1.0)
 
     def test_symmetric_clamp_below(self):
-        result = normalize_vector(np.array([-100.0]), np.array([6.0]), symmetric=True)
+        result = normalize_vector(np.array([-100.0]), 6.0, symmetric=True)
         self.assertEqual(result[0], -1.0)
 
     def test_all_zero_max_returns_zeros(self):
-        result = normalize_vector(np.array([1.0, 2.0]), np.array([0.0, 0.0]))
+        result = normalize_vector(np.array([1.0, 2.0]), 0.0)
         np.testing.assert_array_equal(result, [0.0, 0.0])
 
     def test_partial_zero_max_returns_all_zeros(self):
         # any(vec_max <= 0) → True → all zeros
-        result = normalize_vector(np.array([50.0, 100.0]), np.array([100.0, 0.0]))
+        result = normalize_vector(np.array([50.0, 100.0]), 0.0)
         np.testing.assert_array_equal(result, [0.0, 0.0])
 
     def test_negative_max_returns_zeros(self):
-        result = normalize_vector(np.array([50.0]), np.array([-1.0]))
+        result = normalize_vector(np.array([50.0]), -1.0)
         np.testing.assert_array_equal(result, [0.0])
 
     def test_output_dtype_float32(self):
-        result = normalize_vector(np.array([1.0]), np.array([1.0]))
+        result = normalize_vector(np.array([1.0]), 1.0)
         self.assertEqual(result.dtype, np.float32)
 
 
