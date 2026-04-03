@@ -28,6 +28,7 @@ from stable_baselines3.common.type_aliases import PyTorchObs, Schedule
 
 from .constants import N_SWITCH_ACTIONS
 from .extractor import AttentionPointerExtractor, ExtractorOutput
+from env.battle_config import BattleConfig
 
 
 class AttentionPointerPolicy(MaskableActorCriticPolicy):
@@ -50,8 +51,10 @@ class AttentionPointerPolicy(MaskableActorCriticPolicy):
         team_hidden: int = 64,
         trunk_hidden: int = 128,
         n_attention_heads: int = 4,
+        battle_config: Optional[BattleConfig] = None,
         **kwargs,
     ) -> None:
+        self._battle_config = battle_config if battle_config is not None else BattleConfig.gen1()
         self._attn_kwargs = dict(
             context_hidden=context_hidden,
             move_hidden=move_hidden,
@@ -65,17 +68,10 @@ class AttentionPointerPolicy(MaskableActorCriticPolicy):
     # ── extractor ──────────────────────────────────────────────────────────
 
     def _build_mlp_extractor(self) -> None:
-        # Handle both Box and Dict observation spaces
-        # Dict space occurs when ActionMasker wraps the environment
-        if isinstance(self.observation_space, spaces.Dict):
-            # Extract the actual observation space from the Dict
-            obs_space = self.observation_space.spaces['observation']
-            obs_dim = int(np.prod(obs_space.shape))
-        else:
-            # Direct Box observation space
-            obs_dim = int(np.prod(self.observation_space.shape))
-        
-        self.mlp_extractor = AttentionPointerExtractor(obs_dim, **self._attn_kwargs)
+        self.mlp_extractor = AttentionPointerExtractor(
+            battle_config=self._battle_config,
+            **self._attn_kwargs,
+        )
 
     # ── heads ──────────────────────────────────────────────────────────────
 

@@ -3,6 +3,7 @@ import unittest
 from unittest.mock import MagicMock, patch, PropertyMock
 import numpy as np
 
+from env.battle_config import BattleConfig
 from env.singles_env_wrapper import PokemonRLWrapper, print_state
 from tests.conftest import (
     make_mock_battle, make_mock_move, make_mock_pokemon,
@@ -33,23 +34,25 @@ def _create_wrapper(**kwargs):
         wrapper._obs_cache = {}
         wrapper.action_mask = MagicMock()
         wrapper.rounds_played = 0
+        wrapper._battle_config = BattleConfig.gen1()
         return wrapper
 
 
 class TestPrintState(unittest.TestCase):
     """Test the print_state helper function."""
 
-    @patch('env.singles_env_wrapper.BattleStateGen1')
-    def test_print_state_returns_formatted_message(self, mock_state_class):
+    def test_print_state_returns_formatted_message(self):
         """Verify print_state formats and returns battle state."""
         mock_state = MagicMock()
         mock_state.describe.return_value = "Test battle description"
-        mock_state_class.return_value = mock_state
-        
+        mock_state_class = MagicMock(return_value=mock_state)
+        mock_config = MagicMock()
+        mock_config.battle_state_cls = mock_state_class
+
         battle = make_mock_battle()
-        
-        result = print_state(battle, prefix="[TEST]")
-        
+
+        result = print_state(battle, battle_config=mock_config, prefix="[TEST]")
+
         self.assertIn("[TEST]", result)
         self.assertIn("Test battle description", result)
         mock_state_class.assert_called_once_with(battle)
@@ -179,38 +182,38 @@ class TestActionToOrder(unittest.TestCase):
 class TestEmbedBattle(unittest.TestCase):
     """Test embed_battle method."""
 
-    @patch('env.singles_env_wrapper.BattleStateGen1')
-    def test_embed_battle_returns_array(self, mock_state_class):
+    def test_embed_battle_returns_array(self):
         """Verify embed_battle returns a numpy array."""
         wrapper = _create_wrapper()
 
         mock_state = MagicMock()
         mock_array = np.array([1.0, -0.5, 0.0] * 256)[:768]
         mock_state.to_array.return_value = mock_array
-        mock_state_class.return_value = mock_state
-        
+        mock_state_class = MagicMock(return_value=mock_state)
+        wrapper._battle_config = MagicMock(battle_state_cls=mock_state_class)
+
         battle = make_mock_battle(player_username="player")
-        
+
         result = wrapper.embed_battle(battle)
-        
+
         self.assertIsInstance(result, np.ndarray)
         np.testing.assert_array_equal(result, mock_array)
         mock_state_class.assert_called_once_with(battle)
 
-    @patch('env.singles_env_wrapper.BattleStateGen1')
-    def test_embed_battle_no_mask_set_for_opponent_turn(self, mock_state_class):
+    def test_embed_battle_no_mask_set_for_opponent_turn(self):
         """Verify action mask is NOT set on opponent turn."""
         wrapper = _create_wrapper()
         wrapper.action_mask = MagicMock()
-        
+
         mock_state = MagicMock()
         mock_state.to_array.return_value = np.zeros(768)
-        mock_state_class.return_value = mock_state
-        
+        mock_state_class = MagicMock(return_value=mock_state)
+        wrapper._battle_config = MagicMock(battle_state_cls=mock_state_class)
+
         battle = make_mock_battle(player_username="opponent")
-        
+
         wrapper.embed_battle(battle)
-        
+
         wrapper.action_mask.set_mask.assert_not_called()
 
 

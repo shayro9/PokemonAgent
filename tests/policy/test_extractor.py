@@ -17,6 +17,7 @@ import torch
 import torch.nn as nn
 from unittest.mock import MagicMock, patch
 
+from env.battle_config import BattleConfig
 from policy.extractor import AttentionPointerExtractor, ExtractorOutput
 from policy.constants import (
     CONTEXT_LEN, MOVE_LEN, MAX_MOVES, MY_POKEMON_LEN, ARENA_OPPONENT_LEN,
@@ -33,7 +34,7 @@ from env.states.state_utils import MAX_TEAM_SIZE
 def extractor():
     """Create an AttentionPointerExtractor with standard dimensions."""
     return AttentionPointerExtractor(
-        obs_dim=1279,  # BattleStateGen1.array_len()
+        BattleConfig.gen1(),
         context_hidden=128,
         move_hidden=64,
         team_hidden=64,
@@ -78,7 +79,7 @@ class TestExtractorInit:
 
     def test_init_default_params(self):
         """Test initialization with default parameters."""
-        extractor = AttentionPointerExtractor(obs_dim=1279)
+        extractor = AttentionPointerExtractor(BattleConfig.gen1())
 
         assert extractor.context_encoder is not None
         assert extractor.move_encoder is not None
@@ -95,7 +96,7 @@ class TestExtractorInit:
     def test_init_custom_params(self):
         """Test initialization with custom parameters."""
         extractor = AttentionPointerExtractor(
-            obs_dim=1279,
+            BattleConfig.gen1(),
             context_hidden=256,
             move_hidden=128,
             team_hidden=128,
@@ -112,7 +113,7 @@ class TestExtractorInit:
         # move_hidden=64, n_heads=5: 64 % 5 != 0 → should raise
         with pytest.raises(ValueError, match="must be divisible"):
             AttentionPointerExtractor(
-                obs_dim=1279,
+                BattleConfig.gen1(),
                 move_hidden=64,
                 n_attention_heads=5,
             )
@@ -142,7 +143,7 @@ class TestObservationSlicing:
 
     def test_slice_observation_values(self, batch_size, obs_dim):
         """Test that slicing extracts correct values."""
-        extractor = AttentionPointerExtractor(obs_dim=obs_dim)
+        extractor = AttentionPointerExtractor(BattleConfig.gen1())
 
         obs = torch.arange(obs_dim, dtype=torch.float32).unsqueeze(0).expand(batch_size, -1).clone()
 
@@ -169,7 +170,7 @@ class TestObservationSlicing:
 
     def test_slice_observation_batch_independence(self, batch_size, obs_dim):
         """Test that batch items are sliced independently."""
-        extractor = AttentionPointerExtractor(obs_dim=obs_dim)
+        extractor = AttentionPointerExtractor(BattleConfig.gen1())
 
         obs = torch.zeros(batch_size, obs_dim, dtype=torch.float32)
         for i in range(batch_size):
@@ -272,8 +273,8 @@ class TestForwardPass:
 
     def test_forward_deterministic_with_seed(self, obs_dim):
         """Test that forward is deterministic with same seed."""
-        extractor1 = AttentionPointerExtractor(obs_dim=obs_dim)
-        extractor2 = AttentionPointerExtractor(obs_dim=obs_dim)
+        extractor1 = AttentionPointerExtractor(BattleConfig.gen1())
+        extractor2 = AttentionPointerExtractor(BattleConfig.gen1())
 
         # Copy weights
         extractor2.load_state_dict(extractor1.state_dict())
@@ -562,7 +563,7 @@ class TestModelStateManagement:
         original_state = extractor.state_dict()
 
         # Create new extractor and load state
-        extractor2 = AttentionPointerExtractor(obs_dim=obs_dim)
+        extractor2 = AttentionPointerExtractor(BattleConfig.gen1())
         extractor2.load_state_dict(original_state)
 
         # Should produce same output

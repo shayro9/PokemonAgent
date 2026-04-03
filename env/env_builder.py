@@ -5,6 +5,7 @@ from poke_env.environment import SingleAgentWrapper
 
 from sb3_contrib.common.wrappers import ActionMasker
 
+from env.battle_config import BattleConfig
 from env.singles_env_wrapper import PokemonRLWrapper
 
 
@@ -38,6 +39,7 @@ def build_env(
         battle_team_generator=None,
         use_action_masking: bool = False,
         strict: bool = True,
+        battle_config: BattleConfig | None = None,
 ) -> SingleAgentWrapper:
     """Construct the single-agent battle environment.
     
@@ -49,6 +51,7 @@ def build_env(
     :param agent_team_generator: Optional generator for agent teams.
     :param battle_team_generator: Optional generator yielding both teams.
     :param use_action_masking: Whether to wrap the env with ``ActionMasker``.
+    :param battle_config: Generation config. Defaults to Gen 1.
     :returns: A configured ``SingleAgentWrapper`` environment."""
 
     unique_id = int(time.time() * 1000) % 100000
@@ -68,6 +71,7 @@ def build_env(
         account_configuration1=AccountConfiguration(f"Player_{unique_id}", None),
         account_configuration2=AccountConfiguration(f"Opponent_{unique_id}", None),
         strict=strict,
+        battle_config=battle_config,
     )
 
     env = SingleAgentWrapper(agent, opponent_policy)
