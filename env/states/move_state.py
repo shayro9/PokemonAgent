@@ -65,7 +65,7 @@ class MoveState:
             self.accuracy        = 1.0 if acc is True else float(acc or 0.0)
             self.max_pp          = float(getattr(move, "max_pp", 0.0) or 0.0)
             self.priority        = pull_attribute(move, "priority", 0, int)
-            self.heal            = float(getattr(move, "heal", 0.0)) # pull_attribute(move, "heal", 0.0, float)
+            self.heal            = pull_attribute(move, "heal", 0.0, float)
             self.crit_ratio      = float(getattr(move, "crit_ratio", 0.0) or 0.0)
             self.category        = getattr(move, "category", None)
             self.is_protect_move = float(getattr(move, "is_protect_move", False))
