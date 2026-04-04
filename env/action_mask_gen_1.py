@@ -1,13 +1,12 @@
 import numpy as np
-from sympy.codegen.abstract_nodes import List
 
-from env.states.state_utils import MAX_MOVES, MAX_TEAM_SIZE
+from env.battle_config import BattleConfig
 
 
 class ActionMaskGen1:
 
     ACTION_DEFAULT = -2
-    ACTION_SPACE = 10
+    ACTION_SPACE = BattleConfig.action_space_size
     ACTION_MOVE_RANGE = range(6, 10)
     ACTION_SWITCH_RANGE = range(0, 6)
 

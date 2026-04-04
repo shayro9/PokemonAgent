@@ -15,8 +15,7 @@ class DeviceConfig:
             device: "auto" (detect GPU), "cuda", or "cpu"
         """
         self.device_str = get_device(device)
-        self.device = device
-    
+
     def __str__(self) -> str:
         return self.device_str
     

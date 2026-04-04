@@ -172,7 +172,7 @@ async def main():
             server_configuration=LocalhostServerConfiguration,
             account_configuration1=AccountConfiguration(f"{player_name}_env1", None),
             account_configuration2=AccountConfiguration(f"{player_name}_env2", None),
-            strict=False,
+            strict=True,
         )
         player = PolicyPlayer(
             model_path=args.model_path,

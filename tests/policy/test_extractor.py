@@ -17,7 +17,8 @@ import torch
 import torch.nn as nn
 from unittest.mock import MagicMock, patch
 
-from policy.extractor import AttentionPointerExtractor
+from env.battle_config import BattleConfig
+from policy.extractor import AttentionPointerExtractor, ExtractorOutput
 from policy.constants import (
     CONTEXT_LEN, MOVE_LEN, MAX_MOVES, MY_POKEMON_LEN, ARENA_OPPONENT_LEN,
     MY_MOVES_START, N_SWITCH_ACTIONS,
@@ -33,7 +34,7 @@ from env.states.state_utils import MAX_TEAM_SIZE
 def extractor():
     """Create an AttentionPointerExtractor with standard dimensions."""
     return AttentionPointerExtractor(
-        obs_dim=1279,  # BattleStateGen1.array_len()
+        BattleConfig.gen1(),
         context_hidden=128,
         move_hidden=64,
         team_hidden=64,
@@ -78,7 +79,7 @@ class TestExtractorInit:
 
     def test_init_default_params(self):
         """Test initialization with default parameters."""
-        extractor = AttentionPointerExtractor(obs_dim=1279)
+        extractor = AttentionPointerExtractor(BattleConfig.gen1())
 
         assert extractor.context_encoder is not None
         assert extractor.move_encoder is not None
@@ -95,7 +96,7 @@ class TestExtractorInit:
     def test_init_custom_params(self):
         """Test initialization with custom parameters."""
         extractor = AttentionPointerExtractor(
-            obs_dim=1279,
+            BattleConfig.gen1(),
             context_hidden=256,
             move_hidden=128,
             team_hidden=128,
@@ -107,19 +108,12 @@ class TestExtractorInit:
         assert extractor.latent_dim_pi == 256
         assert extractor.latent_dim_vf == 256
 
-    def test_init_intermediate_state_is_none(self, extractor):
-        """Test that intermediate state is initialized to None."""
-        assert extractor.move_hidden is None
-        assert extractor.team_hidden is None
-        assert extractor.attn_scores_moves is None
-        assert extractor.attn_scores_team is None
-
     def test_init_attention_heads_validation(self):
         """Test that attention module validates head divisibility."""
         # move_hidden=64, n_heads=5: 64 % 5 != 0 → should raise
         with pytest.raises(ValueError, match="must be divisible"):
             AttentionPointerExtractor(
-                obs_dim=1279,
+                BattleConfig.gen1(),
                 move_hidden=64,
                 n_attention_heads=5,
             )
@@ -149,7 +143,7 @@ class TestObservationSlicing:
 
     def test_slice_observation_values(self, batch_size, obs_dim):
         """Test that slicing extracts correct values."""
-        extractor = AttentionPointerExtractor(obs_dim=obs_dim)
+        extractor = AttentionPointerExtractor(BattleConfig.gen1())
 
         obs = torch.arange(obs_dim, dtype=torch.float32).unsqueeze(0).expand(batch_size, -1).clone()
 
@@ -176,7 +170,7 @@ class TestObservationSlicing:
 
     def test_slice_observation_batch_independence(self, batch_size, obs_dim):
         """Test that batch items are sliced independently."""
-        extractor = AttentionPointerExtractor(obs_dim=obs_dim)
+        extractor = AttentionPointerExtractor(BattleConfig.gen1())
 
         obs = torch.zeros(batch_size, obs_dim, dtype=torch.float32)
         for i in range(batch_size):
@@ -200,21 +194,20 @@ class TestPaddingDetection:
 
     def test_padding_detection_in_forward(self, extractor, batch_size):
         """Test that zero vectors are detected as padding."""
-        # Create observation with known padding
         obs_dim = 1279
         obs = torch.randn(batch_size, obs_dim)
 
         # Zero out some moves (last MAX_MOVES * MOVE_LEN elements)
         obs[:, -MAX_TEAM_SIZE:] = 0  # Zero out alive vector (not moves)
 
-        features = extractor(obs)
+        out = extractor(obs)
 
         # move_hidden should have been computed
-        assert extractor.move_hidden is not None
-        assert extractor.move_hidden.shape == (batch_size, MAX_MOVES, 64)
+        assert out.move_hidden is not None
+        assert out.move_hidden.shape == (batch_size, MAX_MOVES, 64)
 
         # attn_scores should reflect masking
-        assert extractor.attn_scores_moves is not None
+        assert out.attn_scores_moves is not None
 
     def test_moves_padding_mask(self, extractor, batch_size):
         """Test that zero move vectors produce padding mask."""
@@ -223,14 +216,14 @@ class TestPaddingDetection:
         # Set context to non-zero
         obs[:, :CONTEXT_LEN] = torch.randn(batch_size, CONTEXT_LEN)
 
-        features = extractor(obs)
+        out = extractor(obs)
 
         # All moves are zero, so all should be masked
-        assert extractor.move_hidden is not None
+        assert out.move_hidden is not None
 
         # Attention scores for padded items should be -inf before softmax
         # After softmax + nan_to_num, should produce zero attention
-        attn_scores = extractor.attn_scores_moves
+        attn_scores = out.attn_scores_moves
         assert attn_scores.shape == (batch_size, 4, MAX_MOVES)  # (B, n_heads, N)
 
 
@@ -244,43 +237,44 @@ class TestForwardPass:
     def test_forward_output_shape(self, extractor, random_observation):
         """Test that forward produces correct output shape."""
         batch_size = random_observation.shape[0]
-        features = extractor(random_observation)
+        out = extractor(random_observation)
 
-        assert features.shape == (batch_size, 128)  # trunk_hidden=128
+        assert isinstance(out, ExtractorOutput)
+        assert out.features.shape == (batch_size, 128)  # trunk_hidden=128
 
     def test_forward_output_dtype(self, extractor, random_observation):
         """Test that forward produces float32 tensors."""
-        features = extractor(random_observation)
-        assert features.dtype == torch.float32
+        out = extractor(random_observation)
+        assert out.features.dtype == torch.float32
 
     def test_forward_no_nan_inf(self, extractor, random_observation):
         """Test that forward doesn't produce NaN or Inf."""
-        features = extractor(random_observation)
+        out = extractor(random_observation)
 
-        assert not torch.isnan(features).any()
-        assert not torch.isinf(features).any()
+        assert not torch.isnan(out.features).any()
+        assert not torch.isinf(out.features).any()
 
     def test_forward_with_zero_observation(self, extractor, zero_observation):
         """Test forward pass with all-zeros observation."""
-        features = extractor(zero_observation)
+        out = extractor(zero_observation)
 
-        assert features.shape == (zero_observation.shape[0], 128)
-        assert not torch.isnan(features).any()
-        assert not torch.isinf(features).any()
+        assert out.features.shape == (zero_observation.shape[0], 128)
+        assert not torch.isnan(out.features).any()
+        assert not torch.isinf(out.features).any()
 
     def test_forward_batch_sizes(self, extractor, obs_dim):
         """Test forward pass with various batch sizes."""
         for batch_size in [1, 4, 8, 16]:
             obs = torch.randn(batch_size, obs_dim)
-            features = extractor(obs)
+            out = extractor(obs)
 
-            assert features.shape == (batch_size, 128)
-            assert not torch.isnan(features).any()
+            assert out.features.shape == (batch_size, 128)
+            assert not torch.isnan(out.features).any()
 
     def test_forward_deterministic_with_seed(self, obs_dim):
         """Test that forward is deterministic with same seed."""
-        extractor1 = AttentionPointerExtractor(obs_dim=obs_dim)
-        extractor2 = AttentionPointerExtractor(obs_dim=obs_dim)
+        extractor1 = AttentionPointerExtractor(BattleConfig.gen1())
+        extractor2 = AttentionPointerExtractor(BattleConfig.gen1())
 
         # Copy weights
         extractor2.load_state_dict(extractor1.state_dict())
@@ -289,10 +283,10 @@ class TestForwardPass:
         obs = torch.randn(2, obs_dim)
 
         torch.manual_seed(42)
-        features1 = extractor1(obs)
-        features2 = extractor2(obs)
+        out1 = extractor1(obs)
+        out2 = extractor2(obs)
 
-        torch.testing.assert_close(features1, features2, atol=1e-6, rtol=1e-5)
+        torch.testing.assert_close(out1.features, out2.features, atol=1e-6, rtol=1e-5)
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -300,52 +294,44 @@ class TestForwardPass:
 # ────────────────────────────────────────────────────────────────────────────
 
 class TestIntermediateStatePersistence:
-    """Test that intermediate states are saved during forward pass."""
+    """Test that intermediate states are returned in ExtractorOutput."""
 
-    def test_move_hidden_saved(self, extractor, random_observation):
-        """Test that move_hidden is saved after forward pass."""
-        assert extractor.move_hidden is None
+    def test_move_hidden_in_output(self, extractor, random_observation):
+        """Test that move_hidden is returned in ExtractorOutput."""
+        out = extractor(random_observation)
 
-        extractor(random_observation)
-
-        assert extractor.move_hidden is not None
+        assert out.move_hidden is not None
         batch_size = random_observation.shape[0]
-        assert extractor.move_hidden.shape == (batch_size, MAX_MOVES, 64)
+        assert out.move_hidden.shape == (batch_size, MAX_MOVES, 64)
 
-    def test_team_hidden_saved(self, extractor, random_observation):
-        """Test that team_hidden is saved after forward pass."""
-        assert extractor.team_hidden is None
+    def test_team_hidden_in_output(self, extractor, random_observation):
+        """Test that team_hidden is returned in ExtractorOutput."""
+        out = extractor(random_observation)
 
-        extractor(random_observation)
-
-        assert extractor.team_hidden is not None
+        assert out.team_hidden is not None
         batch_size = random_observation.shape[0]
-        assert extractor.team_hidden.shape == (batch_size, N_SWITCH_ACTIONS, 64)
+        assert out.team_hidden.shape == (batch_size, N_SWITCH_ACTIONS, 64)
 
-    def test_attn_scores_moves_saved(self, extractor, random_observation):
-        """Test that attention scores for moves are saved."""
-        assert extractor.attn_scores_moves is None
+    def test_attn_scores_moves_in_output(self, extractor, random_observation):
+        """Test that attention scores for moves are returned in ExtractorOutput."""
+        out = extractor(random_observation)
 
-        extractor(random_observation)
-
-        assert extractor.attn_scores_moves is not None
+        assert out.attn_scores_moves is not None
         batch_size = random_observation.shape[0]
         # Shape: (B, n_heads, N) where n_heads=4, N=4
-        assert extractor.attn_scores_moves.shape == (batch_size, 4, MAX_MOVES)
+        assert out.attn_scores_moves.shape == (batch_size, 4, MAX_MOVES)
 
-    def test_attn_scores_team_saved(self, extractor, random_observation):
-        """Test that attention scores for team are saved."""
-        assert extractor.attn_scores_team is None
+    def test_attn_scores_team_in_output(self, extractor, random_observation):
+        """Test that attention scores for team are returned in ExtractorOutput."""
+        out = extractor(random_observation)
 
-        extractor(random_observation)
-
-        assert extractor.attn_scores_team is not None
+        assert out.attn_scores_team is not None
         batch_size = random_observation.shape[0]
         # Shape: (B, n_heads, N) where n_heads=4, N=6
-        assert extractor.attn_scores_team.shape == (batch_size, 4, N_SWITCH_ACTIONS)
+        assert out.attn_scores_team.shape == (batch_size, 4, N_SWITCH_ACTIONS)
 
-    def test_intermediate_states_updated_on_each_forward(self, extractor, obs_dim):
-        """Test that intermediate states are updated on each forward pass."""
+    def test_independent_outputs_per_call(self, extractor, obs_dim):
+        """Test that each call returns independent output with no shared mutable state."""
         obs1 = torch.randn(2, obs_dim)
         obs1[:, -MAX_TEAM_SIZE] = 1.0
         obs1[:, -MAX_TEAM_SIZE + 1:] = 0.0
@@ -354,14 +340,15 @@ class TestIntermediateStatePersistence:
         obs2[:, -MAX_TEAM_SIZE] = 1.0
         obs2[:, -MAX_TEAM_SIZE + 1:] = 0.0
 
-        extractor(obs1)
-        move_hidden_1 = extractor.move_hidden.clone()
+        out1 = extractor(obs1)
+        out2 = extractor(obs2)
 
-        extractor(obs2)
-        move_hidden_2 = extractor.move_hidden.clone()
+        # Outputs should be independent — different inputs → different hidden states
+        assert not torch.allclose(out1.move_hidden, out2.move_hidden)
 
-        # Should be different for different inputs
-        assert not torch.allclose(move_hidden_1, move_hidden_2)
+        # out1 should be unchanged after the second call (no shared mutable state)
+        out1_again = extractor(obs1)
+        torch.testing.assert_close(out1.move_hidden, out1_again.move_hidden)
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -447,8 +434,8 @@ class TestGradientFlow:
     def test_gradients_enabled(self, extractor, random_observation):
         """Test that gradients are computed."""
         obs = random_observation.clone().requires_grad_(True)
-        features = extractor(obs)
-        loss = features.sum()
+        out = extractor(obs)
+        loss = out.features.sum()
         loss.backward()
 
         # Observation gradients should exist
@@ -457,8 +444,8 @@ class TestGradientFlow:
 
     def test_all_parameters_have_gradients(self, extractor, random_observation):
         """Test that all model parameters receive gradients."""
-        features = extractor(random_observation)
-        loss = features.sum()
+        out = extractor(random_observation)
+        loss = out.features.sum()
         loss.backward()
 
         for name, param in extractor.named_parameters():
@@ -468,7 +455,7 @@ class TestGradientFlow:
     def test_no_gradients_in_inference_mode(self, extractor, random_observation):
         """Test that no gradients are computed in no_grad context."""
         with torch.no_grad():
-            features = extractor(random_observation)
+            extractor(random_observation)
 
         # No gradients should be computed
         for param in extractor.parameters():
@@ -485,17 +472,17 @@ class TestDeviceHandling:
     def test_forward_cpu(self, extractor, random_observation):
         """Test forward pass on CPU."""
         extractor = extractor.cpu()
-        features = extractor(random_observation.cpu())
+        out = extractor(random_observation.cpu())
 
-        assert features.device.type == "cpu"
+        assert out.features.device.type == "cpu"
 
     def test_double_precision(self, extractor, obs_dim):
         """Test forward pass with double precision."""
         extractor = extractor.double()
         obs = torch.randn(2, obs_dim, dtype=torch.float64)
 
-        features = extractor(obs)
-        assert features.dtype == torch.float64
+        out = extractor(obs)
+        assert out.features.dtype == torch.float64
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -508,41 +495,41 @@ class TestEdgeCases:
     def test_single_batch(self, extractor, obs_dim):
         """Test with batch size 1."""
         obs = torch.randn(1, obs_dim)
-        features = extractor(obs)
+        out = extractor(obs)
 
-        assert features.shape == (1, 128)
+        assert out.features.shape == (1, 128)
 
     def test_large_batch(self, extractor, obs_dim):
         """Test with large batch size."""
         obs = torch.randn(256, obs_dim)
-        features = extractor(obs)
+        out = extractor(obs)
 
-        assert features.shape == (256, 128)
+        assert out.features.shape == (256, 128)
 
     def test_very_large_values(self, extractor):
         """Test stability with very large input values."""
         obs = torch.randn(4, 1279) * 1e6
-        features = extractor(obs)
+        out = extractor(obs)
 
-        assert not torch.isnan(features).any()
-        assert not torch.isinf(features).any()
+        assert not torch.isnan(out.features).any()
+        assert not torch.isinf(out.features).any()
 
     def test_very_small_values(self, extractor):
         """Test stability with very small input values."""
         obs = torch.randn(4, 1279) * 1e-6
-        features = extractor(obs)
+        out = extractor(obs)
 
-        assert not torch.isnan(features).any()
-        assert not torch.isinf(features).any()
+        assert not torch.isnan(out.features).any()
+        assert not torch.isinf(out.features).any()
 
     def test_mixed_signs(self, extractor):
         """Test with mixed positive and negative values."""
         obs = torch.randn(4, 1279)
-        features = extractor(obs)
+        out = extractor(obs)
 
-        assert not torch.isnan(features).any()
+        assert not torch.isnan(out.features).any()
         # Should have both positive and negative values
-        assert (features > 0).any() and (features < 0).any()
+        assert (out.features > 0).any() and (out.features < 0).any()
 
 
 # ────────────────────────────────────────────────────────────────────────────
@@ -557,12 +544,12 @@ class TestModelStateManagement:
         extractor.train()
         assert extractor.training
 
-        features_train = extractor(random_observation)
+        features_train = extractor(random_observation).features
 
         extractor.eval()
         assert not extractor.training
 
-        features_eval = extractor(random_observation)
+        features_eval = extractor(random_observation).features
 
         # Should be equal or very close (due to batch norm differences)
         assert features_train.shape == features_eval.shape
@@ -572,15 +559,15 @@ class TestModelStateManagement:
         obs = torch.randn(2, obs_dim)
 
         # Get original output
-        original_features = extractor(obs)
+        original_features = extractor(obs).features
         original_state = extractor.state_dict()
 
         # Create new extractor and load state
-        extractor2 = AttentionPointerExtractor(obs_dim=obs_dim)
+        extractor2 = AttentionPointerExtractor(BattleConfig.gen1())
         extractor2.load_state_dict(original_state)
 
         # Should produce same output
-        loaded_features = extractor2(obs)
+        loaded_features = extractor2(obs).features
         torch.testing.assert_close(original_features, loaded_features, atol=1e-6, rtol=1e-5)
 
     def test_parameters_not_none(self, extractor):
@@ -598,20 +585,14 @@ class TestIntegration:
     """Test integration aspects for use in policy."""
 
     def test_intermediate_states_accessible_to_policy(self, extractor, random_observation):
-        """Test that intermediate states are accessible after forward pass."""
-        extractor(random_observation)
+        """Test that intermediate states are returned in ExtractorOutput for policy use."""
+        out = extractor(random_observation)
 
-        # These should be accessible for policy to use
-        assert hasattr(extractor, "move_hidden")
-        assert hasattr(extractor, "team_hidden")
-        assert hasattr(extractor, "attn_scores_moves")
-        assert hasattr(extractor, "attn_scores_team")
-
-        # And should have values
-        assert extractor.move_hidden is not None
-        assert extractor.team_hidden is not None
-        assert extractor.attn_scores_moves is not None
-        assert extractor.attn_scores_team is not None
+        assert isinstance(out, ExtractorOutput)
+        assert out.move_hidden is not None
+        assert out.team_hidden is not None
+        assert out.attn_scores_moves is not None
+        assert out.attn_scores_team is not None
 
     def test_sb3_attributes_present(self, extractor):
         """Test that SB3-required attributes are present."""

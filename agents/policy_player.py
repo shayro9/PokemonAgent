@@ -2,9 +2,9 @@
 from poke_env.player import Player
 from sb3_contrib import MaskablePPO
 
+from env.battle_config import BattleConfig
 from env.action_mask_gen_1 import ActionMaskGen1
 from env.singles_env_wrapper import PokemonRLWrapper
-from env.states.gen1.battle_state_gen_1 import BattleStateGen1
 
 
 class PolicyPlayer(Player):
@@ -13,6 +13,8 @@ class PolicyPlayer(Player):
     :param model_path: Path to the saved ``.zip`` model file.
     :param wrapper: A :class:`~env.singles_env_wrapper.PokemonRLWrapper`
         used as a stateless helper for embedding and action decoding.
+    :param battle_config: Generation config used to build observations.
+        Defaults to Gen 1.
     :param deterministic: Use deterministic action selection (default True).
     :param verbose: Print the full BattleState description on every turn.
     """
@@ -22,6 +24,7 @@ class PolicyPlayer(Player):
         model_path: str,
         wrapper: PokemonRLWrapper,
         *,
+        battle_config: BattleConfig | None = None,
         deterministic: bool = True,
         verbose: bool = True,
         **kwargs,
@@ -29,6 +32,7 @@ class PolicyPlayer(Player):
         super().__init__(**kwargs)
         self.model: MaskablePPO = MaskablePPO.load(model_path)
         self._wrapper = wrapper
+        self._battle_config = battle_config if battle_config is not None else BattleConfig.gen1()
         self._deterministic = deterministic
         self._verbose = verbose
 
@@ -42,10 +46,10 @@ class PolicyPlayer(Player):
             print(f"\n{'='*60}")
             print(f"  Turn {turn}")
             print('='*60)
-            print(BattleStateGen1(battle).describe())
+            print(self._battle_config.battle_state_cls(battle).describe())
 
         observation = {
-                "observation": self._wrapper.embed_battle(battle),
+                "observation": self._battle_config.battle_state_cls(battle).to_array(),
                 "action_mask": self._wrapper.get_action_mask(battle),
             }
         action, _ = self.model.predict(
