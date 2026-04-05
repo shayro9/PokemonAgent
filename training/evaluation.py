@@ -109,7 +109,6 @@ def evaluate_model(
 
     # TODO: add from args
     algo = "maskable_ppo"
-    use_action_masking = (algo == "maskable_ppo")
 
     if battle_team_generator:
         battle_team_generator.reset()
@@ -119,7 +118,6 @@ def evaluate_model(
         opponent_generator=opponent_generator,
         rounds_per_opponent=1,
         agent_team_generator=agent_team_generator,
-        use_action_masking=use_action_masking,
         battle_team_generator=battle_team_generator,
     )
 

@@ -5,8 +5,6 @@ import wandb
 
 from sb3_contrib import MaskablePPO
 from stable_baselines3.common.utils import set_random_seed
-from stable_baselines3.common.callbacks import CallbackList
-from wandb.integration.sb3 import WandbCallback
 
 from policy.policy import AttentionPointerPolicy
 from config.config import resolve_opponents
@@ -57,6 +55,28 @@ def train_model(
     device_config = DeviceConfig(device=device)
     device_config.print_info()
 
+    # TODO: add from args
+    algo = "maskable_ppo"
+
+    if n_envs > 1:
+        train_env = build_vec_env(
+            n_envs=n_envs,
+            battle_format=battle_format,
+            opponent_generator=opponent_generator,
+            rounds_per_opponent=rounds_per_opponent,
+            agent_team_generator=agent_team_generator,
+            battle_team_generator=battle_team_generator,
+        )
+        print(f"Using {n_envs} parallel environment workers (SubprocVecEnv).")
+    else:
+        train_env = build_env(
+            battle_format,
+            opponent_generator,
+            rounds_per_opponent,
+            agent_team_generator=agent_team_generator,
+            battle_team_generator=battle_team_generator,
+        )
+
     run = wandb.init(
         project="pokemon-rl",
         name=f"{battle_format}__{int(time.time())}",
@@ -73,31 +93,6 @@ def train_model(
         },
         save_code=True,
     )
-
-    # TODO: add from args
-    algo = "maskable_ppo"
-    use_action_masking = (algo == "maskable_ppo")
-
-    if n_envs > 1:
-        train_env = build_vec_env(
-            n_envs=n_envs,
-            battle_format=battle_format,
-            opponent_generator=opponent_generator,
-            rounds_per_opponent=rounds_per_opponent,
-            agent_team_generator=agent_team_generator,
-            battle_team_generator=battle_team_generator,
-            use_action_masking=use_action_masking,
-        )
-        print(f"Using {n_envs} parallel environment workers (SubprocVecEnv).")
-    else:
-        train_env = build_env(
-            battle_format,
-            opponent_generator,
-            rounds_per_opponent,
-            agent_team_generator=agent_team_generator,
-            battle_team_generator=battle_team_generator,
-            use_action_masking=use_action_masking,
-        )
 
     policy_kwargs = dict(
         context_hidden=256,
@@ -136,10 +131,7 @@ def train_model(
             model.learn(
                 total_timesteps=step_chunk,
                 reset_num_timesteps=False,
-                callback=CallbackList([
-                    WandbCallback(gradient_save_freq=100, verbose=0),
-                    metrics_cb,
-                ]))
+                callback=metrics_cb)
             trained_steps += step_chunk
 
             eval_res = evaluate_model(model=model, timestep=trained_steps, **eval_kwargs)
@@ -149,10 +141,7 @@ def train_model(
     else:
         model.learn(
             total_timesteps=timesteps,
-            callback=CallbackList([
-                WandbCallback(gradient_save_freq=100, verbose=0),
-                BattleMetricsCallback(env=train_env, log_freq=LOG_FREQ),
-            ])
+            callback=BattleMetricsCallback(env=train_env, log_freq=LOG_FREQ),
         )
 
     model.save(model_path)
