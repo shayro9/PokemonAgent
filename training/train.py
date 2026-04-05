@@ -10,7 +10,7 @@ from wandb.integration.sb3 import WandbCallback
 
 from policy.policy import AttentionPointerPolicy
 from config.config import resolve_opponents
-from env.env_builder import build_env
+from env.env_builder import build_env, build_vec_env
 from training.parse import build_arg_parser
 from training.device_config import DeviceConfig
 from training.battle_metrics_log import BattleMetricsCallback
@@ -30,6 +30,7 @@ def train_model(
         battle_team_generator=None,
         seed: int = 42,
         device: str = "auto",
+        n_envs: int = 1,
 ) -> MaskablePPO:
     """Train a MaskablePPO agent and optionally run periodic evaluation.
 
@@ -44,6 +45,9 @@ def train_model(
     :param battle_team_generator: Optional generator yielding both battle teams.
     :param seed: Random seed.
     :param device: "auto", "cuda", or "cpu"
+    :param n_envs: Number of parallel environment workers. Values > 1 use
+        ``SubprocVecEnv`` for true parallelism. Each worker runs its own
+        asyncio event loop and Pokémon Showdown connections.
     :returns: The trained ``MaskablePPO`` model."""
     random.seed(seed)
     np.random.seed(seed)
@@ -67,7 +71,6 @@ def train_model(
             "ent_coef": ENT_COEF,
             "device": str(device_config),
         },
-        sync_tensorboard=False,
         save_code=True,
     )
 
@@ -75,14 +78,26 @@ def train_model(
     algo = "maskable_ppo"
     use_action_masking = (algo == "maskable_ppo")
 
-    train_env = build_env(
-        battle_format,
-        opponent_generator,
-        rounds_per_opponent,
-        agent_team_generator=agent_team_generator,
-        battle_team_generator=battle_team_generator,
-        use_action_masking=use_action_masking,
-    )
+    if n_envs > 1:
+        train_env = build_vec_env(
+            n_envs=n_envs,
+            battle_format=battle_format,
+            opponent_generator=opponent_generator,
+            rounds_per_opponent=rounds_per_opponent,
+            agent_team_generator=agent_team_generator,
+            battle_team_generator=battle_team_generator,
+            use_action_masking=use_action_masking,
+        )
+        print(f"Using {n_envs} parallel environment workers (SubprocVecEnv).")
+    else:
+        train_env = build_env(
+            battle_format,
+            opponent_generator,
+            rounds_per_opponent,
+            agent_team_generator=agent_team_generator,
+            battle_team_generator=battle_team_generator,
+            use_action_masking=use_action_masking,
+        )
 
     policy_kwargs = dict(
         context_hidden=256,
@@ -177,6 +192,7 @@ def main():
         battle_team_generator=opp.train_battle_team_generator,
         seed=args.seed,
         device=args.device,
+        n_envs=args.n_envs,
     )
 
     if args.skip_eval:

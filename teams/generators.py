@@ -32,6 +32,15 @@ class InfinitePoolGenerator:
         """Restart the sequence from the beginning using the original seed."""
         self._gen = self._make_generator()
 
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        del state["_gen"]  # generator objects are not picklable
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self._gen = self._make_generator()
+
     @property
     def team_size(self) -> int:
         """Return the number of Pokémon in a team."""

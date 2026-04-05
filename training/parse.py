@@ -74,4 +74,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Device to use: 'auto' (GPU if available, else CPU), 'cuda' (GPU only), 'cpu'"
     )
 
+    # Parallelism
+    parser.add_argument(
+        "--n-envs",
+        type=int,
+        default=1,
+        help="Number of parallel environment workers for training. Values > 1 use "
+             "SubprocVecEnv for true parallel rollout collection.",
+    )
+
     return parser

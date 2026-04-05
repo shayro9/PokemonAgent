@@ -4,6 +4,7 @@ import wandb
 import numpy as np
 
 from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.vec_env import VecEnv
 from poke_env.environment import SingleAgentWrapper
 
 from env.singles_env_wrapper import PokemonRLWrapper
@@ -11,7 +12,7 @@ from training.config import LOG_FREQ
 
 
 class BattleMetricsCallback(BaseCallback):
-    def __init__(self, env: SingleAgentWrapper, log_freq: int = 100, verbose=0):
+    def __init__(self, env, log_freq: int = 100, verbose=0):
         super().__init__(verbose)
         self.env = env
         self.log_freq = log_freq
@@ -34,7 +35,7 @@ class BattleMetricsCallback(BaseCallback):
                 self._episode_rewards.append(info["episode"]["r"])
                 self._episode_lengths.append(info["episode"]["l"])
 
-                battle = self._get_battle()
+                battle = self._get_battle(env_idx=i)
                 if battle is not None:
                     if battle.won:
                         self._results.append(1)
@@ -46,7 +47,7 @@ class BattleMetricsCallback(BaseCallback):
         if self.n_calls % self.log_freq == 0 and self._episode_rewards:
             action_list = list(self._switch_actions)
             switch_rate = (
-                sum(1 for a in action_list if 0 <= a <= 3) / len(action_list)
+                sum(1 for a in action_list if 0 <= a <= 5) / len(action_list)
                 if action_list else 0.0
             )
 
@@ -60,11 +61,13 @@ class BattleMetricsCallback(BaseCallback):
 
         return True
 
-    def _get_battle(self):
+    def _get_battle(self, env_idx: int = 0):
         env = self.env
+        if isinstance(env, VecEnv):
+            battles = env.env_method("get_last_battle")
+            return battles[env_idx] if env_idx < len(battles) else None
         while hasattr(env, "env"):
             env = env.env
         if isinstance(env, PokemonRLWrapper):
-            battle = env.get_last_battle()
-            return battle
+            return env.get_last_battle()
         return None
