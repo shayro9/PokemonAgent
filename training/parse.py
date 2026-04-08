@@ -1,8 +1,5 @@
 import argparse
 
-from config.config import TEAM_BY_NAME
-
-
 def build_arg_parser() -> argparse.ArgumentParser:
     """Create the command-line parser for training and evaluation.
     
@@ -17,7 +14,6 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model-path", default="models/1v1_gen1_500k_steps")
 
     # Training
-    parser.add_argument("--train-team", default=None, choices=sorted(TEAM_BY_NAME))
     parser.add_argument("--timesteps", type=int, default=20_000)
     parser.add_argument("--rounds-per-opponent", type=int, default=2_000)
     parser.add_argument("--eval-every-timesteps", type=int, default=0)
@@ -31,17 +27,6 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="How many episodes to evaluate against (one battle per opponent).",
     )
     parser.add_argument("--eval-max-steps", type=int, default=500)
-
-    # Opponent selection: TRAIN
-    train_src = parser.add_mutually_exclusive_group()
-    train_src.add_argument("--pool", default=None, help="Comma-separated opponent pool for training.")
-    train_src.add_argument("--pool-all", action="store_true", default=False, help="Use all prebuilt solo teams.")
-    train_src.add_argument("--random-generated", action="store_true", default=False, help="Use generated opponents.")
-
-    # Opponent selection: EVAL (optional override)
-    eval_src = parser.add_mutually_exclusive_group()
-    eval_src.add_argument("--eval-pool", default=None, help="Comma-separated opponent pool for evaluation.")
-    eval_src.add_argument("--eval-pool-all", action="store_true", default=False, help="Use all prebuilt solo teams.")
 
     # Generated dataset split (only meaningful if --random-generated)
     parser.add_argument(
@@ -78,5 +63,23 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
     parser.add_argument("--train-generator-seed", type=int, default=None)
     parser.add_argument("--eval-generator-seed", type=int, default=None)
+    
+    # Device configuration
+    parser.add_argument(
+        "--device",
+        type=str,
+        default="auto",
+        choices=["auto", "cuda", "cpu"],
+        help="Device to use: 'auto' (GPU if available, else CPU), 'cuda' (GPU only), 'cpu'"
+    )
+
+    # Parallelism
+    parser.add_argument(
+        "--n-envs",
+        type=int,
+        default=1,
+        help="Number of parallel environment workers for training. Values > 1 use "
+             "SubprocVecEnv for true parallel rollout collection.",
+    )
 
     return parser

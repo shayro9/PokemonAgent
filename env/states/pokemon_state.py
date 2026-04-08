@@ -1,13 +1,33 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
+from functools import lru_cache
 from typing import Optional
 
 import numpy as np
+from poke_env.battle import Move
 from poke_env.battle.pokemon import Pokemon
 from poke_env.battle.effect import Effect
 
-from env.states.state_utils import GEN1_BOOST_KEYS, ALL_STATUSES, GEN1_TRACKED_EFFECTS, GEN1_STAT_KEYS
+from env.states.move_state import MoveState
+from env.states.state_utils import GEN1_BOOST_KEYS, ALL_STATUSES, GEN1_TRACKED_EFFECTS, GEN1_STAT_KEYS, MAX_MOVES
 from env.states.state_utils import normalize, normalize_vector, encode_enum, encode_dicts, pull_attribute
+
+# Module-level cache: survives across BattleStateGen1 reconstructions each turn.
+# Key: (move_id, defending_types_tuple, attacking_types_tuple, gen)
+_MOVE_STATE_CACHE: dict[tuple, MoveState] = {}
+
+@lru_cache(maxsize=10000)
+def _get_cached_move_state(move, defending_types: tuple, attacking_types: tuple, gen: int) -> MoveState:
+    if move is None:
+        key = (None,)
+    else:
+        # PokemonType enum members are hashable — use them directly as key
+        key = (move.id, defending_types, attacking_types, gen)
+    cached = _MOVE_STATE_CACHE.get(key)
+    if cached is None:
+        cached = MoveState(move, defending_types, attacking_types, gen)
+        _MOVE_STATE_CACHE[key] = cached
+    return cached
 
 
 class PokemonState(ABC):
@@ -35,6 +55,7 @@ class PokemonState(ABC):
     # ------------------------------------------------------------------
     def __init__(self, pokemon: Optional[Pokemon] = None):
         self.level = 100
+        self.moves_states: list[MoveState] = [MoveState.zero()] * MAX_MOVES
         if pokemon is not None:
             self.hp      = pokemon.current_hp_fraction
             self.species = pokemon.species
@@ -46,6 +67,7 @@ class PokemonState(ABC):
             self.stab    = self.pull_attribute(pokemon, "stab_multiplier", default_value=0.0, type_value=float)
             self.active  = self.pull_attribute(pokemon, "active", default_value=0.0, type_value=float)
             self.fainted = self.pull_attribute(pokemon, "fainted", default_value=0.0, type_value=float)
+            self.moves   = self.pull_attribute(pokemon, "moves", default_value={}, type_value=dict)
         else:
             self.hp      = 0.0
             self.species = "none"
@@ -57,6 +79,7 @@ class PokemonState(ABC):
             self.stab    = self.pull_attribute(None, "stab_multiplier", default_value=0.0, type_value=float)
             self.active = self.pull_attribute(None, "active", default_value=0.0, type_value=float)
             self.fainted = self.pull_attribute(None, "fainted", default_value=0.0, type_value=float)
+            self.moves = self.pull_attribute(None, "moves", default_value={}, type_value=dict)
 
     # ------------------------------------------------------------------
     # Abstract interface
@@ -73,6 +96,26 @@ class PokemonState(ABC):
 
         Must satisfy ``len(self.to_array()) == self.array_len()`` at all times.
         """
+
+    def encode_moves(self, defending_pokemon: Pokemon, gen=1, available_moves=None):
+        """Build up to MAX_MOVES MoveState objects, zero-padded.
+
+        MoveState objects are cached globally by (move_id, defending_types,
+        attacking_types, gen) so repeated reconstruction of PokemonState each
+        turn hits the cache rather than rebuilding from scratch.
+        """
+        defending_types = tuple(defending_pokemon.types)
+        attacking_types = tuple(self.types)
+        all_moves = list(self.moves.values()) + [None] * MAX_MOVES
+        moves_list = (
+            [m if m in available_moves else None for m in all_moves[:MAX_MOVES]]
+            if available_moves
+            else all_moves[:MAX_MOVES]
+        )
+        self.moves_states = [
+            _get_cached_move_state(m, defending_types, attacking_types, gen)
+            for m in moves_list
+        ]
 
     @abstractmethod
     def describe(self) -> str:

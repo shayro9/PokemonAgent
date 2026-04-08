@@ -28,16 +28,15 @@ from poke_env import (
     LocalhostServerConfiguration,
     AccountConfiguration,
     RandomPlayer,
-    MaxBasePowerPlayer,
+    MaxBasePowerPlayer, SimpleHeuristicsPlayer,
 )
 
-from config.config import TEAM_BY_NAME
 from env.singles_env_wrapper import PokemonRLWrapper
 from agents.policy_player import PolicyPlayer
 from teams.generators import matchup_generator
 from data.prossesing import load_pool
 
-AGENT_CHOICES = ["policy", "random", "max-power"]
+AGENT_CHOICES = ["policy", "random", "max-power", "heuristic"]
 DEFAULT_FORMAT = "gen1ou"
 DEFAULT_DATA_PATH = "data/matchups_gen1ou_db.json"
 
@@ -50,10 +49,8 @@ def _resolve_team(team_arg, pool, side, team_size):
     'random' -> sample team_size Pokemon from pool using the given side key.
     Named string -> look up in TEAM_BY_NAME (single Pokemon, team_size ignored).
     """
-    if team_arg is None or team_arg == "random":
-        team = next(matchup_generator(pool=pool))[0 if side == "agent" else 1]
-        return team
-    return TEAM_BY_NAME[team_arg]
+    team = next(matchup_generator(pool=pool))[0 if side == "agent" else 1]
+    return team
 
 
 def _print_packed_team(label, packed):
@@ -110,8 +107,7 @@ def _print_packed_team(label, packed):
 # ------------------------------------------------------------------------------
 
 def build_arg_parser():
-    named_teams = sorted(TEAM_BY_NAME)
-    team_choices = ["random"] + named_teams
+    team_choices = ["random"]
 
     p = argparse.ArgumentParser(description="Challenge a human with a chosen AI agent.")
 
@@ -173,11 +169,10 @@ async def main():
         wrapper = PokemonRLWrapper(
             battle_format=args.format,
             team=ai_team,
-            opponent_teams=[],
             server_configuration=LocalhostServerConfiguration,
             account_configuration1=AccountConfiguration(f"{player_name}_env1", None),
             account_configuration2=AccountConfiguration(f"{player_name}_env2", None),
-            strict=False,
+            strict=True,
         )
         player = PolicyPlayer(
             model_path=args.model_path,
@@ -185,6 +180,8 @@ async def main():
             verbose=verbose,
             **shared,
         )
+    elif args.agent == "heuristic":
+        player = SimpleHeuristicsPlayer(**shared)
     elif args.agent == "random":
         player = RandomPlayer(**shared)
     elif args.agent == "max-power":

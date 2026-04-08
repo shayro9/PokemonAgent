@@ -1,4 +1,5 @@
 import numpy as np
+from functools import lru_cache
 from poke_env.battle.status import Status
 from poke_env.battle.effect import Effect
 
@@ -18,7 +19,7 @@ GEN1_STAT_KEYS      = ["hp", "atk", "def", "spc", "spe"]
 MODERN_STAT_KEYS    = ["hp", "atk", "def", "spa", "spd", "spe"]
 MODERN_BOOST_KEYS   = ["atk", "def", "spa", "spd", "spe", "accuracy", "evasion"]
 
-MAX_TEAM_SIZE = 1
+MAX_TEAM_SIZE = 6
 MAX_MOVES = 4
 
 def normalize(x: float, max_x: float = 1.0, symmetric: bool = False) -> float:
@@ -29,18 +30,13 @@ def normalize(x: float, max_x: float = 1.0, symmetric: bool = False) -> float:
         return max(-1.0, min(1.0, y))
     return min(1.0, max(0.0, y))
 
-def normalize_vector(vec, vec_max, symmetric: bool = False) -> np.ndarray:
-    if np.any(vec_max <= 0):
-        return np.zeros_like(vec, dtype=np.float32)
-
-    y = (vec / vec_max)
-
+def normalize_vector(vec, vec_max: float, symmetric: bool = False) -> np.ndarray:
+    if vec_max <= 0:
+        return np.zeros_like(vec)
+    y = vec / vec_max
     if symmetric:
-        y = np.clip(y, -1.0, 1.0)
-    else:
-        y = np.clip(y, 0.0, 1.0)
-
-    return y.astype(np.float32)
+        return np.clip(y, -1.0, 1.0).astype(np.float32)
+    return np.clip(y, 0.0, 1.0).astype(np.float32)
 
 def encode_enum(value, enums_list) -> np.ndarray:
     """Encode an enum condition over enums_list.
@@ -69,6 +65,10 @@ def encode_enum(value, enums_list) -> np.ndarray:
         dtype=np.float32,
     )
 
+@lru_cache(maxsize=8)
+def _build_key_index(keys_tuple: tuple) -> dict:
+    return {k: i for i, k in enumerate(keys_tuple)}
+
 def encode_dicts(_dict: dict, _keys: list[str]) -> np.ndarray:
     """Extract raw boost stage values in the given key order.
 
@@ -76,10 +76,14 @@ def encode_dicts(_dict: dict, _keys: list[str]) -> np.ndarray:
     :param _keys: Ordered list of keys to extract.
     :returns: Float32 array of raw values stage values.
     """
-    return np.array(
-        [_dict.get(k) or 0 for k in _keys],
-        dtype=np.float32,
-    )
+    out = np.zeros(len(_keys), dtype=np.float32)
+    if _dict:
+        idx_map = _build_key_index(tuple(_keys))
+        for k, v in _dict.items():
+            i = idx_map.get(k)
+            if i is not None and v:
+                out[i] = v
+    return out
 
 def pull_attribute(obj, key, default_value, type_value):
     try:
@@ -88,5 +92,4 @@ def pull_attribute(obj, key, default_value, type_value):
         val = getattr(obj, key, default_value)
         return type_value(val) if val is not None else default_value
     except Exception as e:
-        # print(e)
         return type_value(default_value)

@@ -7,7 +7,7 @@ def load_pool(data_path: str) -> list[dict]:
     :param data_path: Path to the generated JSON dataset.
     :returns: The list stored in the dataset's ``pool`` field."""
     with open(data_path, 'r', encoding='utf-8') as f:
-        _pool = json.load(f)['pool']
+        _pool = json.load(f).get('pool', None)
 
     if not _pool:
         raise ValueError("The database is empty. Run the Node.js script first!")

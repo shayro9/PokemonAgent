@@ -1,35 +1,11 @@
 from typing import Iterable, Optional
 from dataclasses import dataclass
 
-from teams.single_teams import ALL_SOLO_TEAMS
 from teams.generators import team_generator, matchup_generator, InfinitePoolGenerator
 from data.prossesing import load_pool, split_pool
 
 
-TEAM_BY_NAME = {name: team for name, team in ALL_SOLO_TEAMS}
 DEFAULT_DATA_PATH = "data/matchups_gen1ou_db.json"
-
-
-def parse_pool(raw_pool: str | None, pool_all: bool) -> list[str]:
-    """Parse and validate a comma-separated pool of opponent names.
-    
-    :param raw_pool: Comma-separated opponent names.
-    :param pool_all: Whether all predefined solo teams should be used.
-    :returns: A list of validated opponent names."""
-    if pool_all:
-        return [name for name, _ in ALL_SOLO_TEAMS]
-
-    if not raw_pool:
-        return []
-
-    names = [name.strip() for name in raw_pool.split(",") if name.strip()]
-    unknown = [name for name in names if name not in TEAM_BY_NAME]
-    if unknown:
-        raise ValueError(
-            f"Unknown pokemon(s) in pool: {', '.join(unknown)}. "
-            f"Valid names: {', '.join(sorted(TEAM_BY_NAME))}"
-        )
-    return names
 
 
 def resolve_seed(explicit: Optional[int], fallback: int) -> int:
@@ -69,8 +45,6 @@ def _resolve_generated_pools(
 
 @dataclass(frozen=True)
 class OpponentsResolved:
-    train_names: list[str]
-    eval_names: list[str]
     train_gen: Optional[InfinitePoolGenerator]
     eval_gen: Optional[InfinitePoolGenerator]
     train_agent_gen: Optional[InfinitePoolGenerator]
@@ -99,13 +73,6 @@ def _resolve_train_eval_pools(
 
 def resolve_opponents(args) -> OpponentsResolved:
     """Resolve train/eval opponent names and generators from CLI args."""
-    train_names: list[str] = []
-    eval_names: list[str] = []
-    train_gen = None
-    eval_gen = None
-    train_agent_gen = None
-    eval_agent_gen = None
-
     if getattr(args, 'matchup_data_path', None):
         matchup_pool = load_pool(args.matchup_data_path)
 
@@ -123,34 +90,12 @@ def resolve_opponents(args) -> OpponentsResolved:
             train_pool = eval_pool = matchup_pool
 
         return OpponentsResolved(
-            train_names=[],
-            eval_names=[],
             train_gen=None,
             eval_gen=None,
             train_agent_gen=None,
             eval_agent_gen=None,
             train_battle_team_generator=matchup_generator(pool=train_pool, seed=args.seed),
             eval_battle_team_generator=matchup_generator(pool=eval_pool, seed=args.seed),
-        )
-
-    if not args.random_generated:
-        # ---- NAME-BASED TRAIN opponents ----
-        train_names = parse_pool(args.pool, args.pool_all)
-
-        # ---- NAME-BASED EVAL opponents ----
-        if args.eval_pool is not None or args.eval_pool_all:
-            eval_names = parse_pool(args.eval_pool, args.eval_pool_all)
-        else:
-            eval_names = train_names
-
-        # Generators must be None in name-based mode
-        return OpponentsResolved(
-            train_names=train_names,
-            eval_names=eval_names,
-            train_gen=None,
-            eval_gen=None,
-            train_agent_gen=None,
-            eval_agent_gen=None,
         )
 
     # ---- GENERATED MODE ----
@@ -191,25 +136,14 @@ def resolve_opponents(args) -> OpponentsResolved:
     train_gen = team_generator(pool=train_opp_pool, seed=train_seed)
     eval_gen = team_generator(pool=eval_opp_pool, seed=eval_seed)
 
-    # Agent generators only when you did NOT provide an explicit --train-team
-    if args.train_team is None:
-        if agent_data_path == opponent_data_path:
-            train_agent_gen = train_gen
-            eval_agent_gen = eval_gen
-        else:
-            train_agent_gen = team_generator(pool=train_agent_pool, seed=train_seed)
-            eval_agent_gen = team_generator(pool=eval_agent_pool, seed=eval_seed)
-
-    # Names are irrelevant in generated mode, but keep them consistent/empty
-    if args.eval_pool is not None or args.eval_pool_all:
-        eval_names = parse_pool(args.eval_pool, args.eval_pool_all)
-        eval_gen = None
+    if agent_data_path == opponent_data_path:
+        train_agent_gen = train_gen
+        eval_agent_gen = eval_gen
     else:
-        eval_names = train_names  # usually empty
+        train_agent_gen = team_generator(pool=train_agent_pool, seed=train_seed)
+        eval_agent_gen = team_generator(pool=eval_agent_pool, seed=eval_seed)
 
     return OpponentsResolved(
-        train_names=train_names,
-        eval_names=eval_names,
         train_gen=train_gen,
         eval_gen=eval_gen,
         train_agent_gen=train_agent_gen,
