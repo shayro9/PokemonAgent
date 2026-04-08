@@ -80,6 +80,20 @@ def build_env(
     return _PokemonEnvBridge(env)
 
 
+def _fork_generator(gen, worker_id: int):
+    """Return a seed-offset copy of *gen* for a given worker.
+
+    If *gen* is ``None`` or does not support ``fork`` it is returned as-is.
+
+    :param gen: Generator to fork, or ``None``.
+    :param worker_id: Zero-based worker index.
+    :returns: Forked generator or the original value.
+    """
+    if gen is None or not hasattr(gen, "fork"):
+        return gen
+    return gen.fork(worker_id)
+
+
 def build_vec_env(
         n_envs: int,
         battle_format: str,
@@ -105,14 +119,18 @@ def build_vec_env(
     :returns: A ``SubprocVecEnv`` wrapping ``n_envs`` independent environments."""
 
     def make_env(worker_id: int):
+        forked_opponent = _fork_generator(opponent_generator, worker_id)
+        forked_agent = _fork_generator(agent_team_generator, worker_id)
+        forked_battle = _fork_generator(battle_team_generator, worker_id)
+
         def _init():
             set_random_seed(worker_id)
             return build_env(
                 battle_format=battle_format,
-                opponent_generator=opponent_generator,
+                opponent_generator=forked_opponent,
                 rounds_per_opponent=rounds_per_opponent,
-                agent_team_generator=agent_team_generator,
-                battle_team_generator=battle_team_generator,
+                agent_team_generator=forked_agent,
+                battle_team_generator=forked_battle,
                 strict=strict,
                 battle_config=battle_config,
                 worker_id=worker_id,
