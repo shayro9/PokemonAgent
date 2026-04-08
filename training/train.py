@@ -11,6 +11,7 @@ from config.config import resolve_opponents
 from env.env_builder import build_env, build_vec_env
 from training.parse import build_arg_parser
 from training.device_config import DeviceConfig
+from wandb.integration.sb3 import WandbCallback
 from training.battle_metrics_log import BattleMetricsCallback
 from training.config import LR, N_STEPS, BATCH_SIZE, GAMMA, ENT_COEF, LR_DECAY, LOG_FREQ
 from training.evaluation import evaluate_model, print_eval_summary
@@ -126,12 +127,13 @@ def train_model(
         trained_steps = 0
         eval_results = []
         metrics_cb = BattleMetricsCallback(env=train_env, log_freq=LOG_FREQ)
+        wandb_cb = WandbCallback(verbose=0)
         while trained_steps < timesteps:
             step_chunk = min(eval_every_timesteps, timesteps - trained_steps)
             model.learn(
                 total_timesteps=step_chunk,
                 reset_num_timesteps=False,
-                callback=metrics_cb)
+                callback=[metrics_cb, wandb_cb])
             trained_steps += step_chunk
 
             eval_res = evaluate_model(model=model, timestep=trained_steps, **eval_kwargs)
@@ -141,7 +143,7 @@ def train_model(
     else:
         model.learn(
             total_timesteps=timesteps,
-            callback=BattleMetricsCallback(env=train_env, log_freq=LOG_FREQ),
+            callback=[BattleMetricsCallback(env=train_env, log_freq=LOG_FREQ), WandbCallback(verbose=0)],
         )
 
     model.save(model_path)
