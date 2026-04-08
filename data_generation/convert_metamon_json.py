@@ -8,22 +8,30 @@ This version automatically searches for JSON files in subdirectories!
 
 USAGE
 -----
-# Convert with the 6v6 Gen-1 observation format (default)
+# Compact binary format (recommended — ~10–20× smaller than JSONL)
+python convert_metamon_json.py \
+    --input-dir data/metamon/gen1ou \
+    --output data/supervised/gen1ou.npz
+
+# JSONL format (human-readable, slower to load)
 python convert_metamon_json.py \
     --input-dir data/metamon/gen1ou \
     --output data/supervised/gen1ou.jsonl
 
 OUTPUT FORMAT
 -------------
-Each line in the output JSONL file is a single timestep:
-{
-    "obs": [float, ...],   # Observation vector (1279-dim, matches BattleStateGen1)
-    "action": int,         # Action index (0-9: 0-5 switches, 6-9 moves)
-    "battle_id": str,      # Battle identifier
-    "turn": int,           # Turn number
-    "player": "p1",        # Player perspective
-    "outcome": int,        # Only on last step of a battle: +1 win, -1 loss
-}
+The format is inferred from the output file extension:
+
+  .npz   — compressed NumPy archive (recommended).  Arrays stored:
+             obs          : float32 (N, 1279)  — observation vectors
+             actions      : int16   (N,)        — action indices 0-9
+             episode_idx  : int32   (N,)        — maps each step to an episode
+             turns        : int16   (N,)        — turn number within episode
+             outcomes     : float32 (N,)        — NaN except terminal step (+1/-1)
+
+  other  — JSONL, one record per line:
+             {"obs": [...], "action": int, "battle_id": str,
+              "turn": int, "player": "p1", "outcome": int (terminal only)}
 """
 
 import argparse
@@ -34,6 +42,12 @@ import lz4.frame
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 import numpy as np
+
+# Allow `python data_generation/convert_metamon_json.py` from the project root
+# in addition to `python -m data_generation.convert_metamon_json`.
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
 
 from data_generation.metamon_state_gen1 import metamon_to_obs_gen1
 from env.battle_config import BattleConfig
@@ -122,11 +136,10 @@ def convert_metamon_battle(
             )
 
         samples.append({
-            "obs": state_arr.tolist(),
+            "obs": state_arr,       # ndarray — callers convert to list for jsonl
             "action": action,
             "battle_id": battle_id,
             "turn": turn_idx,
-            "player": "p1",
         })
 
     if samples:
@@ -141,14 +154,17 @@ def convert_dataset(
     output_path: Path,
     max_battles: Optional[int] = None,
 ) -> None:
-    """Convert metamon JSON files to your format.
+    """Convert metamon JSON files to training format.
+
+    Format is inferred from *output_path* extension:
+    ``.npz`` → compressed NumPy archive (recommended);
+    anything else → JSONL text.
 
     Args:
         input_dir:    Directory containing metamon JSON files (or parent).
-        output_path:  Output JSONL path.
+        output_path:  Output path — ``.npz`` or ``.jsonl``.
         max_battles:  Maximum number of battles to process (None = all).
     """
-    # Find all JSON files
     json_files = list(input_dir.rglob("*.json.lz4"))
 
     if not json_files:
@@ -158,19 +174,27 @@ def convert_dataset(
 
     print(f"Found {len(json_files)} battle files in {input_dir}")
 
-    # Limit number of files if requested
     if max_battles:
         json_files = json_files[:max_battles]
         print(f"Processing first {len(json_files)} battles")
 
-    # Prepare output file
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    out_fh = output_path.open("w", encoding="utf-8")
+    use_npz = output_path.suffix == ".npz"
+    print(f"Output format     : {'npz (compressed binary)' if use_npz else 'jsonl (text)'}")
 
-    # Convert each battle
     total_samples = 0
-    failed_count = 0
-    empty_count = 0
+    failed_count  = 0
+    empty_count   = 0
+
+    # NPZ accumulation buffers
+    all_obs:     List[np.ndarray] = []
+    all_actions: List[int]        = []
+    all_ep_idx:  List[int]        = []
+    all_turns:   List[int]        = []
+    all_outcomes: List[float]     = []
+    episode_counter = 0
+
+    out_fh = None if use_npz else output_path.open("w", encoding="utf-8")
 
     try:
         for idx, json_file in enumerate(json_files):
@@ -178,45 +202,92 @@ def convert_dataset(
                 print(f"  [{idx + 1}/{len(json_files)}] battles processed | "
                       f"samples: {total_samples}")
             try:
-                # Load battle data
                 battle_data = load_metamon_json(json_file)
-                battle_id = Path(json_file.stem).stem  # strip both .json and .lz4
+                battle_id   = Path(json_file.stem).stem
 
-                # Convert to samples
                 samples = convert_metamon_battle(battle_data, battle_id)
 
                 if not samples:
                     empty_count += 1
                     continue
 
-                # Write sample
-                for sample in samples:
-                    total_samples += 1
-                    out_fh.write(json.dumps(sample) + "\n")
+                if use_npz:
+                    for i, s in enumerate(samples):
+                        all_obs.append(s["obs"])
+                        all_actions.append(s["action"])
+                        all_ep_idx.append(episode_counter)
+                        all_turns.append(s["turn"])
+                        # NaN on every step except the terminal one
+                        all_outcomes.append(float(s.get("outcome", float("nan"))))
+                        total_samples += 1
+                    episode_counter += 1
+                else:
+                    for s in samples:
+                        total_samples += 1
+                        record = {
+                            "obs":       s["obs"].tolist(),
+                            "action":    s["action"],
+                            "battle_id": s["battle_id"],
+                            "turn":      s["turn"],
+                            "player":    "p1",
+                        }
+                        if "outcome" in s:
+                            record["outcome"] = s["outcome"]
+                        out_fh.write(json.dumps(record) + "\n")
 
             except Exception as e:
                 failed_count += 1
-                if failed_count <= 3:  # Only show first 3 errors
+                if failed_count <= 3:
                     print(f"  ⚠ Failed to process {json_file.name}: {e}")
 
-        print(f"\n{'─'*60}")
-        print(f"Battles processed : {len(json_files) - failed_count - empty_count}")
-        print(f"Empty battles     : {empty_count}")
-        print(f"Failed            : {failed_count}")
-        print(f"Total samples     : {total_samples}")
-        print(f"Output            : {output_path}")
-        print(f"{'─'*60}")
+        # ── Finalise NPZ ─────────────────────────────────────────────────────
+        if use_npz and all_obs:
+            print("  Compressing and writing .npz …")
+            np.savez_compressed(
+                output_path,
+                obs         = np.stack(all_obs).astype(np.float32),
+                actions     = np.array(all_actions, dtype=np.int16),
+                episode_idx = np.array(all_ep_idx,  dtype=np.int32),
+                turns       = np.array(all_turns,   dtype=np.int16),
+                outcomes    = np.array(all_outcomes, dtype=np.float32),
+            )
 
-        if failed_count > 0:
-            print(f"\n⚠ {failed_count} battles failed to process.")
-            print("This may indicate a mismatch between the expected and actual")
-            print("metamon JSON structure. Check the first few error messages above.")
-
-        if empty_count > 0:
-            print(f"\n⚠ {empty_count} battles were empty (no valid observations/actions).")
+        _print_summary(
+            len(json_files), failed_count, empty_count,
+            total_samples, output_path, use_npz,
+        )
 
     finally:
-        out_fh.close()
+        if out_fh is not None:
+            out_fh.close()
+
+
+def _print_summary(
+    n_files: int,
+    failed: int,
+    empty: int,
+    total: int,
+    output_path: Path,
+    use_npz: bool,
+) -> None:
+    print(f"\n{'─'*60}")
+    print(f"Battles processed : {n_files - failed - empty}")
+    print(f"Empty battles     : {empty}")
+    print(f"Failed            : {failed}")
+    print(f"Total samples     : {total}")
+    if use_npz and output_path.exists():
+        size_mb = output_path.stat().st_size / 1_048_576
+        print(f"Output            : {output_path}  ({size_mb:.1f} MB)")
+    else:
+        print(f"Output            : {output_path}")
+    print(f"{'─'*60}")
+
+    if failed > 0:
+        print(f"\n⚠ {failed} battles failed to process.")
+        print("This may indicate a mismatch between the expected and actual")
+        print("metamon JSON structure. Check the first few error messages above.")
+    if empty > 0:
+        print(f"\n⚠ {empty} battles were empty (no valid observations/actions).")
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -234,7 +305,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--output",
         type=Path,
         required=True,
-        help="Output JSONL path (e.g., data/supervised/gen9ou.jsonl)",
+        help="Output path — use .npz for compact binary (recommended) or .jsonl for text",
     )
     parser.add_argument(
         "--max-battles",

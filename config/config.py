@@ -73,6 +73,7 @@ def _resolve_train_eval_pools(
 
 def resolve_opponents(args) -> OpponentsResolved:
     """Resolve train/eval opponent names and generators from CLI args."""
+    """Resolve train/eval opponent names and generators from CLI args."""
     if getattr(args, 'matchup_data_path', None):
         matchup_pool = load_pool(args.matchup_data_path)
 
