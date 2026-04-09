@@ -83,9 +83,12 @@ class AttentionPointerPolicy(MaskableActorCriticPolicy):
         move_hidden  = self._attn_kwargs["move_hidden"]
         team_hidden  = self._attn_kwargs["team_hidden"]
 
-        # Pointer projections: trunk → action_hidden space (dot product with encoded_i)
-        self.move_ptr_proj  = nn.Linear(trunk_hidden, move_hidden, bias=False)
-        self.switch_ptr_proj = nn.Linear(trunk_hidden, team_hidden, bias=False)
+        # Pointer projections: trunk → action_hidden space (dot product with encoded_i).
+        # bias=True is required so that switch and move logit scales start near 0;
+        # without bias the switch head produces logits ~-7 while the move head
+        # produces ~0, making switches effectively unsamplable even when valid.
+        self.move_ptr_proj  = nn.Linear(trunk_hidden, move_hidden, bias=True)
+        self.switch_ptr_proj = nn.Linear(trunk_hidden, team_hidden, bias=True)
         self.value_head     = nn.Linear(trunk_hidden, 1)
 
         # Prevent SB3's default heads from interfering
@@ -141,7 +144,7 @@ class AttentionPointerPolicy(MaskableActorCriticPolicy):
         return torch.cat([
             switch_logits,           # 0-5 (6 logits)
             move_logits,             # 6-9 (4 logits)
-        ], dim=-1)                   # (B, 26)
+        ], dim=-1)                   # (B, 10)
 
     # ── distribution helpers ───────────────────────────────────────────────
 
