@@ -23,6 +23,7 @@ Output is always a compressed NumPy archive (.npz).  Arrays stored:
 """
 
 import argparse
+import json
 import sys
 import lz4.frame
 
