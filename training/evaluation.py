@@ -107,9 +107,6 @@ def evaluate_model(
     :returns: A list containing one ``EvalResult`` summary."""
     results: list[EvalResult] = []
 
-    # TODO: add from args
-    algo = "maskable_ppo"
-
     if battle_team_generator:
         battle_team_generator.reset()
 
