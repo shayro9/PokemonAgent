@@ -12,6 +12,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--format", type=str, default="gen9customgame")
     parser.add_argument("--seed", type=int, default=42, help="Global seed for reproducible training/evaluation.")
     parser.add_argument("--model-path", default="models/1v1_gen1_500k_steps")
+    parser.add_argument(
+        "--load-model-path",
+        type=str,
+        default=None,
+        help="Path to an existing saved model (.zip) to load instead of constructing fresh. "
+             "Use with --timesteps 0 to evaluate a warmed-up model with no RL training.",
+    )
 
     # Training
     parser.add_argument("--timesteps", type=int, default=20_000)
@@ -80,6 +87,41 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=1,
         help="Number of parallel environment workers for training. Values > 1 use "
              "SubprocVecEnv for true parallel rollout collection.",
+    )
+
+    # Supervised warmup (all optional — omitting --warmup-data-path disables warmup entirely)
+    parser.add_argument(
+        "--warmup-data-path",
+        type=str,
+        default=None,
+        help="Path to JSONL file for supervised warmup pretraining (produced by "
+             "convert_metamon_json.py). Omit to skip warmup.",
+    )
+    parser.add_argument(
+        "--warmup-epochs",
+        type=int,
+        default=10,
+        help="Number of supervised warmup training epochs (default: 10).",
+    )
+    parser.add_argument(
+        "--warmup-lr",
+        type=float,
+        default=3e-4,
+        help="Learning rate for supervised warmup (default: 3e-4).",
+    )
+    parser.add_argument(
+        "--warmup-batch-size",
+        type=int,
+        default=256,
+        help="Mini-batch size for supervised warmup (default: 256).",
+    )
+    parser.add_argument(
+        "--eval-after-warmup",
+        action="store_true",
+        default=False,
+        help="Run one evaluation pass immediately after warmup and before RL training. "
+             "Produces a baseline win-rate for the warmed-up policy. "
+             "Requires --eval-episodes > 0.",
     )
 
     return parser

@@ -5,7 +5,7 @@ from teams.generators import team_generator, matchup_generator, InfinitePoolGene
 from data.prossesing import load_pool, split_pool
 
 
-DEFAULT_DATA_PATH = "data/matchups_gen1ou_db.json"
+DEFAULT_DATA_PATH = "data/matchups_6v6_gen1ou_db.json"
 
 
 def resolve_seed(explicit: Optional[int], fallback: int) -> int:
