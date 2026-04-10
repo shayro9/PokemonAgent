@@ -5,14 +5,13 @@ import wandb
 
 from sb3_contrib import MaskablePPO
 from stable_baselines3.common.utils import set_random_seed
-from stable_baselines3.common.callbacks import CallbackList
-from wandb.integration.sb3 import WandbCallback
 
 from policy.policy import AttentionPointerPolicy
 from config.config import resolve_opponents
-from env.env_builder import build_env
+from env.env_builder import build_env, build_vec_env
 from training.parse import build_arg_parser
 from training.device_config import DeviceConfig
+from wandb.integration.sb3 import WandbCallback
 from training.battle_metrics_log import BattleMetricsCallback
 from training.config import LR, N_STEPS, BATCH_SIZE, GAMMA, ENT_COEF, LR_DECAY, LOG_FREQ
 from training.evaluation import evaluate_model, print_eval_summary
@@ -30,6 +29,7 @@ def train_model(
         battle_team_generator=None,
         seed: int = 42,
         device: str = "auto",
+        n_envs: int = 1,
 ) -> MaskablePPO:
     """Train a MaskablePPO agent and optionally run periodic evaluation.
 
@@ -44,6 +44,9 @@ def train_model(
     :param battle_team_generator: Optional generator yielding both battle teams.
     :param seed: Random seed.
     :param device: "auto", "cuda", or "cpu"
+    :param n_envs: Number of parallel environment workers. Values > 1 use
+        ``SubprocVecEnv`` for true parallelism. Each worker runs its own
+        asyncio event loop and Pokémon Showdown connections.
     :returns: The trained ``MaskablePPO`` model."""
     random.seed(seed)
     np.random.seed(seed)
@@ -52,6 +55,28 @@ def train_model(
     # Setup device
     device_config = DeviceConfig(device=device)
     device_config.print_info()
+
+    # TODO: add from args
+    algo = "maskable_ppo"
+
+    if n_envs > 1:
+        train_env = build_vec_env(
+            n_envs=n_envs,
+            battle_format=battle_format,
+            opponent_generator=opponent_generator,
+            rounds_per_opponent=rounds_per_opponent,
+            agent_team_generator=agent_team_generator,
+            battle_team_generator=battle_team_generator,
+        )
+        print(f"Using {n_envs} parallel environment workers (SubprocVecEnv).")
+    else:
+        train_env = build_env(
+            battle_format,
+            opponent_generator,
+            rounds_per_opponent,
+            agent_team_generator=agent_team_generator,
+            battle_team_generator=battle_team_generator,
+        )
 
     run = wandb.init(
         project="pokemon-rl",
@@ -67,21 +92,7 @@ def train_model(
             "ent_coef": ENT_COEF,
             "device": str(device_config),
         },
-        sync_tensorboard=False,
         save_code=True,
-    )
-
-    # TODO: add from args
-    algo = "maskable_ppo"
-    use_action_masking = (algo == "maskable_ppo")
-
-    train_env = build_env(
-        battle_format,
-        opponent_generator,
-        rounds_per_opponent,
-        agent_team_generator=agent_team_generator,
-        battle_team_generator=battle_team_generator,
-        use_action_masking=use_action_masking,
     )
 
     policy_kwargs = dict(
@@ -116,15 +127,13 @@ def train_model(
         trained_steps = 0
         eval_results = []
         metrics_cb = BattleMetricsCallback(env=train_env, log_freq=LOG_FREQ)
+        wandb_cb = WandbCallback(verbose=0)
         while trained_steps < timesteps:
             step_chunk = min(eval_every_timesteps, timesteps - trained_steps)
             model.learn(
                 total_timesteps=step_chunk,
                 reset_num_timesteps=False,
-                callback=CallbackList([
-                    WandbCallback(gradient_save_freq=100, verbose=0),
-                    metrics_cb,
-                ]))
+                callback=[metrics_cb, wandb_cb])
             trained_steps += step_chunk
 
             eval_res = evaluate_model(model=model, timestep=trained_steps, **eval_kwargs)
@@ -134,10 +143,7 @@ def train_model(
     else:
         model.learn(
             total_timesteps=timesteps,
-            callback=CallbackList([
-                WandbCallback(gradient_save_freq=100, verbose=0),
-                BattleMetricsCallback(env=train_env, log_freq=LOG_FREQ),
-            ])
+            callback=[BattleMetricsCallback(env=train_env, log_freq=LOG_FREQ), WandbCallback(verbose=0)],
         )
 
     model.save(model_path)
@@ -177,6 +183,7 @@ def main():
         battle_team_generator=opp.train_battle_team_generator,
         seed=args.seed,
         device=args.device,
+        n_envs=args.n_envs,
     )
 
     if args.skip_eval:

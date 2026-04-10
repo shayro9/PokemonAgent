@@ -4,14 +4,14 @@ import wandb
 import numpy as np
 
 from stable_baselines3.common.callbacks import BaseCallback
-from poke_env.environment import SingleAgentWrapper
+from stable_baselines3.common.vec_env import VecEnv, VecMonitor
 
 from env.singles_env_wrapper import PokemonRLWrapper
 from training.config import LOG_FREQ
 
 
 class BattleMetricsCallback(BaseCallback):
-    def __init__(self, env: SingleAgentWrapper, log_freq: int = 100, verbose=0):
+    def __init__(self, env, log_freq: int = 100, verbose=0):
         super().__init__(verbose)
         self.env = env
         self.log_freq = log_freq
@@ -25,16 +25,14 @@ class BattleMetricsCallback(BaseCallback):
         actions = self.locals.get("actions", [])
 
         for i, info in enumerate(infos):
-            # Track raw action values for distribution logging
             if i < len(actions):
-                action = actions[i]
-                self._switch_actions.append(int(action))
+                self._switch_actions.append(int(actions[i]))
 
             if "episode" in info:
                 self._episode_rewards.append(info["episode"]["r"])
                 self._episode_lengths.append(info["episode"]["l"])
 
-                battle = self._get_battle()
+                battle = self._get_battle(env_idx=i)
                 if battle is not None:
                     if battle.won:
                         self._results.append(1)
@@ -45,9 +43,10 @@ class BattleMetricsCallback(BaseCallback):
 
         if self.n_calls % self.log_freq == 0 and self._episode_rewards:
             action_list = list(self._switch_actions)
+            n_actions = len(action_list)
             switch_rate = (
-                sum(1 for a in action_list if 0 <= a <= 3) / len(action_list)
-                if action_list else 0.0
+                sum(1 for a in action_list if 0 <= a <= 5) / n_actions
+                if n_actions else 0.0
             )
 
             wandb.log({
@@ -60,11 +59,13 @@ class BattleMetricsCallback(BaseCallback):
 
         return True
 
-    def _get_battle(self):
+    def _get_battle(self, env_idx: int = 0):
         env = self.env
+        if isinstance(env, VecMonitor):
+            battles = env.env_method("get_last_battle")
+            return battles[env_idx] if env_idx < len(battles) else None
         while hasattr(env, "env"):
             env = env.env
         if isinstance(env, PokemonRLWrapper):
-            battle = env.get_last_battle()
-            return battle
+            return env.get_last_battle()
         return None

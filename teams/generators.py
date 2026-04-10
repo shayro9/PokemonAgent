@@ -28,8 +28,35 @@ class InfinitePoolGenerator:
             for entry in local_pool:
                 yield self._transform_fn(entry)
 
+    def fork(self, worker_id: int) -> "InfinitePoolGenerator":
+        """Return a copy with seed offset by *worker_id* for parallel diversity.
+
+        Each parallel worker should receive its own forked generator so that
+        seeded runs produce different team orderings per worker rather than
+        every subprocess replaying the same shuffled sequence.
+
+        :param worker_id: Zero-based worker index used to offset the seed.
+        :returns: A new ``InfinitePoolGenerator`` with seed ``original_seed + worker_id``.
+        """
+        new_seed = (self._seed + worker_id) if self._seed is not None else worker_id
+        return InfinitePoolGenerator(
+            pool=self._pool,
+            transform_fn=self._transform_fn,
+            seed=new_seed,
+            shuffle_each_epoch=self._shuffle_each_epoch,
+        )
+
     def reset(self):
         """Restart the sequence from the beginning using the original seed."""
+        self._gen = self._make_generator()
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        del state["_gen"]  # generator objects are not picklable
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
         self._gen = self._make_generator()
 
     @property
