@@ -104,7 +104,7 @@ def resolve_opponents(args) -> OpponentsResolved:
 
     # “none” means default
     agent_data_path = args.agent_data_path or DEFAULT_DATA_PATH
-    opponent_data_path = args.opponent_data_path or DEFAULT_DATA_PATH
+    opponent_data_path = args.opponent_data_path or agent_data_path
 
     do_split = bool(args.split_generated_pool)
 
