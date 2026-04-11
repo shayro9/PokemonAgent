@@ -17,6 +17,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--timesteps", type=int, default=20_000)
     parser.add_argument("--rounds-per-opponent", type=int, default=2_000)
     parser.add_argument("--eval-every-timesteps", type=int, default=0)
+    parser.add_argument(
+        "--curriculum-config",
+        type=str,
+        default=None,
+        help="Optional YAML curriculum that switches opponent Player classes by training timestep.",
+    )
 
     # Evaluation
     parser.add_argument("--skip-eval", action="store_true", help="Only train and save model, skip evaluation.")
