@@ -1,14 +1,9 @@
 stages:
   - name: warmup-random
-    duration_timesteps: 200000
+    duration_timesteps: 500000
     opponent_player:
       id: random
 
   - name: midgame-max-power
-    duration_timesteps: 400000
     opponent_player:
       id: max-power
-
-  - name: final-heuristic
-    opponent_player:
-      id: heuristic

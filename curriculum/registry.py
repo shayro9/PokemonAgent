@@ -15,7 +15,6 @@ _RESERVED_PLAYER_KWARGS = {
 }
 
 _OPPONENT_PLAYER_REGISTRY: dict[str, type[Player]] = {
-    "heuristic": SimpleHeuristicsPlayer,
     "max-power": MaxBasePowerPlayer,
     "random": RandomPlayer,
 }

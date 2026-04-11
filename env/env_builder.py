@@ -68,7 +68,7 @@ class _PokemonEnvBridge(gymnasium.Wrapper):
             battle_format=self._battle_format,
             server_configuration=LocalhostServerConfiguration,
             account_configuration=AccountConfiguration(
-                f"OpponentPolicy_{self._unique_id}_{self._opponent_player_revision}",
+                f"Opp_{self._unique_id}_{self._opponent_player_revision}",
                 None,
             ),
         )
@@ -115,7 +115,7 @@ def build_env(
         resolved_opponent_player_spec,
         battle_format=battle_format,
         server_configuration=LocalhostServerConfiguration,
-        account_configuration=AccountConfiguration(f"OpponentPolicy_{unique_id}_0", None),
+        account_configuration=AccountConfiguration(f"Opp_{unique_id}_0", None),
     )
 
     agent = PokemonRLWrapper(

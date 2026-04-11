@@ -20,6 +20,28 @@ from training.curriculum_callback import CurriculumCallback
 from training.evaluation import evaluate_model, print_eval_summary
 
 
+def _print_curriculum_summary(curriculum: Curriculum) -> None:
+    """Print a one-time summary of the loaded curriculum."""
+    stages = getattr(curriculum, "stages", None)
+    if stages:
+        print("Curriculum stages:")
+        for stage in stages:
+            end_label = "end" if stage.end_timestep is None else stage.end_timestep
+            print(
+                f"  - {stage.name}: [{stage.start_timestep}, {end_label}) "
+                f"-> {stage.opponent_player.identifier}"
+            )
+        return
+
+    initial_stage = curriculum.stage_for_timesteps(0)
+    end_label = "end" if initial_stage.end_timestep is None else initial_stage.end_timestep
+    print(
+        "Curriculum loaded: "
+        f"{initial_stage.name} [{initial_stage.start_timestep}, {end_label}) "
+        f"-> {initial_stage.opponent_player.identifier}"
+    )
+
+
 def train_model(
         model_path: str,
         battle_format: str,
@@ -139,6 +161,7 @@ def train_model(
         WandbCallback(verbose=0),
     ]
     if curriculum is not None:
+        _print_curriculum_summary(curriculum)
         callbacks.insert(0, CurriculumCallback(curriculum=curriculum))
 
     if eval_every_timesteps > 0 and eval_kwargs:
