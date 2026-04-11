@@ -208,6 +208,38 @@ python -m training.train \
   --eval-episodes 50
 ```
 
+### Train with an Opponent Curriculum
+
+Switch the **opponent Player class** over global training timesteps while leaving team generation unchanged:
+
+```bash
+python -m training.train \
+  --matchup-data-path data/matchups_gen1ou_db.json \
+  --curriculum-config curriculum/examples/opponent_player_curriculum.yaml \
+  --timesteps 50000
+```
+
+Example curriculum:
+
+```yaml
+stages:
+  - name: warmup-random
+    duration_timesteps: 10000
+    opponent_player:
+      id: random
+
+  - name: midgame-heuristic
+    duration_timesteps: 20000
+    opponent_player:
+      id: heuristic
+
+  - name: final-max-power
+    opponent_player:
+      id: max-power
+```
+
+For your own opponent logic, point `class_path` at a custom `poke_env.player.Player` subclass instead of using a built-in `id`.
+
 ### All Training Arguments
 
 | Argument | Description | Default |
@@ -218,6 +250,7 @@ python -m training.train \
 | `--train-team` | Predefined agent team name | `None` (generated) |
 | `--timesteps` | Total training timesteps | `20000` |
 | `--rounds-per-opponent` | Battles before rotating opponent | `2000` |
+| `--curriculum-config` | YAML file that switches opponent Player classes by training timestep | `None` |
 | `--pool` | Comma-separated opponent names | — |
 | `--pool-all` | Use all predefined solo teams | `False` |
 | `--random-generated` | Use generated opponents | `False` |
