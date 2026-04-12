@@ -6,7 +6,7 @@ import argparse
 
 from scripts.play_policy import (
     build_arg_parser, _resolve_team, _print_packed_team,
-    AGENT_CHOICES, DEFAULT_FORMAT, DEFAULT_DATA_PATH,
+    AGENT_CHOICES, DEFAULT_FORMAT, DEFAULT_DATA_PATH, DEFAULT_MODEL_PATH,
 )
 from tests.conftest import MockTeamGenerator
 
@@ -28,7 +28,7 @@ class TestBuildArgParser(unittest.TestCase):
         args = parser.parse_args(['--challenge-user', 'TestUser'])
         
         self.assertEqual(args.agent, "policy")
-        self.assertEqual(args.model_path, "data/1v1")
+        self.assertEqual(args.model_path, DEFAULT_MODEL_PATH)
         self.assertEqual(args.ai_team, "random")
         self.assertEqual(args.my_team, "random")
         self.assertEqual(args.data_path, DEFAULT_DATA_PATH)

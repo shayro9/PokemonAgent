@@ -5,18 +5,14 @@ Usage
 -----
 From the repo root:
 
-    # Trained policy, both teams randomly sampled from the gen1ou dataset (defaults)
-    python -m scripts.play_policy --agent policy --model-path data/1v1 --challenge-user MyName
-
-    # Trained policy with fixed teams
-    python -m scripts.play_policy --agent policy --model-path data/1v1 \
-        --ai-team steelix --my-team garchomp --challenge-user MyName
+    # Trained policy, both teams randomly sampled from the bundled Gen 1 dataset
+    python -m scripts.play_policy --agent policy --model-path models/1v1_gen1_500k_steps --challenge-user MyName
 
     # Random agent, both teams from the dataset
     python -m scripts.play_policy --agent random --challenge-user MyName
 
     # Max-power agent, fixed AI team, random human team
-    python -m scripts.play_policy --agent max-power --ai-team volcarona --challenge-user MyName
+    python -m scripts.play_policy --agent max-power --challenge-user MyName
 
 Open http://localhost:8000 in your browser and log in as --challenge-user to accept.
 """
@@ -38,7 +34,8 @@ from data.prossesing import load_pool
 
 AGENT_CHOICES = ["policy", "random", "max-power", "heuristic"]
 DEFAULT_FORMAT = "gen1ou"
-DEFAULT_DATA_PATH = "data/matchups_gen1ou_db.json"
+DEFAULT_DATA_PATH = "data/matchups_1v1_gen1ou_db.json"
+DEFAULT_MODEL_PATH = "models/1v1_gen1_500k_steps"
 
 # ------------------------------------------------------------------------------
 # Helpers
@@ -113,8 +110,8 @@ def build_arg_parser():
 
     p.add_argument("--agent", default="policy", choices=AGENT_CHOICES,
                    help="AI type: 'policy', 'random', or 'max-power'. Default: policy.")
-    p.add_argument("--model-path", default="data/1v1",
-                   help="Path to the saved .zip model (policy only). Default: data/1v1.")
+    p.add_argument("--model-path", default=DEFAULT_MODEL_PATH,
+                   help=f"Path to the saved .zip model (policy only). Default: {DEFAULT_MODEL_PATH}.")
     p.add_argument("--ai-team", default="random", choices=team_choices,
                    metavar="{random, <team-name>}",
                    help="AI's team: a named team or 'random' (sampled from dataset). Default: random.")

@@ -5,11 +5,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     
     :returns: Configured ``argparse.ArgumentParser`` instance."""
     parser = argparse.ArgumentParser(
-        description="Train a MaskablePPO Pokémon bot against a pool and evaluate win rate over an opponent set."
+        description="Train a MaskablePPO Pokémon bot against local Pokémon Showdown opponents and evaluate win rate."
     )
 
     # Core
-    parser.add_argument("--format", type=str, default="gen9customgame")
+    parser.add_argument("--format", type=str, default="gen1ou")
     parser.add_argument("--seed", type=int, default=42, help="Global seed for reproducible training/evaluation.")
     parser.add_argument("--model-path", default="models/1v1_gen1_500k_steps")
 
@@ -39,14 +39,15 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--agent-data-path",
         type=str,
         default=None,
-        help="Path to generated dataset used for the agent team generator. Defaults to data/gen9randombattle_db.json.",
+        help="Path to the generated team dataset used for the agent side. Defaults to "
+             "data/meta_pool_teams_6_gen1ou_db.json.",
     )
     parser.add_argument(
         "--opponent-data-path",
         type=str,
         default=None,
-        help="Path to generated dataset used for the opponent team generator. Defaults to "
-             "data/gen9randombattle_db.json.",
+        help="Path to the generated team dataset used for the opponent side. Defaults to "
+             "data/meta_pool_teams_6_gen1ou_db.json.",
     )
     parser.add_argument(
         "--matchup-data-path",
