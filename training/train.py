@@ -3,6 +3,8 @@ import time
 import numpy as np
 import wandb
 
+from curriculum.runtime import Curriculum
+from curriculum.yaml_loader import load_curriculum_from_yaml
 from sb3_contrib import MaskablePPO
 from stable_baselines3.common.utils import set_random_seed
 
@@ -14,7 +16,30 @@ from training.device_config import DeviceConfig
 from wandb.integration.sb3 import WandbCallback
 from training.battle_metrics_log import BattleMetricsCallback
 from training.config import LR, N_STEPS, BATCH_SIZE, GAMMA, ENT_COEF, LR_DECAY, LOG_FREQ
+from training.curriculum_callback import CurriculumCallback
 from training.evaluation import evaluate_model, print_eval_summary
+
+
+def _print_curriculum_summary(curriculum: Curriculum) -> None:
+    """Print a one-time summary of the loaded curriculum."""
+    stages = getattr(curriculum, "stages", None)
+    if stages:
+        print("Curriculum stages:")
+        for stage in stages:
+            end_label = "end" if stage.end_timestep is None else stage.end_timestep
+            print(
+                f"  - {stage.name}: [{stage.start_timestep}, {end_label}) "
+                f"-> {stage.opponent_player.identifier}"
+            )
+        return
+
+    initial_stage = curriculum.stage_for_timesteps(0)
+    end_label = "end" if initial_stage.end_timestep is None else initial_stage.end_timestep
+    print(
+        "Curriculum loaded: "
+        f"{initial_stage.name} [{initial_stage.start_timestep}, {end_label}) "
+        f"-> {initial_stage.opponent_player.identifier}"
+    )
 
 
 def train_model(
@@ -30,6 +55,7 @@ def train_model(
         seed: int = 42,
         device: str = "auto",
         n_envs: int = 1,
+        curriculum: Curriculum | None = None,
 ) -> MaskablePPO:
     """Train a MaskablePPO agent and optionally run periodic evaluation.
 
@@ -47,6 +73,7 @@ def train_model(
     :param n_envs: Number of parallel environment workers. Values > 1 use
         ``SubprocVecEnv`` for true parallelism. Each worker runs its own
         asyncio event loop and Pokémon Showdown connections.
+    :param curriculum: Optional staged opponent-player curriculum.
     :returns: The trained ``MaskablePPO`` model."""
     random.seed(seed)
     np.random.seed(seed)
@@ -58,6 +85,10 @@ def train_model(
 
     # TODO: add from args
     algo = "maskable_ppo"
+    initial_opponent_player_spec = (
+        curriculum.stage_for_timesteps(0).opponent_player
+        if curriculum is not None else None
+    )
 
     if n_envs > 1:
         train_env = build_vec_env(
@@ -65,6 +96,7 @@ def train_model(
             battle_format=battle_format,
             opponent_generator=opponent_generator,
             rounds_per_opponent=rounds_per_opponent,
+            opponent_player_spec=initial_opponent_player_spec,
             agent_team_generator=agent_team_generator,
             battle_team_generator=battle_team_generator,
         )
@@ -74,6 +106,7 @@ def train_model(
             battle_format,
             opponent_generator,
             rounds_per_opponent,
+            opponent_player_spec=initial_opponent_player_spec,
             agent_team_generator=agent_team_generator,
             battle_team_generator=battle_team_generator,
         )
@@ -123,17 +156,23 @@ def train_model(
     )
 
     print(f"rounds_per_opponent={rounds_per_opponent}")
+    callbacks = [
+        BattleMetricsCallback(env=train_env, log_freq=LOG_FREQ),
+        WandbCallback(verbose=0),
+    ]
+    if curriculum is not None:
+        _print_curriculum_summary(curriculum)
+        callbacks.insert(0, CurriculumCallback(curriculum=curriculum))
+
     if eval_every_timesteps > 0 and eval_kwargs:
         trained_steps = 0
         eval_results = []
-        metrics_cb = BattleMetricsCallback(env=train_env, log_freq=LOG_FREQ)
-        wandb_cb = WandbCallback(verbose=0)
         while trained_steps < timesteps:
             step_chunk = min(eval_every_timesteps, timesteps - trained_steps)
             model.learn(
                 total_timesteps=step_chunk,
                 reset_num_timesteps=False,
-                callback=[metrics_cb, wandb_cb])
+                callback=callbacks)
             trained_steps += step_chunk
 
             eval_res = evaluate_model(model=model, timestep=trained_steps, **eval_kwargs)
@@ -143,7 +182,7 @@ def train_model(
     else:
         model.learn(
             total_timesteps=timesteps,
-            callback=[BattleMetricsCallback(env=train_env, log_freq=LOG_FREQ), WandbCallback(verbose=0)],
+            callback=callbacks,
         )
 
     model.save(model_path)
@@ -161,6 +200,10 @@ def main():
 
     battle_format = args.format
     opp = resolve_opponents(args)
+    curriculum = (
+        load_curriculum_from_yaml(args.curriculum_config)
+        if args.curriculum_config else None
+    )
 
     eval_kwargs = {
         "battle_format": battle_format,
@@ -184,6 +227,7 @@ def main():
         seed=args.seed,
         device=args.device,
         n_envs=args.n_envs,
+        curriculum=curriculum,
     )
 
     if args.skip_eval:

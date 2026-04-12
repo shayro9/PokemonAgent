@@ -1,303 +1,247 @@
-# 🎮 PokemonAgent — Reinforcement Learning for Pokémon Showdown
+# PokemonAgent
 
-A deep reinforcement learning agent that learns to play Pokémon 1v1 battles using **MaskablePPO** with a custom **Attention-Pointer Policy**. The agent builds a probabilistic model of the opponent's stats turn-by-turn and uses that belief to make informed move decisions.
+> Train and evaluate reinforcement-learning agents for local Pokemon Showdown battles, then challenge them in the browser.
 
----
+PokemonAgent combines a local Showdown server, `poke-env` environment wrappers, dataset-driven team sampling, and a custom `MaskablePPO` policy. The current default battle configuration is Gen 1, and the repository ships with bundled Gen 1 matchup datasets plus a browser-play script and a Colab notebook.
 
-## 📋 Table of Contents
+## Why this repo exists
 
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Project Structure](#project-structure)
-- [Requirements](#requirements)
-- [Setup](#setup)
-- [Training](#training)
-- [Evaluation](#evaluation)
-- [Key Concepts](#key-concepts)
+If you want a tight local loop for Pokemon RL, you usually have to glue together Showdown, battle-state encoding, action masking, training code, and evaluation yourself. This repo gives you that loop in one place, with a policy architecture that scores both moves and switches and a curriculum system that can swap opponent controllers over training time.
 
----
+## What you can do
 
-## Overview
+- Train a policy with `python -m training.train`
+- Run periodic evaluation during training
+- Switch opponent `Player` implementations with a YAML curriculum
+- Challenge a trained, random, heuristic, or max-power bot with `python -m scripts.play_policy`
+- Use the included Colab notebook for GPU training
 
-PokemonAgent connects to a local [Pokémon Showdown](https://github.com/smogon/pokemon-showdown) server via [poke-env](https://github.com/hsahovic/poke-env) and trains a neural network agent to win 1v1 Pokémon battles. The agent:
+## Quick start
 
-- **Observes** a rich 383-dimensional battle state encoding HP, stats, boosts, status conditions, move embeddings, and Bayesian opponent stat beliefs.
-- **Acts** over 26 discrete actions (4 moves × variants + switches), with invalid actions masked out.
-- **Learns** via MaskablePPO with a reward shaped around HP damage dealt/received, status effects, and win/loss outcomes.
-
----
-
-## Architecture
-
-### Attention-Pointer Policy
-
-The core policy (`policy/attention_policy.py`) uses a permutation-equivariant architecture:
-
-```
-Flat Observation (383-dim)
-         │
-   ┌─────┴────────────┐
-   │                  │
-Context Vector    4 Move Embeddings
-(everything        (MOVE_EMBED_LEN
- except moves)      each)
-   │                  │
-Context Encoder   Move Encoder
-   │                  │
-   └──→ Cross-Attention ←──┘
-              │
-         Trunk MLP
-         /         \
-  Pointer Head    Value Head
-  (dot product     (scalar)
-   per move)
-```
-
-- **Context encoder** — MLP over all non-move features
-- **Move encoder** — Shared-weight MLP applied independently to each of the 4 move slots (permutation-equivariant)
-- **Cross-attention** — Context attends over move embeddings to form an order-invariant summary
-- **Pointer head** — Move logits computed as `dot(trunk_features, move_hidden_i)`, making move selection invariant to slot ordering
-
-### Bayesian Stat Belief (`combat/stats_belief.py`)
-
-Each turn, the agent maintains a **Gaussian posterior** over the opponent's 6 in-battle stats (HP, Atk, Def, SpA, SpD, Spe). The belief is updated from:
-
-- **Damage dealt** → infers opponent Def or SpD
-- **Damage received** → infers opponent Atk or SpA
-- **Turn order** → infers opponent Speed
-
-The resulting 12-dim belief vector `[mean×6, std×6]` is included in the observation, giving the agent explicit uncertainty quantification about the opponent.
-
-### Protect Belief (`combat/protect_belief.py`)
-
-A Bayesian model tracking the probability that the opponent will use a Protect move next turn, accounting for move accuracy and the diminishing-returns Protect mechanic.
-
----
-
-## Project Structure
-
-```
-PokemonAgent/
-├── agents/                  # Debug and utility agents
-├── combat/                  # Battle math and belief systems
-│   ├── combat_utils.py      # Damage modifiers, type chart helpers
-│   ├── damage_estimate.py   # Per-move expected damage fraction
-│   ├── event_parser.py      # Parses Showdown protocol events
-│   ├── protect_belief.py    # Bayesian Protect model
-│   ├── stat_belief_updates.py  # Wrappers to update StatBelief from battle
-│   └── stats_belief.py      # Gaussian posterior over opponent stats
-├── config/
-│   └── config.py            # CLI argument resolution and opponent config
-├── debug/                   # Debug utilities and log helpers
-├── env/                     # Gymnasium environment wrappers
-│   ├── action_masking.py    # Valid action mask builder
-│   ├── battle_state.py      # 383-dim observation builder (BattleState)
-│   ├── battle_tracker.py    # Per-battle mutable state (HP, move history)
-│   ├── embed.py             # Move/status/weather feature encoders
-│   ├── env_builder.py       # Environment factory
-│   ├── reward.py            # Reward function
-│   └── singles_env_wrapper.py  # Main SinglesEnv subclass
-├── policy/
-│   └── attention_policy.py  # AttentionPointerPolicy (MaskablePPO)
-├── scripts/
-│   ├── generate_db.js       # Node.js dataset generator
-│   └── HelloWorldAgent.py   # Simple challenge script
-├── teams/
-│   ├── single_teams.py      # Predefined team strings
-│   └── team_generators.py   # Random team generators from dataset
-├── training/
-│   ├── battle_metrics_log.py  # W&B battle metrics callback
-│   ├── evaluation.py          # Model evaluation utilities
-│   ├── parse.py               # CLI argument parser
-│   └── train.py               # Main training entry point
-├── replays/                 # Saved battle replays
-├── data/                    # Generated datasets (gitignored)
-└── requirements.txt
-```
-
----
-
-## Requirements
-
-- Python 3.12+
-- Node.js (for dataset generation via Pokémon Showdown sim)
-- A running local [Pokémon Showdown server](https://github.com/smogon/pokemon-showdown)
-
----
-
-## Setup
-
-### 1. Clone the Repository
-
-```bash
-git clone <your-repo-url>
-cd PokemonAgent
-```
-
-### 2. Install Python Dependencies
+1. Install Python dependencies.
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Set Up Pokémon Showdown (Local Server)
-
-```bash
-git clone https://github.com/smogon/pokemon-showdown.git
-cd pokemon-showdown
-node build
-node pokemon-showdown start --no-security
-```
-
-The server runs at `localhost:8000` by default.
-
-### 4. Install Node.js Dependencies (for dataset generation)
+2. Install and start the local Showdown server from the vendored `pokemon-showdown` directory.
 
 ```bash
 cd pokemon-showdown
 npm install
-cd ..
+node build
+node pokemon-showdown start --no-security
 ```
 
----
+3. In a second terminal, run a short Gen 1 training job.
 
+```bash
+python -m training.train \
+  --format gen1ou \
+  --matchup-data-path data/matchups_1v1_gen1ou_db.json \
+  --timesteps 10000 \
+  --eval-episodes 20 \
+  --model-path models/quickstart_gen1
+```
+
+This saves `models/quickstart_gen1.zip`.
+
+> **Note**
+> The bundled datasets in `data/` are Gen 1 OU files. The examples below pass `--format gen1ou` and explicit dataset paths on purpose.
+
+## Prerequisites
+
+- Python 3.12
+- Node.js
+- A local Pokemon Showdown checkout in `pokemon-showdown/` (already present in this repo)
+
+## Setup
+
+Clone your fork or this repository, then install the Python and Node dependencies shown above.
+
+If you want a clean first run, keep two terminals open:
+
+1. Terminal 1 runs `node pokemon-showdown start --no-security`
+2. Terminal 2 runs training or `scripts.play_policy`
+
+The local Showdown server listens on `http://localhost:8000`.
 
 ## Training
 
-### Quick Start — Predefined Teams
+### Train from paired matchup data
 
-Train against all built-in single-Pokémon teams:
-
-```bash
-python -m training.train \
-  --train-team steelix \
-  --pool-all \
-  --timesteps 100000 \
-  --rounds-per-opponent 2000
-```
-
-### Train Against a Specific Opponent
+Use `--matchup-data-path` when each JSON row already contains both the agent team and the opponent team.
 
 ```bash
 python -m training.train \
-  --train-team garchomp \
-  --pool toxapex,corviknight,hippowdon \
-  --timesteps 50000
-```
-
-### Train with Generated Random Teams
-
-```bash
-python -m training.train \
-  --random-generated \
-  --matchup-data-path data/matchups_gen9randombattle_db.json \
-  --timesteps 200000 \
-  --rounds-per-opponent 1
-```
-
-### Train with Train/Eval Split
-
-```bash
-python -m training.train \
-  --random-generated \
-  --matchup-data-path data/matchups_gen9randombattle_db.json \
+  --format gen1ou \
+  --matchup-data-path data/matchups_6v6_gen1ou_db.json \
   --split-generated-pool \
   --train-split 0.8 \
-  --timesteps 200000 \
+  --timesteps 100000 \
   --eval-every-timesteps 20000 \
-  --eval-episodes 50
+  --eval-episodes 50 \
+  --device auto \
+  --n-envs 1 \
+  --model-path models/gen1_6v6
 ```
 
-### All Training Arguments
+### Train with an opponent curriculum
 
-| Argument | Description | Default |
-|---|---|---|
-| `--format` | Showdown battle format | `gen9customgame` |
-| `--seed` | Global random seed | `42` |
-| `--model-path` | Where to save the trained model | `data/1v1` |
-| `--train-team` | Predefined agent team name | `None` (generated) |
-| `--timesteps` | Total training timesteps | `20000` |
-| `--rounds-per-opponent` | Battles before rotating opponent | `2000` |
-| `--pool` | Comma-separated opponent names | — |
-| `--pool-all` | Use all predefined solo teams | `False` |
-| `--random-generated` | Use generated opponents | `False` |
-| `--matchup-data-path` | Path to paired matchup dataset | — |
-| `--agent-data-path` | Dataset for agent team generator | — |
-| `--opponent-data-path` | Dataset for opponent team generator | — |
-| `--split-generated-pool` | Split dataset into train/eval | `False` |
-| `--train-split` | Fraction for training split | `0.8` |
-| `--eval-every-timesteps` | Periodic evaluation interval | `0` |
-| `--eval-episodes` | Episodes per evaluation | `0` |
-| `--skip-eval` | Skip final evaluation | `False` |
-
-### Available Predefined Teams
-
-`steelix`, `garchomp`, `conkeldurr`, `rotom_wash`, `corviknight`, `toxapex`, `excadrill`, `hippowdon`, `breloom`, `volcarona`, `regigigas`, `bellibolt`
-
----
-
-## Evaluation
-
-Evaluation runs automatically after training (unless `--skip-eval` is passed). To run standalone evaluation after training:
+Use `--curriculum-config` to swap the opponent `Player` implementation at fixed global timesteps. Team generation stays the same; only the controller changes.
 
 ```bash
 python -m training.train \
-  --model-path data/1v1 \
-  --timesteps 0 \
-  --eval-episodes 100 \
-  --eval-pool-all \
-  --skip-eval false
+  --format gen1ou \
+  --matchup-data-path data/matchups_6v6_gen1ou_db.json \
+  --curriculum-config curriculum/examples/opponent_player_curriculum.yaml \
+  --timesteps 50000 \
+  --eval-episodes 25 \
+  --model-path models/curriculum_gen1
 ```
 
-Metrics are also logged to **Weights & Biases** automatically. Set your W&B API key:
+The bundled example curriculum looks like this:
+
+```yaml
+stages:
+  - name: warmup-random
+    duration_timesteps: 500000
+    opponent_player:
+      id: random
+
+  - name: midgame-max-power
+    opponent_player:
+      id: max-power
+```
+
+Each stage needs:
+
+- `name`
+- `duration_timesteps` or `end_timestep` for every non-final stage
+- `opponent_player.id` or `opponent_player.class_path`
+- optional `opponent_player.kwargs`
+
+### Useful training flags
+
+| Flag | What it does |
+| --- | --- |
+| `--format` | Sets the Showdown battle format |
+| `--matchup-data-path` | Uses a paired matchup JSON file |
+| `--agent-data-path` | Uses a team pool for the agent side |
+| `--opponent-data-path` | Uses a team pool for the opponent side |
+| `--split-generated-pool` | Splits generated data into disjoint train and eval pools |
+| `--eval-every-timesteps` | Runs periodic evaluation during training |
+| `--eval-episodes` | Sets the number of evaluation episodes |
+| `--curriculum-config` | Loads a YAML opponent curriculum |
+| `--device` | Chooses `auto`, `cuda`, or `cpu` |
+| `--n-envs` | Runs multiple `SubprocVecEnv` workers |
+
+For the full CLI, run:
+
+```bash
+python -m training.train --help
+```
+
+## Evaluation and logging
+
+Final evaluation runs automatically unless you pass `--skip-eval`. If you want checkpoint-style evaluation during training, add `--eval-every-timesteps`.
+
+Training also logs to Weights & Biases. Set your API key before you start if you want remote metrics:
 
 ```bash
 export WANDB_API_KEY=<your_key>
 ```
 
----
+PowerShell:
 
-## Key Concepts
+```powershell
+$env:WANDB_API_KEY = "<your_key>"
+```
 
-### Observation Space (383 dimensions)
+## Play against a bot in the browser
 
-| Feature Group | Dims | Description |
-|---|---|---|
-| Turn number | 1 | Normalized turn counter |
-| Weather | 9 | One-hot weather encoding |
-| My HP | 1 | Current HP fraction |
-| My stats | 6 | Normalized stat values |
-| My boosts | 7 | Stat boost stages |
-| My status | 7 | Status condition one-hot |
-| My effects | 3 | Active effects (Confusion, etc.) |
-| Opp HP | 1 | Opponent HP fraction |
-| Opp stat belief | 12 | Posterior mean+std for 6 stats |
-| Opp boosts | 7 | Opponent stat boost stages |
-| Opp status/effects | 11 | Opponent conditions |
-| My moves | 4 × 39 | Embedded move features |
-| Opp moves | 4 × 39 | Opponent revealed moves |
-| Protect belief | 1 | P(opponent uses Protect) |
+Keep the local Showdown server running, open `http://localhost:8000`, and log in with the username you want the bot to challenge.
 
-### Reward Function
+Then run:
 
-| Event | Reward |
-|---|---|
-| Dealing damage | `+HP_fraction_dealt` |
-| Taking damage | `-HP_fraction_taken` |
-| Inflicting status on opponent | `+0.2 to +0.8` (status-dependent) |
-| Receiving status | `-0.2 to -0.8` |
-| Winning the battle | `+15.0` |
-| Losing the battle | `-10.0` |
+```bash
+python -m scripts.play_policy \
+  --agent policy \
+  --model-path models/quickstart_gen1 \
+  --data-path data/matchups_1v1_gen1ou_db.json \
+  --challenge-user MyName
+```
 
-### Action Space (26 actions)
+`--agent` supports `policy`, `random`, `max-power`, and `heuristic`.
 
-| Range | Action |
-|---|---|
-| 0–5 | Switch to party slot 0–5 |
-| 6–9 | Use move slot 0–3 |
-| 10–13 | Mega-evolve + move 0–3 |
-| 14–17 | Z-move 0–3 |
-| 18–21 | Dynamax + move 0–3 |
-| 22–25 | Terastallize + move 0–3 |
+For the full browser-play walkthrough, see [PLAY_VS_AI.md](PLAY_VS_AI.md).
 
-Invalid actions are masked to zero probability before sampling.
+## Included docs
+
+| File | Purpose |
+| --- | --- |
+| [PLAY_VS_AI.md](PLAY_VS_AI.md) | Step-by-step local browser battle flow |
+| [COLAB_QUICK_START.md](COLAB_QUICK_START.md) | Fast Colab setup |
+| [PokemonAgent_Colab_Training.ipynb](PokemonAgent_Colab_Training.ipynb) | Notebook for hosted training |
+
+## Architecture
+
+### Current default battle config
+
+| Component | Value |
+| --- | --- |
+| Battle config | `BattleConfig.gen1()` |
+| Observation size | `1279` floats |
+| Action space | `10` actions (`6` switches + `4` moves) |
+| RL algorithm | `sb3_contrib.MaskablePPO` |
+| Policy class | `policy.policy.AttentionPointerPolicy` |
+
+### Policy overview
+
+The current policy uses separate encoders for battle context, active moves, and the full team:
+
+- a context MLP for the global state
+- a shared-weight move encoder for the 4 active move slots
+- a shared-weight team encoder for the 6 team slots
+- cross-attention from context into moves and team embeddings
+- a move pointer head, a switch pointer head, and a value head
+
+That design keeps move scoring and switch scoring slot-order-equivariant while still letting the policy condition on the whole battle state.
+
+Action masking is provided by `PokemonRLWrapper.action_masks()`, so invalid actions are removed before sampling.
+
+## Bundled datasets
+
+The repo currently includes these Gen 1 JSON files in `data/`:
+
+- `data/matchups_1v1_gen1ou_db.json`
+- `data/matchups_6v6_gen1ou_db.json`
+- `data/meta_pool_teams_6_gen1ou_db.json`
+
+The training examples use explicit dataset paths so you can choose the exact source data instead of relying on CLI defaults.
+
+## Project layout
+
+```text
+PokemonAgent/
+├── agents/              # Playable bot wrappers, including the saved-policy player
+├── combat/              # Battle math and combat helpers
+├── config/              # CLI-side data and opponent resolution
+├── curriculum/          # YAML curriculum models, loader, and runtime
+├── data/                # Bundled matchup and team datasets
+├── env/                 # Showdown environment wrappers and battle-state encoders
+├── policy/              # Attention-pointer extractor and policy
+├── pokemon-showdown/    # Local Showdown server checkout
+├── scripts/             # Human-vs-bot entry points
+├── teams/               # Team and matchup generators
+├── tests/               # Unit tests
+└── training/            # Training loop, evaluation, callbacks, and CLI parsing
+```
+
+## Testing
+
+Run the test suite from the repo root:
+
+```bash
+pytest tests/ -q
+```

@@ -1,0 +1,9 @@
+stages:
+  - name: warmup-random
+    duration_timesteps: 500000
+    opponent_player:
+      id: random
+
+  - name: midgame-max-power
+    opponent_player:
+      id: max-power

@@ -4,6 +4,7 @@ pytest-cov>=4.0.0
 git+https://github.com/hsahovic/poke-env.git@master
 numpy>=2.4.1
 gymnasium>=1.2.3
+PyYAML>=6.0.2
 
 wandb>=0.25.0
 sb3_contrib>=2.7.1

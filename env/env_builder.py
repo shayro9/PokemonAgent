@@ -2,12 +2,14 @@ import time
 
 import gymnasium
 import numpy as np
-from poke_env import RandomPlayer, LocalhostServerConfiguration, AccountConfiguration, MaxBasePowerPlayer, SimpleHeuristicsPlayer
+from poke_env import LocalhostServerConfiguration, AccountConfiguration
 from poke_env.environment import SingleAgentWrapper
 
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecMonitor
 from stable_baselines3.common.utils import set_random_seed
 
+from curriculum.models import OpponentPlayerSpec
+from curriculum.registry import build_opponent_player
 from env.battle_config import BattleConfig
 from env.singles_env_wrapper import PokemonRLWrapper
 
@@ -21,17 +23,68 @@ class _PokemonEnvBridge(gymnasium.Wrapper):
     ``SubprocVecEnv.env_method`` and direct calls both work.
     """
 
+    def __init__(
+        self,
+        env: SingleAgentWrapper,
+        *,
+        battle_format: str,
+        unique_id: str,
+        opponent_player_spec: OpponentPlayerSpec,
+    ):
+        super().__init__(env)
+        self._battle_format = battle_format
+        self._unique_id = unique_id
+        self._current_opponent_player_spec = opponent_player_spec
+        self._pending_opponent_player_spec: OpponentPlayerSpec | None = None
+        self._opponent_player_revision = 1
+
     def action_masks(self) -> np.ndarray:
         return self.env.env.action_masks()
 
     def get_last_battle(self):
         return self.env.env.get_last_battle()
 
+    def get_opponent_player_spec(self) -> OpponentPlayerSpec:
+        """Return the currently active opponent-player spec."""
+        return self._current_opponent_player_spec
+
+    def schedule_opponent_player(self, opponent_player_spec: OpponentPlayerSpec):
+        """Queue an opponent policy change for the next environment reset."""
+        if opponent_player_spec == self._current_opponent_player_spec:
+            self._pending_opponent_player_spec = None
+            return
+        self._pending_opponent_player_spec = opponent_player_spec
+
+    def reset(self, *args, **kwargs):
+        self._maybe_swap_opponent_player()
+        return super().reset(*args, **kwargs)
+
+    def _maybe_swap_opponent_player(self):
+        if self._pending_opponent_player_spec is None:
+            return
+
+        self.env.opponent = build_opponent_player(
+            self._pending_opponent_player_spec,
+            battle_format=self._battle_format,
+            server_configuration=LocalhostServerConfiguration,
+            account_configuration=AccountConfiguration(
+                f"Opp_{self._unique_id}_{self._opponent_player_revision}",
+                None,
+            ),
+        )
+        self._opponent_player_revision += 1
+        self._current_opponent_player_spec = self._pending_opponent_player_spec
+        self._pending_opponent_player_spec = None
+
+
+DEFAULT_OPPONENT_PLAYER_SPEC = OpponentPlayerSpec(id="max-power")
+
 
 def build_env(
         battle_format: str,
         opponent_generator,
         rounds_per_opponent: int,
+        opponent_player_spec: OpponentPlayerSpec | None = None,
         agent_team_generator=None,
         battle_team_generator=None,
         strict: bool = True,
@@ -49,6 +102,7 @@ def build_env(
     :param battle_format: Showdown battle format name.
     :param opponent_generator: Optional generator for opponent teams.
     :param rounds_per_opponent: Battles played before rotating opponent teams.
+    :param opponent_player_spec: Optional curriculum-controlled opponent Player spec.
     :param agent_team_generator: Optional generator for agent teams.
     :param battle_team_generator: Optional generator yielding both teams.
     :param battle_config: Generation config. Defaults to Gen 1.
@@ -56,11 +110,12 @@ def build_env(
     :returns: A configured ``SingleAgentWrapper`` environment."""
 
     unique_id = f"{int(time.time() * 1000) % 100000}_{worker_id}"
-
-    opponent_policy = MaxBasePowerPlayer(
+    resolved_opponent_player_spec = opponent_player_spec or DEFAULT_OPPONENT_PLAYER_SPEC
+    opponent_policy = build_opponent_player(
+        resolved_opponent_player_spec,
         battle_format=battle_format,
         server_configuration=LocalhostServerConfiguration,
-        account_configuration=AccountConfiguration(f"MaxPower_{unique_id}", None),
+        account_configuration=AccountConfiguration(f"Opp_{unique_id}_0", None),
     )
 
     agent = PokemonRLWrapper(
@@ -77,7 +132,12 @@ def build_env(
     )
 
     env = SingleAgentWrapper(agent, opponent_policy)
-    return _PokemonEnvBridge(env)
+    return _PokemonEnvBridge(
+        env,
+        battle_format=battle_format,
+        unique_id=unique_id,
+        opponent_player_spec=resolved_opponent_player_spec,
+    )
 
 
 def _fork_generator(gen, worker_id: int):
@@ -99,6 +159,7 @@ def build_vec_env(
         battle_format: str,
         opponent_generator,
         rounds_per_opponent: int,
+        opponent_player_spec: OpponentPlayerSpec | None = None,
         agent_team_generator=None,
         battle_team_generator=None,
         strict: bool = True,
@@ -113,6 +174,7 @@ def build_vec_env(
     :param battle_format: Showdown battle format name.
     :param opponent_generator: Optional generator for opponent teams.
     :param rounds_per_opponent: Battles played before rotating opponent teams.
+    :param opponent_player_spec: Optional curriculum-controlled opponent Player spec.
     :param agent_team_generator: Optional generator for agent teams.
     :param battle_team_generator: Optional generator yielding both teams.
     :param battle_config: Generation config. Defaults to Gen 1.
@@ -129,6 +191,7 @@ def build_vec_env(
                 battle_format=battle_format,
                 opponent_generator=forked_opponent,
                 rounds_per_opponent=rounds_per_opponent,
+                opponent_player_spec=opponent_player_spec,
                 agent_team_generator=forked_agent,
                 battle_team_generator=forked_battle,
                 strict=strict,
