@@ -13,6 +13,7 @@ import warnings
 from pathlib import Path
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
+_REPO_ROOT_NAME = _REPO_ROOT.name.lower()
 _CONFIGURED = False
 
 
@@ -70,11 +71,28 @@ def is_external_battle_exception(exc: BaseException) -> bool:
     for frame in extracted:
         fpath = Path(frame.filename).resolve()
         frame_lower = str(fpath).lower()
-
-        if _REPO_ROOT in fpath.parents or fpath == _REPO_ROOT:
+        if _is_repo_frame(fpath):
             has_repo_frame = True
-
         if "poke_env" in frame_lower or "showdown" in frame_lower:
             has_third_party_frame = True
 
     return has_third_party_frame and not has_repo_frame
+
+
+def _is_repo_frame(frame_path: Path) -> bool:
+    """Return True when a traceback frame points at this repository."""
+
+    if frame_path == _REPO_ROOT or _REPO_ROOT in frame_path.parents:
+        return True
+
+    parts_lower = [part.lower() for part in frame_path.parts]
+    try:
+        repo_root_index = parts_lower.index(_REPO_ROOT_NAME)
+    except ValueError:
+        return False
+
+    relative_parts = frame_path.parts[repo_root_index + 1 :]
+    if not relative_parts:
+        return False
+
+    return (_REPO_ROOT / Path(*relative_parts)).exists()
