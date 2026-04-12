@@ -3,7 +3,16 @@ import unittest
 from unittest.mock import MagicMock, patch, call
 import time
 
-from training.train import train_model, LR, N_STEPS, BATCH_SIZE, GAMMA, ENT_COEF
+from env.runtime_safety import ThirdPartyBattleError
+from training.train import (
+    ENT_COEF,
+    GAMMA,
+    BATCH_SIZE,
+    LR,
+    N_STEPS,
+    _learn_with_external_error_recovery,
+    train_model,
+)
 from tests.conftest import MockTeamGenerator, make_mock_model
 
 
@@ -313,6 +322,7 @@ class TestTrainModel(unittest.TestCase):
         # Should call learn twice: 100 timesteps each
         self.assertEqual(model.learn.call_count, 2)
 
+
     @patch('training.train.WandbCallback')
     @patch('training.train.BattleMetricsCallback')
     @patch('training.train.wandb')
@@ -474,3 +484,32 @@ class TestTrainModelIntegration(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestExternalErrorRecovery(unittest.TestCase):
+    """Verify training retries when third-party battle errors occur."""
+
+    def test_retries_and_recovers_after_third_party_error(self):
+        model = MagicMock()
+        model.learn.side_effect = [ThirdPartyBattleError("fatal"), None]
+
+        _learn_with_external_error_recovery(
+            model=model,
+            total_timesteps=100,
+            callback=[],
+            reset_num_timesteps=False,
+        )
+
+        self.assertEqual(model.learn.call_count, 2)
+
+    def test_raises_after_max_retries(self):
+        model = MagicMock()
+        model.learn.side_effect = ThirdPartyBattleError("fatal")
+
+        with self.assertRaises(RuntimeError):
+            _learn_with_external_error_recovery(
+                model=model,
+                total_timesteps=100,
+                callback=[],
+                max_retries=2,
+            )

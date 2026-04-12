@@ -12,6 +12,11 @@ from curriculum.models import OpponentPlayerSpec
 from curriculum.registry import build_opponent_player
 from env.battle_config import BattleConfig
 from env.singles_env_wrapper import PokemonRLWrapper
+from env.runtime_safety import (
+    ThirdPartyBattleError,
+    configure_external_runtime_messages,
+    is_external_battle_exception,
+)
 
 
 class _PokemonEnvBridge(gymnasium.Wrapper):
@@ -57,7 +62,20 @@ class _PokemonEnvBridge(gymnasium.Wrapper):
 
     def reset(self, *args, **kwargs):
         self._maybe_swap_opponent_player()
-        return super().reset(*args, **kwargs)
+        try:
+            return super().reset(*args, **kwargs)
+        except Exception as exc:
+            if is_external_battle_exception(exc):
+                raise ThirdPartyBattleError("Fatal poke-env/showdown error during reset") from exc
+            raise
+
+    def step(self, action):
+        try:
+            return super().step(action)
+        except Exception as exc:
+            if is_external_battle_exception(exc):
+                raise ThirdPartyBattleError("Fatal poke-env/showdown error during step") from exc
+            raise
 
     def _maybe_swap_opponent_player(self):
         if self._pending_opponent_player_spec is None:
@@ -108,6 +126,8 @@ def build_env(
     :param battle_config: Generation config. Defaults to Gen 1.
     :param worker_id: Index used to ensure unique account names across parallel workers.
     :returns: A configured ``SingleAgentWrapper`` environment."""
+
+    configure_external_runtime_messages()
 
     unique_id = f"{int(time.time() * 1000) % 100000}_{worker_id}"
     resolved_opponent_player_spec = opponent_player_spec or DEFAULT_OPPONENT_PLAYER_SPEC
