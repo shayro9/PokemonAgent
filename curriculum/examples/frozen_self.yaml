@@ -1,0 +1,18 @@
+stages:
+  - name: warmup-random
+    duration_timesteps: 350000
+    opponent_player:
+      id: random
+
+  - name: midgame-max-power
+    duration_timesteps: 1050000
+    opponent_player:
+      id: max-power
+
+  - name: late-frozen-self
+    opponent_player:
+      class_path: agents.policy_player.PolicyPlayer
+      kwargs:
+        model_path: "models\\6v6_gen1_1M_meta.zip"
+        deterministic: true
+        verbose: false
