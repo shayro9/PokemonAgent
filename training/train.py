@@ -18,6 +18,7 @@ from training.battle_metrics_log import BattleMetricsCallback
 from training.config import LR, N_STEPS, BATCH_SIZE, GAMMA, ENT_COEF, LR_DECAY, LOG_FREQ
 from training.curriculum_callback import CurriculumCallback
 from training.evaluation import evaluate_model, print_eval_summary
+from env.runtime_safety import ThirdPartyBattleError
 
 
 def _print_curriculum_summary(curriculum: Curriculum) -> None:
@@ -169,10 +170,12 @@ def train_model(
         eval_results = []
         while trained_steps < timesteps:
             step_chunk = min(eval_every_timesteps, timesteps - trained_steps)
-            model.learn(
+            _learn_with_external_error_recovery(
+                model=model,
                 total_timesteps=step_chunk,
                 reset_num_timesteps=False,
-                callback=callbacks)
+                callback=callbacks,
+            )
             trained_steps += step_chunk
 
             eval_res = evaluate_model(model=model, timestep=trained_steps, **eval_kwargs)
@@ -180,7 +183,8 @@ def train_model(
             print(f"\n[Eval @ {trained_steps} training timesteps]")
             print_eval_summary(eval_results)
     else:
-        model.learn(
+        _learn_with_external_error_recovery(
+            model=model,
             total_timesteps=timesteps,
             callback=callbacks,
         )
@@ -190,6 +194,37 @@ def train_model(
     print(f"Training complete! Model saved as {model_path}.zip")
 
     return model
+
+
+def _learn_with_external_error_recovery(
+        model: MaskablePPO,
+        *,
+        total_timesteps: int,
+        callback,
+        reset_num_timesteps: bool = True,
+        max_retries: int = 5,
+) -> None:
+    """Run ``model.learn`` while recovering from poke-env/showdown fatal errors."""
+    attempts = 0
+    while True:
+        try:
+            model.learn(
+                total_timesteps=total_timesteps,
+                callback=callback,
+                reset_num_timesteps=reset_num_timesteps,
+            )
+            return
+        except ThirdPartyBattleError as exc:
+            attempts += 1
+            print(
+                "[poke-env] Fatal battle-engine error encountered; "
+                "discarding battle and continuing training "
+                f"(retry {attempts}/{max_retries})."
+            )
+            if attempts >= max_retries:
+                raise RuntimeError(
+                    "Exceeded maximum retries while recovering from poke-env/showdown failures."
+                ) from exc
 
 
 def main():
