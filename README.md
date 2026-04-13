@@ -1,3 +1,5 @@
+<img width="960" height="540" alt="Screenshot_743" src="https://github.com/user-attachments/assets/92794399-6618-4485-a791-503845959ef8" />
+
 # PokemonAgent
 
 > Train and evaluate reinforcement-learning agents for local Pokemon Showdown battles, then challenge them in the browser.
