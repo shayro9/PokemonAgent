@@ -220,7 +220,7 @@ class TestEmbedBattle(unittest.TestCase):
 class TestCalcReward(unittest.TestCase):
     """Test calc_reward method."""
 
-    @patch('env.singles_env_wrapper.get_state_value')
+    @patch('env.singles_env_wrapper.get_state_value_optimizable')
     def test_calc_reward_first_call_initializes_buffer(self, mock_get_value):
         """Verify first call initializes reward buffer."""
         wrapper = _create_wrapper()
@@ -237,7 +237,7 @@ class TestCalcReward(unittest.TestCase):
         self.assertEqual(reward, 0.5)
         self.assertIn(battle, wrapper._reward_buffer)
 
-    @patch('env.singles_env_wrapper.get_state_value')
+    @patch('env.singles_env_wrapper.get_state_value_optimizable')
     def test_calc_reward_delta_calculation(self, mock_get_value):
         """Verify reward is calculated as delta."""
         wrapper = _create_wrapper()
@@ -257,7 +257,7 @@ class TestCalcReward(unittest.TestCase):
         reward2 = wrapper.calc_reward(battle)
         self.assertAlmostEqual(reward2, 0.4)  # 0.7 - 0.3
 
-    @patch('env.singles_env_wrapper.get_state_value')
+    @patch('env.singles_env_wrapper.get_state_value_optimizable')
     def test_calc_reward_increments_rounds_on_finished_battle(self, mock_get_value):
         """Verify rounds_played increments when battle finishes."""
         wrapper = _create_wrapper()
@@ -272,7 +272,7 @@ class TestCalcReward(unittest.TestCase):
         self.assertEqual(wrapper.rounds_played, 1)
         self.assertEqual(wrapper._last_finished_battle, battle)
 
-    @patch('env.singles_env_wrapper.get_state_value')
+    @patch('env.singles_env_wrapper.get_state_value_optimizable')
     def test_calc_reward_no_increment_if_not_player_turn(self, mock_get_value):
         """Verify rounds_played doesn't increment if not player's turn."""
         wrapper = _create_wrapper()

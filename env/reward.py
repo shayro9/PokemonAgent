@@ -1,3 +1,7 @@
+from abc import ABC, abstractmethod
+from typing import Callable
+import threading
+
 from poke_env.battle import Status, AbstractBattle
 
 from env.states.gen1.battle_state_gen_1 import MAX_TEAM_SIZE
@@ -137,3 +141,85 @@ def get_state_value(battle: AbstractBattle) -> float:
         current_value += LOSS_PENALTY
 
     return current_value
+
+
+class RewardFunction(ABC):
+    """Abstract base for pluggable reward functions.
+    
+    Allows external tools (like EUREKA) to generate and inject custom reward implementations.
+    """
+    
+    @abstractmethod
+    def get_state_value(self, battle: AbstractBattle) -> float:
+        """Calculate battle state value.
+        
+        :param battle: poke-env battle object.
+        :return: scalar reward value.
+        """
+        pass
+
+
+class DefaultRewardFunction(RewardFunction):
+    """Default reward function using predefined constants and heuristics."""
+    
+    def get_state_value(self, battle: AbstractBattle) -> float:
+        """Use the original get_state_value logic."""
+        return get_state_value(battle)
+
+
+# ============================================================================
+# GLOBAL REWARD FUNCTION PROVIDER (for external optimization)
+# ============================================================================
+
+_reward_fn: RewardFunction = None  # Will be initialized below
+_reward_fn_lock: threading.RLock = threading.RLock()
+
+# Initialize with default
+_reward_fn = DefaultRewardFunction()
+
+
+def get_reward_function() -> RewardFunction:
+    """Get the currently active reward function (set by EUREKA or training config).
+    
+    Thread-safe: Uses a lock to prevent race conditions.
+    """
+    with _reward_fn_lock:
+        return _reward_fn
+
+
+def set_reward_function(fn: RewardFunction | Callable[[AbstractBattle], float]) -> None:
+    """Set a custom reward function (for EUREKA optimization or custom implementations).
+    
+    Thread-safe: Uses a lock to ensure atomic updates.
+    
+    Args:
+        fn: Either a RewardFunction instance or a callable that takes a battle and returns a float.
+    """
+    global _reward_fn
+    
+    if callable(fn) and not isinstance(fn, RewardFunction):
+        # Wrap plain callables in a RewardFunction adapter
+        class CallableRewardFunction(RewardFunction):
+            def __init__(self, func):
+                self.func = func
+            
+            def get_state_value(self, battle: AbstractBattle) -> float:
+                return self.func(battle)
+        
+        wrapped_fn = CallableRewardFunction(fn)
+    else:
+        wrapped_fn = fn
+    
+    with _reward_fn_lock:
+        _reward_fn = wrapped_fn
+
+
+def get_state_value_optimizable(battle: AbstractBattle) -> float:
+    """Get state value using the active (possibly EUREKA-optimized) reward function.
+    
+    This is the entry point that training code should use to support external optimization.
+    
+    :param battle: poke-env battle object.
+    :return: scalar reward value.
+    """
+    return get_reward_function().get_state_value(battle)

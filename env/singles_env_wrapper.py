@@ -7,7 +7,7 @@ from poke_env.environment import SinglesEnv
 
 from env.battle_config import BattleConfig
 from env.action_mask_gen_1 import ActionMaskGen1
-from env.reward import get_state_value
+from env.reward import get_state_value_optimizable
 from teams.generators import InfinitePoolGenerator
 
 def print_state(battle, *, battle_config: BattleConfig | None = None, prefix="[PokemonRLWrapper]") -> str:
@@ -121,7 +121,7 @@ class PokemonRLWrapper(SinglesEnv):
         if battle not in self._reward_buffer:
             self._reward_buffer[battle] = 0.0
 
-        value = get_state_value(battle)
+        value = get_state_value_optimizable(battle)
         reward = value - self._reward_buffer[battle]
         self._reward_buffer[battle] = value
 
